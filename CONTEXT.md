@@ -14,6 +14,12 @@ The smallest deployed evidence path from k6 `TestRun` through direct Kubernetes 
 completion, Prometheus remote write, Grafana queryability, and cleanup.
 _Avoid_: horizontal runner scaling, distributed k6 execution
 
+**Kind smoke**:
+A developer validation run in a local kind cluster that proves the custom k6 runner can execute
+through the k6 Operator and complete one direct Kubernetes workload without Kueue, Skaha,
+Prometheus, or Grafana.
+_Avoid_: thin horizontal slice, production evidence path, remote-write proof
+
 **Spot check**:
 A small hard-gated run that proves a workload path is healthy enough for operational confidence.
 _Avoid_: smoke test, synthetic monitor
@@ -47,6 +53,8 @@ _Avoid_: real Skaha user, service account
 ## Relationships
 
 - A **Spot check**, **Routine benchmark**, or **Stress campaign** runs one or more **Test surfaces**.
+- A **Kind smoke** validates runner, operator, direct Kubernetes Job, completion, cleanup, and
+  local artifacts before the **Thin horizontal slice**.
 - A **Thin horizontal slice** proves exactly one **Test surface** before broader profiles are enabled.
 - A **Visibility gate** applies after submission succeeds and before completion is evaluated.
 - A **Completion gate** is a hard spot-check gate for tiny direct Kubernetes and Skaha workloads.
@@ -61,5 +69,7 @@ _Avoid_: real Skaha user, service account
 
 - "Horizontal deployment" is resolved as **Thin horizontal slice**, not distributed k6 runner
   parallelism.
+- "Kind smoke" is resolved as local developer validation, not a substitute for Prometheus remote
+  write or Grafana queryability.
 - "Spot check" is resolved as an operational hard gate, while **Routine benchmark** and
   **Stress campaign** are measurement activities with different failure semantics.

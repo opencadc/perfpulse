@@ -1,0 +1,26 @@
+name: M0.5 Kind Smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  kind-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.12
+      - uses: grafana/setup-k6-action@v1
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: perfpulse
+      - run: bun install --frozen-lockfile
+      - run: kubectl apply -f https://raw.githubusercontent.com/grafana/k6-operator/main/bundle.yaml
+      - run: kubectl rollout status deployment/k6-operator-controller-manager -n k6-operator-system --timeout=180s
+      - run: bun run kind:smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: perfpulse-kind-smoke
+          path: artifacts/kind-smoke/

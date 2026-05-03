@@ -1,0 +1,36 @@
+import { describe, expect, test } from "bun:test";
+import { resolveRunConfig } from "../src/config";
+import { createOptions } from "../src/options";
+
+describe("k6 options contract", () => {
+  test("runs the Kind smoke as exactly one bounded shared-iterations workload", () => {
+    const options = createOptions(
+      resolveRunConfig({
+        COMPLETION_GATE_SECONDS: "120",
+        VISIBILITY_GATE_SECONDS: "60",
+      }),
+    );
+    const scenario = options.scenarios?.spot_direct_tiny;
+
+    expect(scenario).toMatchObject({
+      executor: "shared-iterations",
+      gracefulStop: "30s",
+      iterations: 1,
+      maxDuration: "240s",
+      vus: 1,
+    });
+  });
+
+  test("keeps failure thresholds focused on the M0.5 gates", () => {
+    const options = createOptions(resolveRunConfig({}));
+
+    expect(Object.keys(options.thresholds ?? {}).sort()).toEqual([
+      "checks",
+      "http_req_failed",
+      "perfpulse_cleanup_failed",
+      "perfpulse_jobs_completion_failed",
+      "perfpulse_jobs_submission_failed",
+      "perfpulse_jobs_visibility_failed",
+    ]);
+  });
+});

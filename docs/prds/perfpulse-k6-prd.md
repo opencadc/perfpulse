@@ -2,7 +2,8 @@
 
 ## Problem Statement
 
-The current Kueue performance exploration lives in `configs/kueue/kueuer` as a Python
+The current Kueue performance exploration lives in
+`https://github.com/opencadc/deployments/configs/kueue/kueuer` as a Python
 CLI named `kr`. It was useful for early investigation, but it is not the right long-term
 shape for CANFAR performance testing.
 
@@ -128,11 +129,16 @@ The k6 runner will drive three surfaces:
 All workload Jobs must land in `canfar-workloads`. k6 `TestRun` resources and the supporting
 PerfPulse control resources should live in `canfar-perfpulse`.
 
-The first implementation should validate the smallest deployed evidence path:
+The first implementation sequence should validate the system in three steps:
+
+1. M0 establishes the local Bun TypeScript project, bundle, tests, and no-op k6 dry run.
+2. M0.5 runs a kind-backed Kubernetes-only smoke through the k6 Operator and captures k6 HTML
+   dashboard output plus logs.
+3. M1 validates the smallest deployed evidence path:
 
 - A custom v1 runner image.
 - One manual `spot-direct-tiny` k6 `TestRun`.
-- One tiny direct Kubernetes `stress-ng` Job without Kueue, completed within 120s.
+- One 10s tiny direct Kubernetes `stress-ng` Job without Kueue, completed within 120s.
 - Prometheus remote write enabled.
 - Native histogram mode enabled for k6 trend metrics when the Prometheus path supports it,
   with `p50,p95,p99` trend-stat fallback for M1.
@@ -155,12 +161,49 @@ Purpose:
 
 Acceptance:
 
+- Set up a Bun-based TypeScript project with linting, type checking, unit tests, and GitHub
+  Actions PR checks.
 - TypeScript builds into one k6-compatible JavaScript bundle.
 - Unit tests cover profile resolution, tag allowlists, metric names, Kubernetes label
   generation, and the direct Kubernetes Job manifest.
 - A local k6 dry run can execute the script with a mocked or no-op workload path.
 - The runbook contains the exact command, required environment, expected metrics, and executor
   rationale for the first script.
+
+### M0.5: Kind Smoke, Kubernetes Only
+
+Purpose:
+
+- Validate the custom k6 runner, k6 Operator execution path, direct Kubernetes Job lifecycle, and
+  artifact capture in a local kind cluster before introducing Prometheus remote write.
+
+Scope:
+
+- One locally built custom image.
+- One local kind cluster.
+- One pre-installed k6 Operator.
+- One `TestRun` in `canfar-perfpulse`.
+- One direct no-Kueue `batch/v1` Job in `canfar-workloads`.
+- One static k6 web dashboard HTML export.
+- Runner and `TestRun` logs.
+
+Acceptance:
+
+- The smoke script assumes a kind cluster and k6 Operator are already available and fails fast if
+  they are missing.
+- The custom image is built and loaded into kind.
+- The `TestRun` starts with the custom image.
+- The runner authenticates to the Kubernetes API with a service account.
+- The runner creates exactly one direct Kubernetes Job without Kueue labels.
+- The Job is visible by PerfPulse labels.
+- The Job completes within the configured completion gate.
+- The runner cleanup removes the Job.
+- The script stores `k6-web-dashboard.html`, runner logs, `TestRun` describe output, and
+  post-cleanup workload Job state under `artifacts/kind-smoke/<testid>/` after the `TestRun`
+  passes.
+- Live web dashboard port-forwarding is available for interactive local runs but is not required
+  in CI.
+- Prometheus, Grafana, Kueue, Skaha, scheduled runs, and stress profiles remain out of scope.
 
 ### M1: Thin Horizontal Slice, Direct Kubernetes Only
 
@@ -336,8 +379,16 @@ not a compatibility layer.
 
 ## Target Architecture
 
-PerfPulse should be a TypeScript project with a small set of deep modules that hide protocol
-details behind test-oriented interfaces.
+PerfPulse should be a Bun-managed TypeScript project with a small set of deep modules that hide
+protocol details behind test-oriented interfaces.
+
+### TypeScript Tooling
+
+The v1 project uses Bun for package management, tests, and bundling. The generated k6 bundle must
+externalize `k6`, `k6/*`, and future xk6 imports so the output runs under k6 rather than Bun.
+
+GitHub Actions PR checks should run Bun install, linting, type checking, unit tests, bundling, and
+the local no-op k6 dry run. The kind smoke should be a manual `workflow_dispatch` workflow.
 
 ### Runtime Model
 
@@ -487,6 +538,11 @@ M0 local validation uses a no-op client mode to prove the bundle, options, thres
 and summary behavior. No-op is a local execution mode, not a `surface` value, and it must not
 appear in production metric or dashboard surface filters.
 
+M0.5 kind validation uses Kubernetes client mode, the k6 Operator, and one real direct Kubernetes
+Job. It supports live k6 web dashboard port-forwarding during the runner execution and stores a
+static k6 web dashboard HTML artifact from the same built bundle after the `TestRun` passes, but
+does not enable Prometheus remote write or Grafana queryability.
+
 ## Test Surfaces
 
 ### Direct Kubernetes with Kueue
@@ -616,7 +672,7 @@ The named job-duration profiles are:
 
 | Job profile | Duration |
 | --- | ---: |
-| `tiny` | 15s |
+| `tiny` | 10s |
 | `small` | 30s |
 | `standard` | 45s |
 | `heavy` | 60s |
@@ -646,7 +702,7 @@ run_class: spot
 surfaces: k8s-direct
 jobs_per_surface: 1
 job_profile: tiny
-duration: 15s
+duration: 10s
 metric_profile: full
 visibility_gate: 60s
 completion_gate: 120s
@@ -672,7 +728,7 @@ run_class: spot
 surfaces: enabled stable surfaces from k8s-direct, k8s-kueue, skaha
 jobs_per_surface: 1
 job_profile: tiny
-duration: 15s
+duration: 10s
 metric_profile: full
 visibility_gate: 60s
 completion_gate: 120s
