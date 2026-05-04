@@ -1,0 +1,57 @@
+name: "CD: Release Please"
+
+# release-please creates tags with GITHUB_TOKEN. The repository_dispatch step
+# starts the image workflow because GITHUB_TOKEN-created tags do not reliably
+# trigger push.tag workflows.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    if: github.repository == 'opencadc/perfpulse'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Create release
+        id: release-please
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+      - name: Release Info
+        if: steps['release-please'].outputs.release_created == 'true'
+        run: |
+          echo "release_created=${{ steps.release-please.outputs.release_created }}"
+          echo "tag=${{ steps.release-please.outputs.tag_name }}"
+          echo "sha=${{ steps.release-please.outputs.sha }}"
+          echo "major=${{ steps.release-please.outputs.major }}"
+          echo "minor=${{ steps.release-please.outputs.minor }}"
+          echo "patch=${{ steps.release-please.outputs.patch }}"
+      - name: Dispatch release image build
+        if: steps['release-please'].outputs.release_created == 'true'
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
+        with:
+          repository: opencadc/perfpulse
+          event-type: perfpulse-release-build
+          token: ${{ secrets.GITHUB_TOKEN }}
+          client-payload: |-
+            {
+              "release_created": "${{ steps['release-please'].outputs.release_created }}",
+              "tag_name": "${{ steps['release-please'].outputs.tag_name }}",
+              "sha": "${{ steps['release-please'].outputs.sha }}"
+            }

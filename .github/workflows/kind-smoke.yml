@@ -1,26 +1,68 @@
 name: M0.5 Kind Smoke
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/kind-smoke.yml"
+      - "Dockerfile"
+      - "bun.lock"
+      - "package.json"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/kind-smoke.yml"
+      - "Dockerfile"
+      - "bun.lock"
+      - "package.json"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   kind-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.2.12
-      - uses: grafana/setup-k6-action@v1
-      - uses: helm/kind-action@v1
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+      - name: Setup kind cluster
+        uses: helm/kind-action@v1
         with:
           cluster_name: perfpulse
-      - run: bun install --frozen-lockfile
-      - run: kubectl apply -f https://raw.githubusercontent.com/grafana/k6-operator/main/bundle.yaml
-      - run: kubectl rollout status deployment/k6-operator-controller-manager -n k6-operator-system --timeout=180s
-      - run: bun run kind:smoke
-      - uses: actions/upload-artifact@v4
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Install k6 operator
+        run: kubectl apply -f https://raw.githubusercontent.com/grafana/k6-operator/main/bundle.yaml
+      - name: Wait for k6 operator
+        run: kubectl rollout status deployment/k6-operator-controller-manager -n k6-operator-system --timeout=180s
+      - name: Run kind smoke
+        run: bun run kind:smoke
+      - name: Upload kind smoke artifacts
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: perfpulse-kind-smoke
           path: artifacts/kind-smoke/
+          if-no-files-found: warn
