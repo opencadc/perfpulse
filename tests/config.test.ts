@@ -29,9 +29,110 @@ describe("resolveRunConfig", () => {
     expect(config.workload.args).toEqual(["--cpu", "1", "--timeout", "10s", "--metrics-brief"]);
   });
 
-  test("rejects unsupported surfaces until later milestones implement them", () => {
-    expect(() => resolveRunConfig({ SURFACE: "k8s-kueue" })).toThrow(
-      'SURFACE must be "k8s-direct"',
+  test("resolves canned benchmark profiles without changing the default client mode", () => {
+    const config = resolveRunConfig({ PROFILE: "benchmark-small" });
+
+    expect(config.clientMode).toBe("noop");
+    expect(config.profile).toBe("benchmark-small");
+    expect(config.runClass).toBe("benchmark");
+    expect(config.surfaces).toEqual(["k8s-kueue", "k8s-direct", "skaha"]);
+    expect(config.surface).toBe("k8s-kueue");
+    expect(config.scenario).toBe("single-bulk-user");
+    expect(config.jobProfile).toBe("small");
+    expect(config.jobsPerSurface).toBe(100);
+    expect(config.totalJobs).toBe(100);
+    expect(config.logicalUsers).toBe(1);
+    expect(config.userShape).toBe("1x100");
+    expect(config.workload.durationSeconds).toBe(30);
+  });
+
+  test("resolves the PRD canned profile catalog through public configuration", () => {
+    const profileInputs = [
+      { env: { PROFILE: "spot-direct-tiny" }, jobs: 1, runClass: "spot", surfaces: ["k8s-direct"] },
+      {
+        env: { PROFILE: "spot-tiny" },
+        jobs: 1,
+        runClass: "spot",
+        surfaces: ["k8s-direct", "k8s-kueue", "skaha"],
+      },
+      {
+        env: { PROFILE: "benchmark-medium" },
+        jobs: 1000,
+        runClass: "benchmark",
+        surfaces: ["k8s-kueue", "k8s-direct", "skaha"],
+      },
+      {
+        env: { CONFIRM_STRESS: "true", PROFILE: "stress-medium" },
+        jobs: 10000,
+        runClass: "stress",
+        surfaces: ["k8s-kueue", "k8s-direct", "skaha"],
+      },
+      {
+        env: { CONFIRM_STRESS: "true", PROFILE: "stress-high" },
+        jobs: 100000,
+        runClass: "stress",
+        surfaces: ["k8s-kueue"],
+      },
+    ] as const;
+
+    for (const input of profileInputs) {
+      const config = resolveRunConfig(input.env);
+
+      expect(config.runClass).toBe(input.runClass);
+      expect(config.surfaces).toEqual([...input.surfaces]);
+      expect(config.jobsPerSurface).toBe(input.jobs);
+    }
+  });
+
+  test("rejects stress profiles unless the operator confirms the campaign", () => {
+    expect(() => resolveRunConfig({ PROFILE: "stress-medium" })).toThrow(
+      'Profile "stress-medium" requires CONFIRM_STRESS=true before workloads are created',
+    );
+  });
+
+  test("keeps stress-high on Kueue unless optional surfaces are explicitly selected", () => {
+    const defaultConfig = resolveRunConfig({
+      CONFIRM_STRESS: "true",
+      PROFILE: "stress-high",
+    });
+    const explicitConfig = resolveRunConfig({
+      CONFIRM_STRESS: "true",
+      PROFILE: "stress-high",
+      SURFACES: "k8s-direct,skaha",
+    });
+
+    expect(defaultConfig.surfaces).toEqual(["k8s-kueue"]);
+    expect(defaultConfig.surface).toBe("k8s-kueue");
+    expect(defaultConfig.jobsPerSurface).toBe(100000);
+    expect(explicitConfig.surfaces).toEqual(["k8s-direct", "skaha"]);
+    expect(explicitConfig.surface).toBe("k8s-direct");
+  });
+
+  test("accepts constrained run overrides and testid aliases", () => {
+    const config = resolveRunConfig({
+      JOB_PROFILE: "heavy",
+      LOGICAL_USERS: "4",
+      SCENARIO: "many-small-users",
+      SURFACES: "k8s-direct,skaha",
+      TOTAL_JOBS: "12",
+      testid: "Spot Override 01",
+    });
+
+    expect(config.testid).toBe("spot-override-01");
+    expect(config.surfaces).toEqual(["k8s-direct", "skaha"]);
+    expect(config.surface).toBe("k8s-direct");
+    expect(config.scenario).toBe("many-small-users");
+    expect(config.jobProfile).toBe("heavy");
+    expect(config.workload.durationSeconds).toBe(60);
+    expect(config.logicalUsers).toBe(4);
+    expect(config.jobsPerLogicalUser).toBe(3);
+    expect(config.totalJobs).toBe(12);
+    expect(config.userShape).toBe("4x3");
+  });
+
+  test("keeps no-op as a client mode only, never a surface", () => {
+    expect(() => resolveRunConfig({ SURFACE: "noop" })).toThrow(
+      "No-op is a client mode only; it is not a surface value",
     );
   });
 

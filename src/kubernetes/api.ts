@@ -4,6 +4,7 @@ import type { RunConfig } from "../config";
 import { testidSelector } from "../labels";
 import type { DirectKubernetesClient } from "./direct";
 import type { KubernetesJobManifest } from "./job";
+import type { WorkloadListLike } from "./kueue";
 import type { JobListLike } from "./status";
 
 type JsonResponse = RefinedResponse<ResponseType | undefined>;
@@ -12,6 +13,7 @@ export interface KubernetesClient extends DirectKubernetesClient {
   createJob(manifest: KubernetesJobManifest): JsonResponse;
   deleteJob(name: string): JsonResponse;
   listJobsByTestId(): JobListLike;
+  listWorkloadsByTestId(): WorkloadListLike;
 }
 
 export function createKubernetesClient(config: RunConfig, token: string): KubernetesClient {
@@ -22,6 +24,7 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
   };
   const namespace = encodeURIComponent(config.kubernetes.namespace);
   const jobsUrl = `${config.kubernetes.apiServer}/apis/batch/v1/namespaces/${namespace}/jobs`;
+  const workloadsUrl = `${config.kubernetes.apiServer}/apis/kueue.x-k8s.io/v1beta1/namespaces/${namespace}/workloads`;
 
   return {
     createJob(manifest: KubernetesJobManifest): JsonResponse {
@@ -52,6 +55,20 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
         );
       }
       return JSON.parse(String(response.body ?? "{}")) as JobListLike;
+    },
+    listWorkloadsByTestId(): WorkloadListLike {
+      const selector = encodeURIComponent(testidSelector(config));
+      const response = http.get(`${workloadsUrl}?labelSelector=${selector}`, {
+        headers,
+        tags: { name: "k8s_list_workloads" },
+        timeout: "30s",
+      });
+      if (response.status !== 200) {
+        throw new Error(
+          `Kubernetes list Kueue Workloads failed with HTTP ${response.status}: ${response.body}`,
+        );
+      }
+      return JSON.parse(String(response.body ?? "{}")) as WorkloadListLike;
     },
   };
 }

@@ -12,6 +12,7 @@ export interface KubernetesJobManifest {
   spec: {
     activeDeadlineSeconds: number;
     backoffLimit: 0;
+    suspend: boolean;
     template: {
       metadata: {
         labels: Record<string, string>;
@@ -35,8 +36,43 @@ export interface KubernetesJobManifest {
   };
 }
 
+export interface KueueJobOptions {
+  priorityClass: string;
+  queueName: string;
+  userBucketIndex?: number;
+}
+
 export function buildDirectJobManifest(config: RunConfig): KubernetesJobManifest {
+  return buildJobManifest(config, workloadLabels(config), false);
+}
+
+export function buildKueueJobManifest(
+  config: RunConfig,
+  options: KueueJobOptions,
+): KubernetesJobManifest {
   const labels = workloadLabels(config);
+  const userBucketIndex = options.userBucketIndex ?? 0;
+
+  return buildJobManifest(
+    config,
+    {
+      ...labels,
+      "canfar-net-sessionName": config.jobName,
+      "canfar-net-sessionType": "headless",
+      "canfar-net-userid": `perfpulse-bucket-${userBucketIndex}`,
+      "kueue.x-k8s.io/priority-class": options.priorityClass,
+      "kueue.x-k8s.io/queue-name": options.queueName,
+      "opencadc.org/canfar-job-fixed": "true",
+    },
+    true,
+  );
+}
+
+function buildJobManifest(
+  config: RunConfig,
+  labels: Record<string, string>,
+  suspend: boolean,
+): KubernetesJobManifest {
   const container: KubernetesJobManifest["spec"]["template"]["spec"]["containers"][number] = {
     args: config.workload.args,
     image: config.workload.image,
@@ -70,6 +106,7 @@ export function buildDirectJobManifest(config: RunConfig): KubernetesJobManifest
     spec: {
       activeDeadlineSeconds: config.workload.activeDeadlineSeconds,
       backoffLimit: 0,
+      suspend,
       template: {
         metadata: {
           labels,

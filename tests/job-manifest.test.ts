@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { resolveRunConfig } from "../src/config";
-import { buildDirectJobManifest } from "../src/kubernetes/job";
+import { buildDirectJobManifest, buildKueueJobManifest } from "../src/kubernetes/job";
 import { KUBERNETES_LABEL_KEYS } from "../src/labels";
 
 describe("direct Kubernetes Job manifest", () => {
@@ -18,6 +18,7 @@ describe("direct Kubernetes Job manifest", () => {
     expect(manifest.metadata.namespace).toBe("canfar-workloads");
     expect(manifest.metadata.labels[KUBERNETES_LABEL_KEYS.testid]).toBe("kind-smoke");
     expect(manifest.metadata.labels["kueue.x-k8s.io/queue-name"]).toBeUndefined();
+    expect(manifest.spec.suspend).toBe(false);
     expect(manifest.spec.backoffLimit).toBe(0);
     expect(manifest.spec.template.spec.restartPolicy).toBe("Never");
     expect(manifest.spec.template.spec.containers[0]?.image).toBe("docker.io/alexeiled/stress-ng");
@@ -29,5 +30,32 @@ describe("direct Kubernetes Job manifest", () => {
       "3s",
       "--metrics-brief",
     ]);
+  });
+
+  test("builds a suspended Kueue workload manifest with queue and CANFAR parity labels", () => {
+    const config = resolveRunConfig({
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      TESTID: "kueue-spot",
+      WORKLOAD_ACTIVE_DEADLINE_SECONDS: "150",
+      WORKLOAD_TTL_SECONDS_AFTER_FINISHED: "45",
+    });
+
+    const manifest = buildKueueJobManifest(config, {
+      priorityClass: "low",
+      queueName: "cadc-default",
+      userBucketIndex: 3,
+    });
+
+    expect(manifest.metadata.labels[KUBERNETES_LABEL_KEYS.testid]).toBe("kueue-spot");
+    expect(manifest.metadata.labels["kueue.x-k8s.io/queue-name"]).toBe("cadc-default");
+    expect(manifest.metadata.labels["kueue.x-k8s.io/priority-class"]).toBe("low");
+    expect(manifest.metadata.labels["canfar-net-sessionName"]).toBe("perfpulse-kueue-spot-0");
+    expect(manifest.metadata.labels["canfar-net-sessionType"]).toBe("headless");
+    expect(manifest.metadata.labels["canfar-net-userid"]).toBe("perfpulse-bucket-3");
+    expect(manifest.metadata.labels["opencadc.org/canfar-job-fixed"]).toBe("true");
+    expect(manifest.spec.suspend).toBe(true);
+    expect(manifest.spec.backoffLimit).toBe(0);
+    expect(manifest.spec.activeDeadlineSeconds).toBe(150);
+    expect(manifest.spec.ttlSecondsAfterFinished).toBe(45);
   });
 });
