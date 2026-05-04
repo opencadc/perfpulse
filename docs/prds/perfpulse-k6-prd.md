@@ -1,51 +1,43 @@
-# PerfPulse k6 Migration PRD
+# PerfPulse Product PRD
 
 ## Problem Statement
 
-The current Kueue performance exploration lives in
-`https://github.com/opencadc/deployments/configs/kueue/kueuer` as a Python
-CLI named `kr`. It was useful for early investigation, but it is not the right long-term
-shape for CANFAR performance testing.
+CANFAR needs production-grade evidence about Science Platform workload performance. Operators
+need to know whether core workload paths can accept work, expose status, complete tiny sanity
+workloads, clean up safely, and remain visible through Grafana dashboards.
 
-The existing tool answers two core questions:
+PerfPulse is the in-cluster k6 product that generates this evidence. It must cover routine
+production spot checks, manual benchmark campaigns, and rare stress campaigns without changing
+the measurement model between those run classes.
 
-1. Can Kueue handle very large batch queues without breaking admission, preemption,
-   requeueing, or workload visibility?
-2. Does Kueue add unacceptable Kubernetes control-plane load when many Jobs are created
-   and tracked?
+The product exists to answer operational questions repeatedly:
 
-It does this by launching Kubernetes `batch/v1` Jobs, optionally adding Kueue labels,
-tracking creation-to-completion timing, collecting controller and API-server pressure,
-and writing CSV/plot/report artifacts. The important concepts are sound, but the delivery
-model is not:
+1. Are production workload paths healthy enough for operator confidence?
+2. Are staging and integration deployments healthy enough to promote when PerfPulse is used as
+   a release gate?
+3. Are Kubernetes, Kueue, Skaha, Prometheus, and Grafana exposing enough evidence to diagnose
+   whether a regression is in submission, queueing, status visibility, observability, or cleanup?
+4. What production performance evidence should inform future SLOs and SLAs?
 
-- It depends on local Python tooling and ad hoc plot artifacts instead of the production
-  observability stack.
-- It primarily compares direct Kubernetes Jobs with and without Kueue, while the platform
-  also needs Skaha API driven workloads.
-- It treats many tests as one large batch submission, which does not clearly separate
-  single-user bulk pressure from many-user burst pressure.
-- It records useful metrics, but they are not emitted as first-class Prometheus time
-  series that can be queried, alerted on, and dashboarded consistently.
-- It is easy to run large experiments manually, but harder to standardize spot checks,
-  benchmark campaigns, and stress campaigns under one test harness.
-
-PerfPulse should replace `kr` completely. The new system should be an in-cluster k6 based
-performance harness that can drive direct Kubernetes APIs and Skaha APIs, emit production
-metrics through Prometheus remote write, and support small routine checks as well as large
-rare stress campaigns.
+PerfPulse is not the SLO or SLA source of truth. It provides measurements and gates that can
+later be promoted into formal service commitments after the team has enough production evidence.
 
 ## Vision and Intent
 
-PerfPulse is a cluster-native performance evidence product, not a one-off benchmark script.
-Its job is to answer a small set of operational questions repeatedly:
+PerfPulse is a cluster-native performance evidence product. Grafana dashboards are the primary
+operator-facing surface. Logs, run notes, and artifacts are secondary diagnostics used when a
+dashboard indicates a regression or missing signal.
 
-- Can the deployed cluster accept workload submissions through the supported platform paths?
-- Can accepted work be observed through Kubernetes, Kueue, Skaha, Prometheus, and Grafana?
-- Can operators spot a regression quickly enough to decide whether the fault is submission,
-  queueing, status visibility, observability, or cleanup?
-- Can the same harness scale from tiny recurring spot checks to rare stress campaigns without
-  changing the measurement model?
+The product must support three run classes:
+
+- `spot`: a small hard-gated production check. The default cadence is hourly. A 30-minute
+  cadence may be enabled later when the check is proven stable and harmless.
+- `benchmark`: a manual operator-run campaign used to compare performance over time. Benchmark
+  runs may happen roughly daily to monthly depending on cost and signal value, but PerfPulse
+  must not schedule them by default.
+- `stress`: a rare quiet-window campaign that validates full cluster and platform behavior,
+  including Kubernetes API health, workload acceptance, scheduling and execution, visibility,
+  cleanup, and related cluster metrics.
 
 The first product milestone must therefore be the smallest thin horizontal slice: one k6
 `TestRun`, one direct Kubernetes workload that completes within the gate, one remote-write
@@ -59,44 +51,67 @@ requirement for the first working product.
 
 ## Goals
 
-PerfPulse must support two major classes of tests.
+PerfPulse must support three run classes with different cadence and failure semantics.
+
+### Spot Checks
+
+Spot checks are small production sanity runs. They prove that stable workload paths are healthy
+enough for operational confidence and, when enabled in staging or integration, for release
+promotion.
+
+Spot-check success is:
+
+- Submission succeeds.
+- The created work becomes visible within the configured visibility gate.
+- Tiny direct Kubernetes and Skaha work reaches the configured completion gate.
+- Kueue Workloads are admitted within the configured admission gate.
+- Cleanup succeeds.
+- Expected low-cardinality metrics appear in Prometheus and Grafana.
+- A failed run is categorized well enough to identify whether the problem is auth, Kubernetes
+  API, Kueue admission, Skaha API, visibility polling, metrics export, or cleanup.
+
+Spot checks are the hard gate when PerfPulse is used for promotion. Benchmark and stress
+campaigns provide human-reviewed evidence unless a later policy promotes a specific benchmark
+into a formal gate.
+
+### Routine Benchmarks
+
+Routine benchmarks are manual bounded campaigns. They should simulate user behavior and produce
+comparable performance time series over time without intentionally finding the cluster limit.
+
+Examples include:
+
+- A single logical user submitting many Jobs through a workload path.
+- Many logical users each submitting one or a small number of Jobs.
+- A user submitting work through the Skaha API and polling status until visible or complete.
+- A manually selected benchmark profile that compares direct Kubernetes, Kueue, and Skaha
+  surfaces against established baselines.
+
+Benchmark success is:
+
+- Submission and visibility behavior can be compared across runs.
+- The dashboard shows accepted work, visible work, latency, cleanup, dropped iterations, and
+  relevant cluster metrics.
+- Baselines are derived from repeated successful runs, not guessed in advance.
+- Benchmark thresholds fail the `TestRun` only after baselines exist.
 
 ### Stress Campaigns
 
-Stress campaigns are rare, large-scale tests used to characterize and validate cluster
-capacity. Examples include 10,000 or 100,000 `stress-ng` jobs. They may run only once in
-a while, and they exist to discover throughput limits, queue behavior, API-server pressure,
-and control-plane failure boundaries.
+Stress campaigns are rare, large-scale tests used to characterize and validate cluster and
+platform capacity. Examples include 10,000 or 100,000 `stress-ng` jobs. They should normally run
+in quiet windows when operators intend to validate hardware, Kubernetes API behavior, scheduling,
+queueing, workload execution, visibility, observability, and cleanup.
 
 For stress campaigns, success is primarily:
 
 - Jobs or sessions are accepted by the target surface.
-- Accepted work becomes visible within the configured SLO or baseline envelope.
+- Accepted work becomes visible within the configured gate or measured baseline envelope.
+- Kubernetes API servers, Kueue controllers, Skaha, Prometheus, and Grafana remain observable.
 - The cluster and controllers remain observable and recoverable.
 - Cleanup succeeds or leaves resources clearly labeled for manual follow-up.
 
 Completion is secondary for stress campaigns. It is useful to record, but the primary
 question is whether a large amount of work can be submitted, queued, observed, and managed.
-
-### Routine Benchmarks and Spot Checks
-
-Routine benchmarks are smaller but run more often. They should simulate user behavior and
-produce comparable performance time series over time. Examples include:
-
-- A single logical user submitting many Jobs through the Kubernetes API.
-- Many logical users each submitting one or a small number of Jobs.
-- A user submitting work through the Skaha API and polling status until visible or complete.
-- Hourly spot checks to verify that the workload path, Kueue, Skaha, Prometheus remote
-  write, and cleanup are still working.
-
-For routine benchmarks and spot checks, success is:
-
-- Submission succeeds.
-- The created work becomes visible within the configured gate.
-- Cleanup succeeds.
-- The expected low-cardinality metrics appear in Prometheus and Grafana.
-- Failures are clear enough to identify whether the problem is auth, Kubernetes API,
-  Kueue admission, Skaha API, visibility polling, metrics export, or cleanup.
 
 ### Diagnostic Discipline
 
@@ -116,15 +131,17 @@ changes queue configuration or runner parallelism.
 
 ## Solution
 
-Build a greenfield TypeScript k6 project in `opencadc/perfpulse`. The project will bundle
-TypeScript to JavaScript, package that JavaScript into a custom k6 runner image, and execute
-it inside the cluster through the installed Grafana k6 Operator.
+Build PerfPulse as a TypeScript k6 project in `opencadc/perfpulse`. The project will bundle
+TypeScript to JavaScript, package that JavaScript into a custom k6 runner image, and execute it
+inside the cluster through the installed Grafana k6 Operator.
 
-The k6 runner will drive three surfaces:
+The k6 runner will drive three surfaces with distinct product roles:
 
-1. Direct Kubernetes `batch/v1` Job deployment with Kueue.
-2. Direct Kubernetes `batch/v1` Job deployment without Kueue.
-3. Headless job/session deployment through the Skaha API.
+1. Direct Kubernetes `batch/v1` Job deployment without Kueue as the baseline sanity path.
+2. Direct Kubernetes `batch/v1` Job deployment with Kueue as the internal dependency surface
+   used to catch upstream Kueue regressions.
+3. Headless job/session deployment through the Skaha API as the real user-facing Science
+   Platform surface.
 
 All workload Jobs must land in `canfar-workloads`. k6 `TestRun` resources and the supporting
 PerfPulse control resources should live in `canfar-perfpulse`.
@@ -284,7 +301,8 @@ Purpose:
 
 Acceptance:
 
-- A Kubernetes `CronJob` creates bounded `spot-tiny` `TestRun` resources.
+- A Kubernetes `CronJob` creates bounded hourly `spot-tiny` `TestRun` resources.
+- A 30-minute cadence is available only after hourly production checks are stable and low-risk.
 - Runs do not overlap unless explicitly configured.
 - The generated `testid` is stable enough for Grafana filtering and cleanup.
 - Alerting is limited to missing or failed spot checks.
@@ -294,10 +312,11 @@ Acceptance:
 Purpose:
 
 - Add repeatable low- and medium-scale benchmark profiles after the spot-check loop is stable.
+  Benchmarks are manual operator-run campaigns, not scheduled checks.
 
 Acceptance:
 
-- `benchmark-small` and `benchmark-medium` run as manual profiles.
+- `benchmark-small` and `benchmark-medium` run as manual profiles only.
 - Baselines are derived from repeated successful runs, not guessed in advance.
 - The benchmark report compares accepted work, visible work, latency, cleanup, dropped
   iterations, and relevant cluster metrics.
@@ -307,75 +326,17 @@ Acceptance:
 
 Purpose:
 
-- Characterize cluster and control-plane boundaries under large workload submissions.
+- Characterize cluster, control-plane, workload-execution, observability, and cleanup boundaries
+  under large workload submissions.
 
 Acceptance:
 
 - `stress-medium` and `stress-high` require explicit profile selection.
 - Stress campaigns abort only for safety failures, not for discovering capacity limits.
 - The report records accepted work, visible work, rejection categories, dropped iterations,
-  API-server pressure, Kueue controller health, and cleanup status.
+  API-server pressure, Kueue controller health, workload execution, Grafana visibility, and
+  cleanup status.
 - Preserve-on-failure mode leaves clearly labeled resources only when explicitly enabled.
-
-## Current `kueuer` Project Overview
-
-`kueuer` is a Python project under `configs/kueue/kueuer`. Its CLI is `kr`.
-
-The project currently contains these major areas:
-
-- Benchmark commands that create Kubernetes Jobs with and without Kueue.
-- Eviction scenarios that exercise priority, preemption, requeue, and workload state.
-- E2E orchestration that runs preflight checks, benchmark phases, observation, plotting,
-  reporting, and teardown.
-- Observation collectors for Kueue controller pressure, API-server latency, queue depth,
-  and workload wait times.
-- CSV, YAML, JSON, Markdown, and plot artifacts written under an artifact run directory.
-
-The current benchmark metrics include:
-
-- `throughput`
-- `completion_ratio`
-- `tail_job_turnaround_s`
-- `turnaround_overhead_s`
-- `completed_jobs_tracked`
-- `total_execution_time`
-- `submission_jobs_applied`
-- `submission_jobs_failed_to_apply`
-- `submission_manifest_apply_seconds`
-- `submission_chunk_spawn_seconds`
-- `pods_oomkilled`
-- `kueue_controller_restarts_delta`
-
-The current observation metrics include:
-
-- Kueue controller working-set memory.
-- Kueue controller CPU.
-- Kueue controller restarts.
-- API-server p95 and p99 latency.
-- API-server inflight request pressure.
-- Pending Workloads.
-- Admitted Workloads.
-- Workload queue wait p50 and p95.
-- OOMKilled benchmark Pods.
-
-The current eviction metrics include:
-
-- Priority class.
-- Admission time.
-- Finish time.
-- Requeue count.
-- Preemptor relationships.
-
-The current profiles are:
-
-- `local-safe`: small local smoke-test defaults.
-- `cluster-scale`: heavier queue-pressure defaults.
-
-Those profile names and values should not be carried forward directly. The new PerfPulse
-profiles should be named for the operational purpose and scale of the test.
-
-The current `kr` model should be treated as prior art only. PerfPulse is a clean replacement,
-not a compatibility layer.
 
 ## Target Architecture
 
@@ -545,12 +506,44 @@ does not enable Prometheus remote write or Grafana queryability.
 
 ## Test Surfaces
 
+### Direct Kubernetes without Kueue
+
+This surface creates `batch/v1` Jobs directly through the Kubernetes API without Kueue labels.
+It is the baseline sanity path for proving Kubernetes API auth, Job creation, Job visibility,
+completion, metrics export, and cleanup without queueing complexity.
+
+The Job spec should include:
+
+```text
+spec.suspend=false
+spec.backoffLimit=0
+spec.ttlSecondsAfterFinished=<configured TTL>
+spec.activeDeadlineSeconds=<bounded deadline>
+```
+
+Completion success means:
+
+- The Job create call returned success.
+- The Job is visible through Kubernetes list/get by PerfPulse labels.
+- The Job reaches `Complete` within the configured completion gate for spot profiles.
+
+This surface is both a baseline comparator and an independent cluster sanity path.
+
 ### Direct Kubernetes with Kueue
 
 This surface creates `batch/v1` Jobs directly through the Kubernetes API and opts them into
-Kueue by setting queue labels and starting suspended.
+Kueue by setting queue labels and starting suspended. It is the internal dependency surface for
+catching changes in upstream Kueue behavior before they affect the user-facing Science Platform
+path.
 
-Default v1 queue configuration:
+The current queue configuration must be read from the deployed cluster configuration source of
+truth before implementing or running this surface:
+
+```text
+https://github.com/cadc-ccda-infra/keel-deploy/tree/main/helm/values/canfar.net/kueue
+```
+
+Example v1 queue configuration:
 
 ```text
 namespace: canfar-workloads
@@ -585,30 +578,11 @@ For spot checks, visible-but-not-admitted is a hard failure because the tiny wor
 enter the queue and be admitted quickly. For stress campaigns, accepted and visible/admitted
 counts are recorded separately so capacity limits are characterized rather than hidden.
 
-### Direct Kubernetes without Kueue
-
-This surface creates `batch/v1` Jobs directly through the Kubernetes API without Kueue labels.
-
-The Job spec should include:
-
-```text
-spec.suspend=false
-spec.backoffLimit=0
-spec.ttlSecondsAfterFinished=<configured TTL>
-spec.activeDeadlineSeconds=<bounded deadline>
-```
-
-Completion success means:
-
-- The Job create call returned success.
-- The Job is visible through Kubernetes list/get by PerfPulse labels.
-- The Job reaches `Complete` within the configured completion gate for spot profiles.
-
-This surface is both a baseline comparator and an independent cluster sanity path.
-
 ### Skaha API
 
-This surface creates Skaha headless sessions through the Skaha API.
+This surface creates Skaha headless sessions through the Skaha API. It is the real user-facing
+Science Platform surface and should be treated as the primary production signal after the direct
+Kubernetes baseline and Kueue dependency surfaces are proven.
 
 The session should request the same logical `stress-ng` workload shape as direct Kubernetes
 surfaces, but exact Kubernetes manifests do not need to be byte-for-byte identical. Skaha
@@ -750,6 +724,7 @@ Defaults:
 ```text
 run_class: benchmark
 surfaces: k8s-kueue, k8s-direct, skaha
+schedule: manual
 jobs_per_surface: 100
 job_profile: small
 duration: 30s
@@ -771,6 +746,7 @@ Defaults:
 ```text
 run_class: benchmark
 surfaces: k8s-kueue, k8s-direct, skaha
+schedule: manual
 jobs_per_surface: 1000
 job_profile: standard
 duration: 45s
@@ -784,7 +760,9 @@ testrun_grouping: separate per surface
 Purpose:
 
 - Rare stress campaign.
-- Characterize behavior around 10,000 jobs per surface.
+- Characterize behavior around 10,000 jobs per surface during an operator-selected quiet window.
+- Validate Kubernetes API health, scheduling, workload execution, visibility, cleanup, and
+  platform observability at scale.
 
 Defaults:
 
@@ -806,7 +784,10 @@ testrun_grouping: separate per surface
 Purpose:
 
 - Rare high-scale campaign.
-- Characterize direct Kueue behavior around 100,000 jobs.
+- Characterize direct Kueue behavior around 100,000 jobs during an operator-selected quiet
+  window.
+- Validate API-server pressure, Kueue behavior, workload visibility, cleanup, and dashboard
+  evidence under deliberate high-scale load.
 
 Defaults:
 
@@ -1123,7 +1104,7 @@ Examples of catastrophic issues:
 
 Benchmark baselines live in ConfigMap once benchmark profiles become gated. Until baselines
 exist, benchmark profiles record comparable evidence but should not pretend guessed latency
-thresholds are SLOs.
+thresholds are official SLOs.
 
 ### Stress Campaigns
 
@@ -1133,7 +1114,7 @@ they discovered a performance limit.
 Stress success is primarily:
 
 - Accepted work count.
-- Accepted work visible within configured SLO or measured baseline.
+- Accepted work visible within the configured gate or measured baseline.
 - Error rates and rejection reasons captured.
 - Cluster remains observable.
 - Cleanup is complete or preserved resources are clearly labeled.
@@ -1195,9 +1176,10 @@ fallback to prove the first evidence loop while that infrastructure verification
 
 ## Dashboard Plan
 
-M1 needs the smallest repo-managed dashboard artifact: a Grafana JSON dashboard filtered by
-`testid` that shows direct Kubernetes submitted work, visible work, completed work, submission
-latency, completion latency, and cleanup status.
+Grafana dashboards are the primary PerfPulse evidence surface. M1 needs the smallest
+repo-managed dashboard artifact: a Grafana JSON dashboard filtered by `testid` that shows direct
+Kubernetes submitted work, visible work, completed work, submission latency, completion latency,
+and cleanup status.
 
 After M2 and M3, the dashboard should become one combined PerfPulse Overview dashboard in
 Grafana.
@@ -1239,8 +1221,8 @@ Panels:
 16. Kubernetes API-server pressure and latency from existing Prometheus metrics.
 
 The dashboard should be useful for both a single run and comparisons across runs. The first
-version does not need to replace every old plot from `kr`; it should prove that production
-Prometheus and Grafana are the new evidence system.
+version should prove that production Prometheus and Grafana are the primary PerfPulse evidence
+system.
 
 ## Alerting Plan
 
@@ -1254,7 +1236,7 @@ Initial alert candidates:
 - `spot-tiny` remote-write metrics missing.
 
 Benchmark and stress profiles should not alert by default. They should be dashboarded and
-reviewed manually unless a specific benchmark is later promoted to an operational SLO.
+reviewed manually unless a specific benchmark is later promoted to a formal operational gate.
 
 ## Deployment Model
 
@@ -1311,6 +1293,7 @@ After the manual PoC succeeds, add a Kubernetes `CronJob` that creates `spot-tin
 The CronJob should:
 
 - Run hourly.
+- Allow a 30-minute cadence only after hourly production checks are stable and low-risk.
 - Use a generated `testid`.
 - Create a bounded TestRun manifest.
 - Avoid overlapping runs unless explicitly allowed.
@@ -1373,10 +1356,11 @@ the benchmark must test per-user quotas, auth cost, or user-specific Skaha behav
 
 ## User Stories
 
-1. As a platform operator, I want an hourly tiny spot check across direct Kueue, direct
-   Kubernetes, and Skaha, so that I can see whether the core workload paths are healthy.
+1. As a platform operator, I want an hourly tiny spot check across the Skaha user-facing path,
+   the Kueue dependency path, and the direct Kubernetes baseline, so that I can see whether the
+   core workload paths are healthy.
 2. As a platform operator, I want all test metrics in production Prometheus, so that I do
-   not need to inspect local CSV and plot artifacts to understand test results.
+   not need to inspect local artifacts to understand test results.
 3. As a platform operator, I want Grafana dashboards for PerfPulse runs, so that I can
    compare performance across runs and surfaces.
 4. As a platform operator, I want a manual first PoC TestRun, so that I can debug RBAC,
@@ -1391,8 +1375,8 @@ the benchmark must test per-user quotas, auth cost, or user-specific Skaha behav
    I can characterize cluster and control-plane capacity.
 9. As a platform operator, I want stress campaign success to focus on accepted and visible
    work, so that very large tests do not block on every workload completing.
-10. As a platform operator, I want benchmark profiles at smaller scales, so that I can run
-    performance tests regularly without creating unnecessary cluster risk.
+10. As a platform operator, I want manual benchmark profiles at smaller scales, so that I can
+    run performance tests when evidence is needed without creating unnecessary cluster risk.
 11. As a platform operator, I want `single-bulk-user` scenarios, so that I can model one user
     launching a large queue of work.
 12. As a platform operator, I want `many-small-users` scenarios, so that I can model many users
@@ -1429,8 +1413,8 @@ the benchmark must test per-user quotas, auth cost, or user-specific Skaha behav
     immutable runner image.
 28. As a release owner, I want secrets separated from ConfigMaps, so that Skaha and Prometheus
     credentials are not committed or exposed in logs.
-29. As a release owner, I want no legacy `kr` compatibility requirement, so that the repo can
-    remove old Python assumptions and start cleanly.
+29. As a release owner, I want PerfPulse to define its own product contracts, so that the repo
+    can stay focused on production evidence.
 30. As a dashboard author, I want consistent low-cardinality labels, so that Grafana variables
     work across spot, benchmark, and stress runs.
 
@@ -1439,10 +1423,6 @@ the benchmark must test per-user quotas, auth cost, or user-specific Skaha behav
 ### Repository Direction
 
 - Use `opencadc/perfpulse` as the implementation repository.
-- Treat the old Python PerfPulse code as disposable.
-- Preserve unrelated local changes while implementing the new plan.
-- Do not maintain compatibility with `kr`.
-- Do not port old CSV plotting scripts.
 - Do not use Pushgateway as the primary metric path.
 
 ### Language and Build
@@ -1570,7 +1550,7 @@ before adding Kueue or Skaha.
 - Token pools for real multi-user Skaha tests.
 - Kubernetes watch support.
 - Advanced mixed pressure scenarios.
-- Full dashboard parity with every old `kr` plot.
+- Full dashboard coverage for every possible diagnostic panel.
 
 ## Test Plan
 
@@ -1651,14 +1631,13 @@ Dashboard verification requires:
 ### PRD Acceptance
 
 - The plan is written locally in the PerfPulse repo.
-- The PRD captures current `kueuer` goals, metrics, and limitations.
-- The PRD captures the new k6 architecture and decisions.
+- The PRD captures PerfPulse's production evidence goals, run classes, surface hierarchy,
+  architecture, and decisions.
 - The PRD is detailed enough for an implementation agent to start without making product
   decisions.
 
 ### First Implementation Acceptance
 
-- `kr` is not required for PerfPulse v1.
 - TypeScript builds into a k6-compatible JavaScript bundle.
 - The custom image can run a local dry run and a cluster `spot-direct-tiny` test.
 - Manual `spot-direct-tiny` TestRun works in `canfar-perfpulse`.
@@ -1712,8 +1691,6 @@ auth, quota, or fairness behavior. Add a token-pool mode later if that becomes a
 
 ## Out of Scope
 
-- Maintaining `kr` compatibility.
-- Re-implementing old Python CSV plots.
 - Pushgateway support as the main metrics path.
 - Per-job Prometheus labels.
 - Real multi-user Skaha token pools in v1.
@@ -1723,16 +1700,14 @@ auth, quota, or fairness behavior. Add a token-pool mode later if that becomes a
 
 ## Source Truth and References
 
-Local source truth:
+Source truth:
 
-- `configs/kueue/kueuer` for prior `kr` behavior and metric semantics.
-- `configs/kueue/kueuer/docs/metrics-semantics.md` for old metric interpretation.
-- `configs/kueue/kueuer/src/kueuer/benchmarks/k8s.py` for old Job creation behavior.
-- `configs/kueue/kueuer/src/kueuer/benchmarks/skaha/stress.py` for prior Skaha stress shape.
 - `keel-deploy/helm/values/canfar.net/skaha/staging.yaml` for current staging Skaha queue
   and namespace configuration.
-- `keel-deploy/helm/values/canfar.net/kueue/controller/prod.controller.yml` for deployed
-  Kueue controller behavior.
+- <https://github.com/cadc-ccda-infra/keel-deploy/tree/main/helm/values/canfar.net/kueue> for
+  the current deployed cluster Kueue configuration on the `main` branch. Use this path for
+  current Kueue controller, queue, resource, admission, and workload configuration instead of
+  copying values into this PRD.
 - `science-platform/skaha` and `canfar` client code for Skaha session API shape and runtime
   token headers.
 

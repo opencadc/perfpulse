@@ -1,13 +1,15 @@
 # PerfPulse
 
-PerfPulse is the performance evidence context for validating CANFAR workload paths under
-routine checks, benchmark pressure, and rare stress campaigns.
+PerfPulse is the performance evidence context for understanding CANFAR Science Platform
+performance through production Grafana dashboards, routine spot checks, manual benchmarks, and
+rare stress campaigns.
 
 ## Language
 
 **PerfPulse**:
-An in-cluster k6-based product for generating and recording workload-path performance evidence.
-_Avoid_: `kr`, Python benchmark tool, plot generator
+An in-cluster k6-based product for generating workload-path performance evidence and presenting
+it through production observability surfaces.
+_Avoid_: one-off benchmark script, local-only artifact generator
 
 **Thin horizontal slice**:
 The smallest deployed evidence path from k6 `TestRun` through direct Kubernetes workload
@@ -22,20 +24,38 @@ _Avoid_: thin horizontal slice, production evidence path, remote-write proof
 
 **Spot check**:
 A small hard-gated run that proves a workload path is healthy enough for operational confidence.
+The default production cadence is hourly, with a 30-minute cadence available after the check is
+stable and low-risk.
 _Avoid_: smoke test, synthetic monitor
 
 **Routine benchmark**:
-A repeatable bounded run that measures comparable performance over time without intentionally
-finding the cluster limit.
+A manual bounded run that measures comparable performance over time without intentionally finding
+the cluster limit.
 _Avoid_: stress test, spot check
 
 **Stress campaign**:
-A rare large-scale run that characterizes cluster or control-plane capacity boundaries.
+A rare quiet-window run that characterizes cluster, control-plane, workload-execution,
+observability, and cleanup boundaries.
 _Avoid_: routine benchmark, scheduled check
 
 **Test surface**:
 One workload submission path that PerfPulse can drive and measure.
 _Avoid_: backend, provider
+
+**Direct Kubernetes baseline**:
+The direct no-Kueue Job path used to prove the Kubernetes API, Job lifecycle, metrics export, and
+cleanup without queueing complexity.
+_Avoid_: user-facing platform path
+
+**Kueue dependency surface**:
+The direct Kueue Job path used to detect changes in queue admission, Workload visibility, and
+upstream Kueue behavior.
+_Avoid_: user-facing platform path
+
+**Skaha user-facing surface**:
+The headless session path through the Skaha API and the main CANFAR Science Platform user-facing
+performance signal.
+_Avoid_: direct Kubernetes baseline
 
 **Visibility gate**:
 The configured time window in which accepted work must become observable through the target
@@ -50,12 +70,21 @@ _Avoid_: visibility gate, benchmark SLO
 A synthetic user bucket used by k6 to model submission shape.
 _Avoid_: real Skaha user, service account
 
+**Dashboard evidence surface**:
+Grafana dashboards backed by Prometheus remote-write metrics. This is the primary operator-facing
+PerfPulse output.
+_Avoid_: local run artifact as primary output
+
 ## Relationships
 
 - A **Spot check**, **Routine benchmark**, or **Stress campaign** runs one or more **Test surfaces**.
 - A **Kind smoke** validates runner, operator, direct Kubernetes Job, completion, cleanup, and
   local artifacts before the **Thin horizontal slice**.
 - A **Thin horizontal slice** proves exactly one **Test surface** before broader profiles are enabled.
+- The **Direct Kubernetes baseline** is proven before the **Kueue dependency surface** and
+  **Skaha user-facing surface**.
+- **Dashboard evidence surface** is the primary output; run logs and artifacts are diagnostic
+  support.
 - A **Visibility gate** applies after submission succeeds and before completion is evaluated.
 - A **Completion gate** is a hard spot-check gate for tiny direct Kubernetes and Skaha workloads.
 - A **Logical user** can submit many workloads, but it is not necessarily a real authenticated user.
@@ -63,7 +92,7 @@ _Avoid_: real Skaha user, service account
 ## Example Dialogue
 
 > **Dev:** "Should the first PerfPulse run use Kueue and Skaha?"
-> **Domain expert:** "No. First prove the thin horizontal slice with one completed direct Kubernetes Job, then add Kueue admission and Skaha completion as separate test surfaces."
+> **Domain expert:** "No. First prove the thin horizontal slice with one completed direct Kubernetes baseline Job, then add Kueue admission and Skaha completion as separate test surfaces."
 
 ## Flagged Ambiguities
 
@@ -73,3 +102,5 @@ _Avoid_: real Skaha user, service account
   write or Grafana queryability.
 - "Spot check" is resolved as an operational hard gate, while **Routine benchmark** and
   **Stress campaign** are measurement activities with different failure semantics.
+- "Production-first" means production dashboards are the primary PerfPulse outcome; staging and
+  integration promotion gates reuse the same spot-check evidence model.
