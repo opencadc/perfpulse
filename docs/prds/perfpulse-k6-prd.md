@@ -40,10 +40,10 @@ The product must support three run classes:
   cleanup, and related cluster metrics.
 
 The first product milestone must therefore be the smallest thin horizontal slice: one k6
-`TestRun`, one direct Kubernetes workload that completes within the gate, one remote-write
-metrics path, one repo-managed Grafana dashboard artifact, and one cleanup path. That slice
-proves the deployed feedback loop. Additional surfaces and larger profiles are added only
-after the previous slice has a deterministic pass/fail signal.
+`TestRun`, one direct Kubernetes workload that completes within the gate, one low-volume k6
+OTLP metrics export path into Prometheus, one repo-managed Grafana dashboard artifact, and one
+cleanup path. That slice proves the deployed feedback loop. Additional surfaces and larger
+profiles are added only after the previous slice has a deterministic pass/fail signal.
 
 The phrase "horizontal deployment" means this thin deployed evidence path. It does not mean
 distributed k6 runner parallelism. Distributed execution is a later scaling option, not a
@@ -156,9 +156,7 @@ The first implementation sequence should validate the system in three steps:
 - A custom v1 runner image.
 - One manual `spot-direct-tiny` k6 `TestRun`.
 - One 10s tiny direct Kubernetes `stress-ng` Job without Kueue, completed within 120s.
-- Prometheus remote write enabled.
-- Native histogram mode enabled for k6 trend metrics when the Prometheus path supports it,
-  with `p50,p95,p99` trend-stat fallback for M1.
+- Low-volume k6 OpenTelemetry metrics export enabled into Prometheus for M1/spot validation.
 - Low-cardinality custom metrics.
 - k6 teardown plus Kubernetes TTL cleanup.
 - One repo-managed minimal Grafana dashboard JSON artifact that proves the metrics are
@@ -192,7 +190,7 @@ Acceptance:
 Purpose:
 
 - Validate the custom k6 runner, k6 Operator execution path, direct Kubernetes Job lifecycle, and
-  artifact capture in a local kind cluster before introducing Prometheus remote write.
+  artifact capture in a local kind cluster before introducing Prometheus/Grafana metrics export.
 
 Scope:
 
@@ -235,7 +233,7 @@ Scope:
 - One `TestRun` in `canfar-perfpulse`.
 - One direct no-Kueue `batch/v1` Job in `canfar-workloads`.
 - One `testid`.
-- One remote-write metrics path.
+- One low-volume k6 OTLP metrics export path into Prometheus.
 - One cleanup path.
 - One repo-managed Grafana dashboard JSON artifact.
 
@@ -288,7 +286,7 @@ Purpose:
 Acceptance:
 
 - `spot-tiny` can run all stable surfaces enabled for the environment.
-- Each enabled surface has hard gates for create, target state, remote-write presence, and cleanup.
+- Each enabled surface has hard gates for create, target state, metrics export presence, and cleanup.
 - The dashboard shows submitted, visible, completed/admitted, failed, latency, and cleanup
   panels by surface.
 - A failed run categorizes the failure without using unbounded Prometheus labels.
@@ -441,8 +439,8 @@ PerfPulse should use four configuration layers:
 
 1. Image: versioned TypeScript code, scenarios, default profiles, helper modules.
 2. ConfigMap: non-secret environment config such as namespaces, queue defaults, Skaha URL,
-   Prometheus remote write URL, profile defaults, and threshold defaults.
-3. Secret: Skaha runtime token and any remote-write credentials.
+   Prometheus OTLP endpoint, profile defaults, and threshold defaults.
+3. Secret: Skaha runtime token and any metrics-export credentials.
 4. TestRun environment: run-specific overrides such as `TESTID`, `RUN_CLASS`, `SCENARIO`,
    `SURFACE`, profile, total job count, user shape, duration, metric profile, and cleanup mode.
 
@@ -502,7 +500,7 @@ appear in production metric or dashboard surface filters.
 M0.5 kind validation uses Kubernetes client mode, the k6 Operator, and one real direct Kubernetes
 Job. It supports live k6 web dashboard port-forwarding during the runner execution and stores a
 static k6 web dashboard HTML artifact from the same built bundle after the `TestRun` passes, but
-does not enable Prometheus remote write or Grafana queryability.
+does not enable Prometheus OTLP metrics export or Grafana queryability.
 
 ## Test Surfaces
 
@@ -666,7 +664,7 @@ Purpose:
 
 - First deployed thin horizontal slice.
 - Prove k6 Operator execution, custom image, Kubernetes API auth, direct Job creation,
-  visibility polling, remote write, Grafana queryability, and cleanup.
+  visibility polling, low-volume OTLP metrics export, Grafana queryability, and cleanup.
 - Avoid Kueue and Skaha complexity until the runner, metrics, and cleanup path are proven.
 
 Defaults:
@@ -692,7 +690,7 @@ Purpose:
 - Hourly sanity check after the direct Kubernetes, Kueue, and Skaha surfaces have each been
   proven independently.
 - Prove all enabled stable surfaces still work.
-- Prove remote write and dashboard queries work.
+- Prove metrics export and dashboard queries work.
 - Catch auth, API, queue, visibility, and cleanup failures.
 
 Defaults:
@@ -924,10 +922,10 @@ labels should record cohort-level state.
 PerfPulse must rely on k6 built-in metrics where possible and define custom metrics only
 for domain-specific events that k6 does not know about.
 
-All custom metrics should use the `perfpulse_` prefix in code. In Prometheus remote write,
-k6 adds the `k6_` namespace and counter suffixes, so a k6 Counter named
-`perfpulse_jobs_submitted` will appear as a Prometheus series like
-`k6_perfpulse_jobs_submitted_total`.
+All custom metrics should use the `perfpulse_` prefix in code. With
+`K6_OTEL_METRIC_PREFIX=k6_`, Prometheus-visible names will use the `k6_perfpulse_*` shape
+depending on OTLP translation; for example, a k6 Counter named `perfpulse_jobs_submitted` may
+appear as a Prometheus series like `k6_perfpulse_jobs_submitted_total`.
 
 Do not name k6 Counters with `_total` in code.
 
@@ -1082,7 +1080,7 @@ Spot failures should indicate:
 - Kueue Workload did not become admitted.
 - Direct Job did not complete.
 - Skaha session did not complete.
-- Remote write did not emit expected metrics.
+- Metrics export did not emit expected metrics.
 - Cleanup failed.
 
 Spot profiles delete created resources by default even when a gate fails. Manual reruns may
@@ -1119,60 +1117,39 @@ Stress success is primarily:
 - Cluster remains observable.
 - Cleanup is complete or preserved resources are clearly labeled.
 
-## Prometheus Remote Write
+## k6 OpenTelemetry Metrics Export
 
-Remote write is the primary metrics path. Scrape-per-runner is not part of the v1 design.
+Low-volume k6 OpenTelemetry export directly into Prometheus is the primary metrics path for
+M1 and spot validation. Scrape-per-runner is not part of the v1 design.
 
 The k6 `TestRun` should run with:
 
 ```text
--o experimental-prometheus-rw
+-o opentelemetry
 ```
 
 Required environment:
 
 ```text
-K6_PROMETHEUS_RW_SERVER_URL=<prometheus remote write URL>
-K6_PROMETHEUS_RW_STALE_MARKERS=true
+K6_OTEL_EXPORTER_PROTOCOL=http/protobuf
+K6_OTEL_HTTP_EXPORTER_INSECURE=true
+K6_OTEL_HTTP_EXPORTER_ENDPOINT=kube-prometheus-stack-prometheus.monitoring:9090
+K6_OTEL_HTTP_EXPORTER_URL_PATH=/api/v1/otlp/v1/metrics
+K6_OTEL_METRIC_PREFIX=k6_
+K6_OTEL_SERVICE_NAME=perfpulse
+K6_OTEL_EXPORT_INTERVAL=5s
 ```
 
-Preferred native-histogram environment:
-
-```text
-K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=true
-```
-
-M1 fallback environment when native histograms are not enabled on the Prometheus path:
-
-```text
-K6_PROMETHEUS_RW_TREND_STATS=p50,p95,p99
-```
-
-Optional environment:
-
-```text
-K6_PROMETHEUS_RW_PUSH_INTERVAL=5s
-K6_PROMETHEUS_RW_BEARER_TOKEN=<token>
-K6_PROMETHEUS_RW_USERNAME=<username>
-K6_PROMETHEUS_RW_PASSWORD=<password>
-K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY=false
-```
-
-Default push intervals:
+Default export intervals:
 
 - `spot-direct-tiny`: `5s`
 - `spot-tiny`: `5s`
-- `benchmark-small`: `5s`
-- `benchmark-medium`: `5s` or `10s`
-- `stress-medium`: `10s` or `15s`
-- `stress-high`: `15s`
 
-Native histogram support must be verified in the deployed Prometheus configuration before
-benchmark profiles become gated. For remote write, ensure the receiver can ingest native
-histograms. For Prometheus 2.x this typically means enabling the required feature flags. For
-newer Prometheus versions, verify the current native histogram and remote-write receiver
-configuration in ArgoCD or the deployed Prometheus config. M1 may use the `p50,p95,p99`
-fallback to prove the first evidence loop while that infrastructure verification is pending.
+Direct OTLP into central Prometheus is acceptable only for low-volume M1 and spot validation.
+Benchmark and stress scale need an OpenTelemetry Collector, Alloy, or a dedicated metrics
+backend before those profiles become gated. Prometheus OTLP receiver support and the current
+metric translation behavior must be verified in ArgoCD or the deployed Prometheus config before
+the first M1 run is accepted.
 
 ## Dashboard Plan
 
@@ -1233,7 +1210,7 @@ Initial alert candidates:
 - No recent successful `spot-tiny` run.
 - `spot-tiny` target-state failure on any enabled surface.
 - `spot-tiny` cleanup failure.
-- `spot-tiny` remote-write metrics missing.
+- `spot-tiny` metrics export missing.
 
 Benchmark and stress profiles should not alert by default. They should be dashboarded and
 reviewed manually unless a specific benchmark is later promoted to a formal operational gate.
@@ -1264,7 +1241,7 @@ The operator-created runner Pods need:
 - The PerfPulse custom image.
 - A service account with Kubernetes workload permissions.
 - ConfigMap environment for non-secret configuration.
-- Secret environment for Skaha and Prometheus credentials.
+- Secret environment for Skaha and metrics-export credentials.
 - Resource requests/limits sized so the test runner does not become the bottleneck.
 
 For distributed tests, `parallelism` can be increased, but the first PoC should use the
@@ -1283,7 +1260,7 @@ The first cluster milestone is manual and direct Kubernetes only:
 - Verify metrics in Prometheus/Grafana.
 - Verify cleanup.
 
-Secrets are introduced in the first milestone only if the Prometheus remote-write path requires
+Secrets are introduced in the first milestone only if the Prometheus OTLP metrics path requires
 credentials. Skaha credentials are introduced with the Skaha surface, not before.
 
 ### CronJob Later
@@ -1364,7 +1341,7 @@ the benchmark must test per-user quotas, auth cost, or user-specific Skaha behav
 3. As a platform operator, I want Grafana dashboards for PerfPulse runs, so that I can
    compare performance across runs and surfaces.
 4. As a platform operator, I want a manual first PoC TestRun, so that I can debug RBAC,
-   remote write, Skaha auth, and cleanup before scheduling recurring checks.
+   metrics export, Skaha auth, and cleanup before scheduling recurring checks.
 5. As a platform operator, I want direct Kubernetes Jobs with Kueue, so that I can isolate
    Kueue admission and queue visibility behavior.
 6. As a platform operator, I want direct Kubernetes Jobs without Kueue, so that I can compare
@@ -1530,9 +1507,9 @@ before adding Kueue or Skaha.
 - `spot-direct-tiny` profile only.
 - One TestRun manifest.
 - One repo-managed Grafana dashboard JSON artifact.
-- ConfigMap contract and optional Secret contract for remote-write credentials.
+- ConfigMap contract and optional Secret contract for metrics-export credentials.
 - Minimal RBAC.
-- Remote write configuration.
+- OpenTelemetry metrics export configuration.
 - Minimal custom metrics.
 - Cleanup.
 - Documentation for running and verifying the PoC.
@@ -1593,7 +1570,7 @@ The first cluster run is accepted when:
 - The k6 runner can authenticate to the Kubernetes API.
 - One direct no-Kueue Job is accepted, visible, and completed within 120s.
 - Direct no-Kueue submission, visibility, completion, and cleanup metrics are emitted.
-- Remote write metrics are visible in Prometheus.
+- OTLP metrics are visible in Prometheus.
 - The repo-managed Grafana dashboard can filter by `testid`.
 - Cleanup succeeds.
 
@@ -1642,7 +1619,7 @@ Dashboard verification requires:
 - The custom image can run a local dry run and a cluster `spot-direct-tiny` test.
 - Manual `spot-direct-tiny` TestRun works in `canfar-perfpulse`.
 - The direct tiny workload lands in `canfar-workloads` and completes within 120s.
-- Metrics arrive through Prometheus remote write.
+- Metrics arrive through low-volume k6 OTLP export to Prometheus.
 - The repo-managed Grafana dashboard can show the first run.
 - Cleanup succeeds.
 
@@ -1717,8 +1694,10 @@ External references:
   <https://grafana.com/docs/k6/latest/set-up/set-up-distributed-k6/usage/executing-k6-scripts-with-testrun-crd/>
 - Grafana k6 Operator `TestRun` configuration documentation:
   <https://grafana.com/docs/k6/latest/set-up/set-up-distributed-k6/usage/configure-testrun-crd/>
-- Grafana k6 Prometheus remote write documentation:
-  <https://grafana.com/docs/k6/latest/results-output/real-time/prometheus-remote-write/>
+- Grafana k6 OpenTelemetry output documentation:
+  <https://grafana.com/docs/k6/latest/results-output/real-time/opentelemetry/>
+- Prometheus OTLP backend guidance:
+  <https://prometheus.io/docs/guides/opentelemetry/>
 - Prometheus native histogram specification:
   <https://prometheus.io/docs/specs/native_histograms/>
 
@@ -1728,7 +1707,7 @@ The first implementation should be intentionally boring. The value is in proving
 path:
 
 ```text
-k6 TestRun -> Kubernetes API -> direct Job completion -> remote write -> Prometheus -> Grafana -> cleanup
+k6 TestRun -> Kubernetes API -> direct Job completion -> OTLP -> Prometheus -> Grafana -> cleanup
 ```
 
 Once that path works, add Kueue visibility, then Skaha visibility, then scheduled spot checks,

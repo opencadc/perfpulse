@@ -13,14 +13,14 @@ _Avoid_: one-off benchmark script, local-only artifact generator
 
 **Thin horizontal slice**:
 The smallest deployed evidence path from k6 `TestRun` through direct Kubernetes workload
-completion, Prometheus remote write, Grafana queryability, and cleanup.
+completion, low-volume OTLP metrics export to Prometheus, Grafana queryability, and cleanup.
 _Avoid_: horizontal runner scaling, distributed k6 execution
 
 **Kind smoke**:
 A developer validation run in a local kind cluster that proves the custom k6 runner can execute
 through the k6 Operator and complete one direct Kubernetes workload without Kueue, Skaha,
 Prometheus, or Grafana.
-_Avoid_: thin horizontal slice, production evidence path, remote-write proof
+_Avoid_: thin horizontal slice, production evidence path, OTLP metrics proof
 
 **Spot check**:
 A small hard-gated run that proves a workload path is healthy enough for operational confidence.
@@ -71,8 +71,8 @@ A synthetic user bucket used by k6 to model submission shape.
 _Avoid_: real Skaha user, service account
 
 **Dashboard evidence surface**:
-Grafana dashboards backed by Prometheus remote-write metrics. This is the primary operator-facing
-PerfPulse output.
+Grafana dashboards backed by Prometheus metrics ingested from k6 OTLP export. This is the primary
+operator-facing PerfPulse output.
 _Avoid_: local run artifact as primary output
 
 ## Relationships
@@ -98,8 +98,8 @@ _Avoid_: local run artifact as primary output
 
 - "Horizontal deployment" is resolved as **Thin horizontal slice**, not distributed k6 runner
   parallelism.
-- "Kind smoke" is resolved as local developer validation, not a substitute for Prometheus remote
-  write or Grafana queryability.
+- "Kind smoke" is resolved as local developer validation, not a substitute for OTLP-to-Prometheus
+  metrics ingestion or Grafana queryability.
 - "Spot check" is resolved as an operational hard gate, while **Routine benchmark** and
   **Stress campaign** are measurement activities with different failure semantics.
 - "Production-first" means production dashboards are the primary PerfPulse outcome; staging and
