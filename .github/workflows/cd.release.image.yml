@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 env:
-  REGISTRY: images.canfar.net
+  REGISTRY: images.opencadc.org
   IMAGE: platform/perfpulse
   IMAGE_TAG: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.tag_name || github.ref_name }}
 
