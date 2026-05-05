@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/opencadc/perfpulse/compare/v0.1.3...v0.1.4) (2026-05-05)
+
+
+### Bug Fixes
+
+* bind Grafana dashboard to prod metrics ([2c85ab9](https://github.com/opencadc/perfpulse/commit/2c85ab9244259f49197660e3a28dd0fbe15f19fe))
+
 ## [0.1.3](https://github.com/opencadc/perfpulse/compare/v0.1.2...v0.1.3) (2026-05-05)
 
 
