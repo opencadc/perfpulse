@@ -24,7 +24,7 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
   };
   const namespace = encodeURIComponent(config.kubernetes.namespace);
   const jobsUrl = `${config.kubernetes.apiServer}/apis/batch/v1/namespaces/${namespace}/jobs`;
-  const workloadsUrl = `${config.kubernetes.apiServer}/apis/kueue.x-k8s.io/v1beta1/namespaces/${namespace}/workloads`;
+  const workloadsUrl = `${config.kubernetes.apiServer}/apis/kueue.x-k8s.io/v1beta2/namespaces/${namespace}/workloads`;
 
   return {
     createJob(manifest: KubernetesJobManifest): JsonResponse {
@@ -57,8 +57,7 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
       return JSON.parse(String(response.body ?? "{}")) as JobListLike;
     },
     listWorkloadsByTestId(): WorkloadListLike {
-      const selector = encodeURIComponent(testidSelector(config));
-      const response = http.get(`${workloadsUrl}?labelSelector=${selector}`, {
+      const response = http.get(workloadsUrl, {
         headers,
         tags: { name: "k8s_list_workloads" },
         timeout: "30s",

@@ -137,6 +137,27 @@ describe("PerfPulse k6 runtime dispatch", () => {
     expect(
       httpRequests.some((request) => request.options?.tags?.name === "k8s_list_workloads"),
     ).toBe(true);
+    expect(
+      httpRequests.some(
+        (request) =>
+          request.options?.tags?.name === "k8s_list_jobs" &&
+          request.url.includes("labelSelector=perfpulse.opencadc.org%2Ftestid%3Dkueue-spot"),
+      ),
+    ).toBe(true);
+    expect(
+      httpRequests.some(
+        (request) =>
+          request.options?.tags?.name === "k8s_list_workloads" &&
+          request.url.includes("/apis/kueue.x-k8s.io/v1beta2/"),
+      ),
+    ).toBe(true);
+    expect(
+      httpRequests.every(
+        (request) =>
+          request.options?.tags?.name !== "k8s_list_workloads" ||
+          !request.url.includes("labelSelector="),
+      ),
+    ).toBe(true);
     expect(metricRecords).toContainEqual({
       metric: METRIC_NAMES.kueueWorkloadsAdmitted,
       tags: expect.objectContaining({

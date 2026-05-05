@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   buildHourlySpotTinySchedule,
   buildManualSpotDirectTinyDeployment,
+  buildManualSpotKueueTinyDeployment,
   renderManifestDocuments,
 } from "../src/deployment-manifests";
 
@@ -102,6 +103,66 @@ describe("deployment manifest contracts", () => {
     );
   });
 
+  test("builds the manual M2 spot Kueue TestRun contract", () => {
+    const contract = buildManualSpotKueueTinyDeployment({
+      imageTag: "2026.05.04",
+      otlpCredentialsSecretName: "perfpulse-otlp-credentials",
+      testid: "spot-kueue-tiny-manual",
+    });
+
+    const resources = contract.resources;
+    const role = resource(resources, "Role", "perfpulse-workload-writer");
+    const configMap = resource(resources, "ConfigMap", "perfpulse-spot-kueue-tiny-config");
+    const testRun = resource(resources, "TestRun", "perfpulse-spot-kueue-tiny");
+
+    expect(role.metadata.namespace).toBe("canfar-workloads");
+    expect(role.rules).toContainEqual({
+      apiGroups: ["batch"],
+      resources: ["jobs"],
+      verbs: ["create", "delete", "get", "list"],
+    });
+    expect(role.rules).toContainEqual({
+      apiGroups: ["kueue.x-k8s.io"],
+      resources: ["workloads"],
+      verbs: ["get", "list"],
+    });
+    expect(configMap.metadata.namespace).toBe("canfar-perfpulse");
+    expect(configMap.data).toMatchObject({
+      KUEUE_ADMISSION_GATE_SECONDS: "120",
+      KUEUE_PRIORITY_CLASS: "low",
+      KUEUE_QUEUE_NAME: "cadc-default",
+      K6_OTEL_EXPORT_INTERVAL: "1s",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "spot-tiny",
+      RUN_CLASS: "spot",
+      SURFACE: "k8s-kueue",
+      WORKLOAD_NAMESPACE: "canfar-workloads",
+    });
+    expect(testRun.metadata.namespace).toBe("canfar-perfpulse");
+    expect(testRun.spec).toMatchObject({
+      arguments: "-o opentelemetry",
+      parallelism: 1,
+      runner: {
+        image: "images.opencadc.org/platform/perfpulse:2026.05.04",
+        serviceAccountName: "canfar-perfpulse",
+      },
+    });
+    const testRunSpec = testRun.spec as {
+      runner: {
+        env: Array<{ name: string; value: string }>;
+        envFrom: Array<Record<string, unknown>>;
+      };
+    };
+    expect(testRunSpec.runner.env).toContainEqual({
+      name: "TESTID",
+      value: "spot-kueue-tiny-manual",
+    });
+    expect(testRunSpec.runner.envFrom).toEqual([
+      { configMapRef: { name: "perfpulse-spot-kueue-tiny-config" } },
+      { secretRef: { name: "perfpulse-otlp-credentials", optional: true } },
+    ]);
+  });
+
   test("builds an hourly non-overlapping spot-tiny CronJob contract", () => {
     const contract = buildHourlySpotTinySchedule({
       imageTag: "2026.05.04",
@@ -186,6 +247,7 @@ describe("deployment manifest contracts", () => {
 
   test("keeps checked-in YAML examples synchronized with the public contract", async () => {
     const manualYaml = await Bun.file("docs/manifests/perfpulse-m1-spot-direct-tiny.yaml").text();
+    const kueueYaml = await Bun.file("docs/manifests/perfpulse-m2-spot-kueue-tiny.yaml").text();
     const hourlyYaml = await Bun.file("docs/manifests/perfpulse-spot-tiny-hourly.yaml").text();
 
     expect(manualYaml).toBe(
@@ -208,11 +270,21 @@ describe("deployment manifest contracts", () => {
         }),
       ),
     );
+    expect(kueueYaml).toBe(
+      renderManifestDocuments(
+        buildManualSpotKueueTinyDeployment({
+          imageTag: "TAG",
+          otlpCredentialsSecretName: "perfpulse-otlp-credentials",
+          testid: "spot-kueue-tiny-manual",
+        }),
+      ),
+    );
   });
 });
 
 type ContractResource =
   | ReturnType<typeof buildManualSpotDirectTinyDeployment>["resources"][number]
+  | ReturnType<typeof buildManualSpotKueueTinyDeployment>["resources"][number]
   | ReturnType<typeof buildHourlySpotTinySchedule>["resources"][number];
 
 const restrictedPodSecurityContext = {

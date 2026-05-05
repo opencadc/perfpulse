@@ -66,6 +66,14 @@ export interface ManualSpotDirectTinyOptions {
   testid: string;
 }
 
+export interface ManualSpotKueueTinyOptions {
+  imageTag: string;
+  otlpCredentialsSecretName?: string;
+  otlpHttpExporterEndpoint?: string;
+  otlpHttpExporterUrlPath?: string;
+  testid: string;
+}
+
 export interface HourlySpotTinyScheduleOptions {
   imageTag: string;
   kubectlImage?: string;
@@ -86,7 +94,7 @@ export function buildManualSpotDirectTinyDeployment(
       namespace(CONTROL_NAMESPACE),
       namespace(WORKLOAD_NAMESPACE),
       serviceAccount(labels),
-      workloadRole(labels),
+      workloadRole(labels, false),
       workloadRoleBinding(labels),
       {
         apiVersion: "v1",
@@ -122,6 +130,57 @@ export function buildManualSpotDirectTinyDeployment(
   };
 }
 
+export function buildManualSpotKueueTinyDeployment(
+  options: ManualSpotKueueTinyOptions,
+): DeploymentContract {
+  const configMapName = "perfpulse-spot-kueue-tiny-config";
+  const labels = contractLabels("spot-tiny");
+
+  return {
+    resources: [
+      namespace(CONTROL_NAMESPACE),
+      namespace(WORKLOAD_NAMESPACE),
+      serviceAccount(labels),
+      workloadRole(labels, true),
+      workloadRoleBinding(labels),
+      {
+        apiVersion: "v1",
+        data: {
+          CLEANUP: "true",
+          COMPLETION_GATE_SECONDS: "120",
+          KUEUE_ADMISSION_GATE_SECONDS: "120",
+          KUEUE_PRIORITY_CLASS: "low",
+          KUEUE_QUEUE_NAME: "cadc-default",
+          ...otlpConfig(options),
+          K6_OTEL_EXPORT_INTERVAL: "1s",
+          PERF_PULSE_CLIENT_MODE: "kubernetes",
+          PROFILE: "spot-tiny",
+          RUN_CLASS: "spot",
+          SURFACE: "k8s-kueue",
+          VISIBILITY_GATE_SECONDS: "60",
+          WORKLOAD_NAMESPACE,
+        },
+        kind: "ConfigMap",
+        metadata: {
+          labels,
+          name: configMapName,
+          namespace: CONTROL_NAMESPACE,
+        },
+      },
+      testRun({
+        arguments: "-o opentelemetry",
+        configMapName,
+        image: `${DEFAULT_IMAGE_REPOSITORY}:${options.imageTag}`,
+        labels,
+        name: "perfpulse-spot-kueue-tiny",
+        profile: "spot-tiny",
+        secretNames: [options.otlpCredentialsSecretName],
+        testid: options.testid,
+      }),
+    ],
+  };
+}
+
 export function buildHourlySpotTinySchedule(
   options: HourlySpotTinyScheduleOptions,
 ): DeploymentContract {
@@ -138,7 +197,7 @@ export function buildHourlySpotTinySchedule(
       namespace(CONTROL_NAMESPACE),
       namespace(WORKLOAD_NAMESPACE),
       serviceAccount(labels),
-      workloadRole(labels),
+      workloadRole(labels, false),
       workloadRoleBinding(labels),
       testRunWriterRole(labels),
       testRunWriterRoleBinding(labels),
@@ -238,7 +297,25 @@ function serviceAccount(labels: Record<string, string>): KubernetesResource {
   };
 }
 
-function workloadRole(labels: Record<string, string>): KubernetesResource {
+function workloadRole(
+  labels: Record<string, string>,
+  includeKueueWorkloads: boolean,
+): KubernetesResource {
+  const rules: NonNullable<KubernetesResource["rules"]> = [
+    {
+      apiGroups: ["batch"],
+      resources: ["jobs"],
+      verbs: ["create", "delete", "get", "list"],
+    },
+  ];
+  if (includeKueueWorkloads) {
+    rules.push({
+      apiGroups: ["kueue.x-k8s.io"],
+      resources: ["workloads"],
+      verbs: ["get", "list"],
+    });
+  }
+
   return {
     apiVersion: "rbac.authorization.k8s.io/v1",
     kind: "Role",
@@ -247,13 +324,7 @@ function workloadRole(labels: Record<string, string>): KubernetesResource {
       name: "perfpulse-workload-writer",
       namespace: WORKLOAD_NAMESPACE,
     },
-    rules: [
-      {
-        apiGroups: ["batch"],
-        resources: ["jobs"],
-        verbs: ["create", "delete", "get", "list"],
-      },
-    ],
+    rules,
   };
 }
 
