@@ -23,7 +23,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -81,7 +81,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -139,7 +139,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -201,7 +201,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -263,7 +263,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -339,17 +339,17 @@
       },
       "targets": [
         {
-          "expr": "k6_perfpulse_submission_duration_ms_p50{testid=\"$testid\",surface=~\"$surface\"}",
+          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_submission_duration_ms_bucket{testid=\"$testid\",surface=~\"$surface\"}[$__range])))",
           "legendFormat": "p50 {{surface}}",
           "refId": "A"
         },
         {
-          "expr": "k6_perfpulse_submission_duration_ms_p95{testid=\"$testid\",surface=~\"$surface\"}",
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_submission_duration_ms_bucket{testid=\"$testid\",surface=~\"$surface\"}[$__range])))",
           "legendFormat": "p95 {{surface}}",
           "refId": "B"
         },
         {
-          "expr": "k6_perfpulse_submission_duration_ms_p99{testid=\"$testid\",surface=~\"$surface\"}",
+          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_submission_duration_ms_bucket{testid=\"$testid\",surface=~\"$surface\"}[$__range])))",
           "legendFormat": "p99 {{surface}}",
           "refId": "C"
         }
@@ -360,7 +360,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -436,17 +436,17 @@
       },
       "targets": [
         {
-          "expr": "k6_perfpulse_completion_latency_ms_p50{testid=\"$testid\",surface=~\"$surface\"}",
+          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=\"$testid\",surface=~\"$surface\"}[$__range])))",
           "legendFormat": "p50 {{surface}}",
           "refId": "A"
         },
         {
-          "expr": "k6_perfpulse_completion_latency_ms_p95{testid=\"$testid\",surface=~\"$surface\"}",
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=\"$testid\",surface=~\"$surface\"}[$__range])))",
           "legendFormat": "p95 {{surface}}",
           "refId": "B"
         },
         {
-          "expr": "k6_perfpulse_completion_latency_ms_p99{testid=\"$testid\",surface=~\"$surface\"}",
+          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=\"$testid\",surface=~\"$surface\"}[$__range])))",
           "legendFormat": "p99 {{surface}}",
           "refId": "C"
         }
@@ -468,7 +468,7 @@
         "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
+          "uid": "prometheus"
         },
         "definition": "label_values(k6_perfpulse_jobs_submitted_total, testid)",
         "hide": 0,
@@ -499,7 +499,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
+          "uid": "prometheus"
         },
         "definition": "label_values(k6_perfpulse_jobs_submitted_total{testid=\"$testid\"}, surface)",
         "hide": 0,
@@ -527,7 +527,7 @@
   "timepicker": {},
   "timezone": "browser",
   "title": "PerfPulse M1 Spot Direct Tiny",
-  "uid": "perfpulse-m1-spot-direct-tiny",
+  "uid": "perfpulse",
   "version": 1,
   "weekStart": ""
 }
