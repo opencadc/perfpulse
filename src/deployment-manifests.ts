@@ -1,10 +1,30 @@
 const CONTROL_NAMESPACE = "canfar-perfpulse";
 const WORKLOAD_NAMESPACE = "canfar-workloads";
-const RUNNER_SERVICE_ACCOUNT = "perfpulse-runner";
+const RUNNER_SERVICE_ACCOUNT = "canfar-perfpulse";
 const DEFAULT_IMAGE_REPOSITORY = "images.opencadc.org/platform/perfpulse";
 const SCRIPT_LOCAL_FILE = "/test/perfpulse.js";
 const DEFAULT_OTLP_HTTP_EXPORTER_ENDPOINT = "kube-prometheus-stack-prometheus.monitoring:9090";
 const DEFAULT_OTLP_HTTP_EXPORTER_URL_PATH = "/api/v1/otlp/v1/metrics";
+const RESTRICTED_POD_SECURITY_CONTEXT = {
+  runAsGroup: 1000,
+  runAsNonRoot: true,
+  runAsUser: 1000,
+  seccompProfile: {
+    type: "RuntimeDefault",
+  },
+};
+const RESTRICTED_CONTAINER_SECURITY_CONTEXT = {
+  allowPrivilegeEscalation: false,
+  capabilities: {
+    drop: ["ALL"],
+  },
+  runAsGroup: 1000,
+  runAsNonRoot: true,
+  runAsUser: 1000,
+  seccompProfile: {
+    type: "RuntimeDefault",
+  },
+};
 
 export interface DeploymentContract {
   resources: KubernetesResource[];
@@ -173,9 +193,11 @@ export function buildHourlySpotTinySchedule(
                       command: ["/bin/sh", "-c"],
                       image: options.kubectlImage ?? "docker.io/bitnami/kubectl:1.31",
                       name: "create-testrun",
+                      securityContext: RESTRICTED_CONTAINER_SECURITY_CONTEXT,
                     },
                   ],
                   restartPolicy: "Never",
+                  securityContext: RESTRICTED_POD_SECURITY_CONTEXT,
                   serviceAccountName: RUNNER_SERVICE_ACCOUNT,
                 },
               },
@@ -322,8 +344,15 @@ function testRun(options: {
     },
     spec: {
       arguments: options.arguments,
+      initializer: {
+        containerSecurityContext: RESTRICTED_CONTAINER_SECURITY_CONTEXT,
+        image: options.image,
+        securityContext: RESTRICTED_POD_SECURITY_CONTEXT,
+        serviceAccountName: RUNNER_SERVICE_ACCOUNT,
+      },
       parallelism: 1,
       runner: {
+        containerSecurityContext: RESTRICTED_CONTAINER_SECURITY_CONTEXT,
         env: [
           {
             name: "TESTID",
@@ -346,12 +375,15 @@ function testRun(options: {
             })),
         ],
         image: options.image,
+        securityContext: RESTRICTED_POD_SECURITY_CONTEXT,
         serviceAccountName: RUNNER_SERVICE_ACCOUNT,
       },
       script: {
         localFile: SCRIPT_LOCAL_FILE,
       },
       starter: {
+        containerSecurityContext: RESTRICTED_CONTAINER_SECURITY_CONTEXT,
+        securityContext: RESTRICTED_POD_SECURITY_CONTEXT,
         serviceAccountName: RUNNER_SERVICE_ACCOUNT,
       },
     },
@@ -512,9 +544,44 @@ spec:
   arguments: "-o opentelemetry"
   script:
     localFile: ${SCRIPT_LOCAL_FILE}
+  initializer:
+    image: ${options.image}
+    serviceAccountName: ${RUNNER_SERVICE_ACCOUNT}
+    securityContext:
+      runAsGroup: 1000
+      runAsNonRoot: true
+      runAsUser: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      runAsGroup: 1000
+      runAsNonRoot: true
+      runAsUser: 1000
+      seccompProfile:
+        type: RuntimeDefault
   runner:
     image: ${options.image}
     serviceAccountName: ${RUNNER_SERVICE_ACCOUNT}
+    securityContext:
+      runAsGroup: 1000
+      runAsNonRoot: true
+      runAsUser: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      runAsGroup: 1000
+      runAsNonRoot: true
+      runAsUser: 1000
+      seccompProfile:
+        type: RuntimeDefault
     env:
       - name: TESTID
         value: \${TESTID}
@@ -523,5 +590,21 @@ spec:
           name: ${options.configMapName}${secretRefs}
   starter:
     serviceAccountName: ${RUNNER_SERVICE_ACCOUNT}
+    securityContext:
+      runAsGroup: 1000
+      runAsNonRoot: true
+      runAsUser: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      runAsGroup: 1000
+      runAsNonRoot: true
+      runAsUser: 1000
+      seccompProfile:
+        type: RuntimeDefault
 YAML`;
 }

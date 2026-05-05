@@ -28,13 +28,53 @@ export interface KubernetesJobManifest {
             limits: Record<string, string>;
             requests: Record<string, string>;
           };
+          securityContext: RestrictedContainerSecurityContext;
         }>;
         restartPolicy: "Never";
+        securityContext: RestrictedPodSecurityContext;
       };
     };
     ttlSecondsAfterFinished: number;
   };
 }
+
+interface RestrictedPodSecurityContext {
+  runAsGroup: number;
+  runAsNonRoot: boolean;
+  runAsUser: number;
+  seccompProfile: {
+    type: string;
+  };
+}
+
+interface RestrictedContainerSecurityContext extends RestrictedPodSecurityContext {
+  allowPrivilegeEscalation: boolean;
+  capabilities: {
+    drop: string[];
+  };
+}
+
+const RESTRICTED_POD_SECURITY_CONTEXT: RestrictedPodSecurityContext = {
+  runAsGroup: 1000,
+  runAsNonRoot: true,
+  runAsUser: 1000,
+  seccompProfile: {
+    type: "RuntimeDefault",
+  },
+};
+
+const RESTRICTED_CONTAINER_SECURITY_CONTEXT: RestrictedContainerSecurityContext = {
+  allowPrivilegeEscalation: false,
+  capabilities: {
+    drop: ["ALL"],
+  },
+  runAsGroup: 1000,
+  runAsNonRoot: true,
+  runAsUser: 1000,
+  seccompProfile: {
+    type: "RuntimeDefault",
+  },
+};
 
 export interface KueueJobOptions {
   priorityClass: string;
@@ -90,6 +130,7 @@ function buildJobManifest(
         memory: "256Mi",
       },
     },
+    securityContext: RESTRICTED_CONTAINER_SECURITY_CONTEXT,
   };
   if (config.workload.command !== undefined) {
     container.command = config.workload.command;
@@ -114,6 +155,7 @@ function buildJobManifest(
         spec: {
           containers: [container],
           restartPolicy: "Never",
+          securityContext: RESTRICTED_POD_SECURITY_CONTEXT,
         },
       },
       ttlSecondsAfterFinished: config.workload.ttlSecondsAfterFinished,

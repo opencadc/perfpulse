@@ -19,11 +19,15 @@ The manifest creates:
 
 - `canfar-perfpulse` for PerfPulse control resources and k6 `TestRun` resources.
 - `canfar-workloads` for workload Jobs created by the runner.
-- `perfpulse-runner` service account in `canfar-perfpulse`.
+- `canfar-perfpulse` service account in `canfar-perfpulse`.
 - Workload namespace RBAC for `batch/v1` Job create, list, get, and delete.
 - A ConfigMap for non-secret runtime configuration.
 - Optional Secret references for OTLP headers/credentials and Skaha credentials.
 - A k6 Operator `TestRun` using `/test/perfpulse.js` from the custom runner image.
+- k6 Operator initializer, runner, and starter pods running as `canfar-perfpulse` with restricted
+  pod and container security contexts for production Kyverno admission.
+- Runtime workload Jobs created in `canfar-workloads` use restricted pod and container security
+  contexts for production Kyverno admission.
 
 Apply:
 
@@ -41,7 +45,33 @@ control namespace: canfar-perfpulse
 workload namespace: canfar-workloads
 script.localFile: /test/perfpulse.js
 runner image: images.opencadc.org/platform/perfpulse:TAG
+initializer image: images.opencadc.org/platform/perfpulse:TAG
+starter image: operator default curl image
 arguments: -o opentelemetry
+```
+
+The initializer must use the same custom PerfPulse image as the runner because the script path is
+`/test/perfpulse.js`. Keep the starter image unset so the k6 Operator keeps its default curl image;
+using the PerfPulse image for starter previously failed with `sh: curl: not found`.
+
+Each k6 Operator pod template uses:
+
+```text
+serviceAccountName: canfar-perfpulse
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  capabilities.drop: [ALL]
+  seccompProfile:
+    type: RuntimeDefault
 ```
 
 OTLP metrics behavior is configured through non-secret ConfigMap values:
@@ -93,3 +123,8 @@ The checked-in schedule is intentionally hourly:
 A 30-minute cadence is a later option only after the hourly production check is stable and
 low-risk. Do not schedule benchmark or stress profiles by default; those remain manual operator-run
 campaigns.
+
+The embedded scheduled `TestRun` follows the same pod contract as the manual M1 run: custom
+PerfPulse image for initializer and runner, no custom starter image, `canfar-perfpulse` service
+account on initializer/runner/starter, and restricted security contexts on each operator pod
+template. The CronJob creator pod also runs with restricted pod and container security contexts.

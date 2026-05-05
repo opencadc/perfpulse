@@ -30,6 +30,10 @@ describe("direct Kubernetes Job manifest", () => {
       "3s",
       "--metrics-brief",
     ]);
+    expect(manifest.spec.template.spec.securityContext).toEqual(restrictedPodSecurityContext);
+    expect(manifest.spec.template.spec.containers[0]?.securityContext).toEqual(
+      restrictedContainerSecurityContext,
+    );
   });
 
   test("builds a suspended Kueue workload manifest with queue and CANFAR parity labels", () => {
@@ -57,5 +61,31 @@ describe("direct Kubernetes Job manifest", () => {
     expect(manifest.spec.backoffLimit).toBe(0);
     expect(manifest.spec.activeDeadlineSeconds).toBe(150);
     expect(manifest.spec.ttlSecondsAfterFinished).toBe(45);
+    expect(manifest.spec.template.spec.securityContext).toEqual(restrictedPodSecurityContext);
+    expect(manifest.spec.template.spec.containers[0]?.securityContext).toEqual(
+      restrictedContainerSecurityContext,
+    );
   });
 });
+
+const restrictedPodSecurityContext = {
+  runAsGroup: 1000,
+  runAsNonRoot: true,
+  runAsUser: 1000,
+  seccompProfile: {
+    type: "RuntimeDefault",
+  },
+};
+
+const restrictedContainerSecurityContext = {
+  allowPrivilegeEscalation: false,
+  capabilities: {
+    drop: ["ALL"],
+  },
+  runAsGroup: 1000,
+  runAsNonRoot: true,
+  runAsUser: 1000,
+  seccompProfile: {
+    type: "RuntimeDefault",
+  },
+};

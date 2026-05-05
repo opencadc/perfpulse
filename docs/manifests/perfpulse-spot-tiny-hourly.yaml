@@ -15,7 +15,7 @@ metadata:
     app.kubernetes.io/name: perfpulse
     app.kubernetes.io/part-of: perfpulse
     perfpulse.opencadc.org/profile: spot-tiny
-  name: perfpulse-runner
+  name: canfar-perfpulse
   namespace: canfar-perfpulse
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -55,7 +55,7 @@ roleRef:
 subjects:
   -
     kind: ServiceAccount
-    name: perfpulse-runner
+    name: canfar-perfpulse
     namespace: canfar-perfpulse
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -96,7 +96,7 @@ roleRef:
 subjects:
   -
     kind: ServiceAccount
-    name: perfpulse-runner
+    name: canfar-perfpulse
     namespace: canfar-perfpulse
 ---
 apiVersion: v1
@@ -170,9 +170,44 @@ spec:
                     arguments: "-o opentelemetry"
                     script:
                       localFile: /test/perfpulse.js
+                    initializer:
+                      image: images.opencadc.org/platform/perfpulse:TAG
+                      serviceAccountName: canfar-perfpulse
+                      securityContext:
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      containerSecurityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
                     runner:
                       image: images.opencadc.org/platform/perfpulse:TAG
-                      serviceAccountName: perfpulse-runner
+                      serviceAccountName: canfar-perfpulse
+                      securityContext:
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      containerSecurityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
                       env:
                         - name: TESTID
                           value: ${TESTID}
@@ -186,15 +221,47 @@ spec:
                             name: perfpulse-skaha-runtime-token
                             optional: true
                     starter:
-                      serviceAccountName: perfpulse-runner
+                      serviceAccountName: canfar-perfpulse
+                      securityContext:
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      containerSecurityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
                   YAML
               command:
                 - /bin/sh
                 - "-c"
               image: docker.io/bitnami/kubectl:1.31
               name: create-testrun
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                runAsGroup: 1000
+                runAsNonRoot: true
+                runAsUser: 1000
+                seccompProfile:
+                  type: RuntimeDefault
           restartPolicy: Never
-          serviceAccountName: perfpulse-runner
+          securityContext:
+            runAsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          serviceAccountName: canfar-perfpulse
       ttlSecondsAfterFinished: 900
   schedule: "0 * * * *"
   successfulJobsHistoryLimit: 1

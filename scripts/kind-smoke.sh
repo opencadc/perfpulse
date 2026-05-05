@@ -73,7 +73,7 @@ cat >"${tmp_dir}/rbac.yaml" <<YAML
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: perfpulse-runner
+  name: canfar-perfpulse
   namespace: ${CONTROL_NAMESPACE}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -97,7 +97,7 @@ roleRef:
   name: perfpulse-workload-writer
 subjects:
   - kind: ServiceAccount
-    name: perfpulse-runner
+    name: canfar-perfpulse
     namespace: ${CONTROL_NAMESPACE}
 YAML
 
@@ -117,7 +117,7 @@ spec:
   runner:
     image: ${IMAGE}
     imagePullPolicy: IfNotPresent
-    serviceAccountName: perfpulse-runner
+    serviceAccountName: canfar-perfpulse
     metadata:
       labels:
         ${LABEL_APP_NAME}: perfpulse
@@ -136,7 +136,7 @@ spec:
       - name: K6_WEB_DASHBOARD_PERIOD
         value: 1s
   starter:
-    serviceAccountName: perfpulse-runner
+    serviceAccountName: canfar-perfpulse
 YAML
 
 kubectl apply -f "${tmp_dir}/namespaces.yaml"

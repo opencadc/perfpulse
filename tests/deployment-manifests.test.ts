@@ -17,7 +17,7 @@ describe("deployment manifest contracts", () => {
     const resources = contract.resources;
     const controlNamespace = resource(resources, "Namespace", "canfar-perfpulse");
     const workloadNamespace = resource(resources, "Namespace", "canfar-workloads");
-    const serviceAccount = resource(resources, "ServiceAccount", "perfpulse-runner");
+    const serviceAccount = resource(resources, "ServiceAccount", "canfar-perfpulse");
     const role = resource(resources, "Role", "perfpulse-workload-writer");
     const roleBinding = resource(resources, "RoleBinding", "perfpulse-workload-writer");
     const configMap = resource(resources, "ConfigMap", "perfpulse-spot-direct-tiny-config");
@@ -28,6 +28,13 @@ describe("deployment manifest contracts", () => {
     expect(serviceAccount.metadata.namespace).toBe("canfar-perfpulse");
     expect(role.metadata.namespace).toBe("canfar-workloads");
     expect(roleBinding.metadata.namespace).toBe("canfar-workloads");
+    expect(roleBinding.subjects).toEqual([
+      {
+        kind: "ServiceAccount",
+        name: "canfar-perfpulse",
+        namespace: "canfar-perfpulse",
+      },
+    ]);
 
     expect(configMap.metadata.namespace).toBe("canfar-perfpulse");
     expect(configMap.data).toMatchObject({
@@ -51,18 +58,30 @@ describe("deployment manifest contracts", () => {
     expect(testRun.metadata.namespace).toBe("canfar-perfpulse");
     expect(testRun.spec).toMatchObject({
       arguments: "-o opentelemetry",
+      initializer: {
+        containerSecurityContext: restrictedContainerSecurityContext,
+        image: "images.opencadc.org/platform/perfpulse:2026.05.04",
+        securityContext: restrictedPodSecurityContext,
+        serviceAccountName: "canfar-perfpulse",
+      },
       parallelism: 1,
       runner: {
+        containerSecurityContext: restrictedContainerSecurityContext,
         image: "images.opencadc.org/platform/perfpulse:2026.05.04",
-        serviceAccountName: "perfpulse-runner",
+        securityContext: restrictedPodSecurityContext,
+        serviceAccountName: "canfar-perfpulse",
       },
       script: {
         localFile: "/test/perfpulse.js",
       },
       starter: {
-        serviceAccountName: "perfpulse-runner",
+        containerSecurityContext: restrictedContainerSecurityContext,
+        securityContext: restrictedPodSecurityContext,
+        serviceAccountName: "canfar-perfpulse",
       },
     });
+    expect((testRun.spec?.starter as Record<string, unknown>).image).toBeUndefined();
+    expect((testRun.spec?.starter as Record<string, unknown>).envFrom).toBeUndefined();
     const testRunSpec = testRun.spec as {
       runner: {
         env: Array<{ name: string; value: string }>;
@@ -94,6 +113,7 @@ describe("deployment manifest contracts", () => {
     const resources = contract.resources;
     const cronJob = resource(resources, "CronJob", "perfpulse-spot-tiny-hourly");
     const controlRole = resource(resources, "Role", "perfpulse-testrun-writer");
+    const controlRoleBinding = resource(resources, "RoleBinding", "perfpulse-testrun-writer");
     const configMap = resource(resources, "ConfigMap", "perfpulse-spot-tiny-config");
 
     expect(controlRole.metadata.namespace).toBe("canfar-perfpulse");
@@ -102,6 +122,13 @@ describe("deployment manifest contracts", () => {
       resources: ["testruns"],
       verbs: ["create", "delete", "get", "list", "patch"],
     });
+    expect(controlRoleBinding.subjects).toEqual([
+      {
+        kind: "ServiceAccount",
+        name: "canfar-perfpulse",
+        namespace: "canfar-perfpulse",
+      },
+    ]);
     expect(configMap.data).toMatchObject({
       PROFILE: "spot-tiny",
       RUN_CLASS: "spot",
@@ -123,17 +150,35 @@ describe("deployment manifest contracts", () => {
     const containers = podSpec.containers as Array<{ args: string[]; image: string; name: string }>;
     const createCommand = containers[0]?.args.join("\n") ?? "";
 
-    expect(podSpec.serviceAccountName).toBe("perfpulse-runner");
+    expect(podSpec.serviceAccountName).toBe("canfar-perfpulse");
     expect(containers[0]?.image).toBe("docker.io/bitnami/kubectl:1.31");
     expect(createCommand).toContain('TESTID="spot-tiny-$(date -u +%Y%m%d%H%M%S)"');
     expect(createCommand).toContain(`name: perfpulse-spot-tiny-$${"{TESTID}"}`);
     expect(createCommand).toContain("name: perfpulse-spot-tiny-config");
     expect(createCommand).toContain('arguments: "-o opentelemetry"');
+    expect(createCommand).toContain("initializer:");
+    expect(createCommand).toContain("image: images.opencadc.org/platform/perfpulse:2026.05.04");
+    expect(createCommand).toContain("serviceAccountName: canfar-perfpulse");
+    expect(createCommand).toContain("securityContext:");
+    expect(createCommand).toContain("runAsNonRoot: true");
+    expect(createCommand).toContain("runAsUser: 1000");
+    expect(createCommand).toContain("runAsGroup: 1000");
+    expect(createCommand).toContain("seccompProfile:");
+    expect(createCommand).toContain("type: RuntimeDefault");
+    expect(createCommand).toContain("containerSecurityContext:");
+    expect(createCommand).toContain("allowPrivilegeEscalation: false");
+    expect(createCommand).toContain("capabilities:");
+    expect(createCommand).toContain("drop:");
+    expect(createCommand).toContain("- ALL");
     expect(createCommand).toContain(
       "\n      - secretRef:\n          name: perfpulse-otlp-credentials",
     );
     expect(createCommand).toContain("spot-tiny");
     expect(createCommand).not.toMatch(/benchmark|stress/u);
+    expect(starterBlock(createCommand)).not.toContain(
+      "image: images.opencadc.org/platform/perfpulse",
+    );
+    expect(starterBlock(createCommand)).not.toContain("envFrom:");
     expect(renderManifestDocuments(contract)).not.toMatch(
       /experimental-prometheus-rw|K6_PROMETHEUS_RW/u,
     );
@@ -170,6 +215,28 @@ type ContractResource =
   | ReturnType<typeof buildManualSpotDirectTinyDeployment>["resources"][number]
   | ReturnType<typeof buildHourlySpotTinySchedule>["resources"][number];
 
+const restrictedPodSecurityContext = {
+  runAsGroup: 1000,
+  runAsNonRoot: true,
+  runAsUser: 1000,
+  seccompProfile: {
+    type: "RuntimeDefault",
+  },
+};
+
+const restrictedContainerSecurityContext = {
+  allowPrivilegeEscalation: false,
+  capabilities: {
+    drop: ["ALL"],
+  },
+  runAsGroup: 1000,
+  runAsNonRoot: true,
+  runAsUser: 1000,
+  seccompProfile: {
+    type: "RuntimeDefault",
+  },
+};
+
 function resource(
   resources: ContractResource[],
   kind: ContractResource["kind"],
@@ -180,4 +247,12 @@ function resource(
     throw new Error(`Missing ${kind}/${name}`);
   }
   return found;
+}
+
+function starterBlock(createCommand: string): string {
+  const match = createCommand.match(/\n {2}starter:\n(?<starter>[\s\S]*?)\nYAML/u);
+  if (match?.groups?.starter === undefined) {
+    throw new Error("Missing starter block");
+  }
+  return match.groups.starter;
 }
