@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/opencadc/perfpulse/compare/v0.1.5...v0.1.6) (2026-05-05)
+
+
+### Features
+
+* add kueue spot validation slice ([dcbaab3](https://github.com/opencadc/perfpulse/commit/dcbaab3a80ef11fb23996e0a4da7ce05d91100d5))
+
 ## [0.1.5](https://github.com/opencadc/perfpulse/compare/v0.1.4...v0.1.5) (2026-05-05)
 
 
