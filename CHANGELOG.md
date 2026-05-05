@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/opencadc/perfpulse/compare/v0.1.4...v0.1.5) (2026-05-05)
+
+
+### Features
+
+* support artifact links in run evidence ([8356a9c](https://github.com/opencadc/perfpulse/commit/8356a9cfe333ce78172aea86cc6b55e7dabc1c3f))
+
 ## [0.1.4](https://github.com/opencadc/perfpulse/compare/v0.1.3...v0.1.4) (2026-05-05)
 
 
