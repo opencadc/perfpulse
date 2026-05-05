@@ -70,7 +70,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum(increase(k6_perfpulse_jobs_submitted_total{testid=\"$testid\",surface=~\"$surface\"}[$__range]))",
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_submitted_total{testid=\"$testid\",surface=~\"$surface\"}[$__range]))",
           "legendFormat": "submitted",
           "refId": "A"
         }
@@ -128,7 +128,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum(increase(k6_perfpulse_jobs_visible_total{testid=\"$testid\",surface=~\"$surface\"}[$__range]))",
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_visible_total{testid=\"$testid\",surface=~\"$surface\"}[$__range]))",
           "legendFormat": "visible",
           "refId": "A"
         }
@@ -190,7 +190,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum(increase(k6_perfpulse_jobs_completed_total{testid=\"$testid\",surface=~\"$surface\"}[$__range]))",
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_completed_total{testid=\"$testid\",surface=~\"$surface\"}[$__range]))",
           "legendFormat": "completed",
           "refId": "A"
         }
@@ -252,7 +252,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum(increase(k6_perfpulse_cleanup_failed_total{testid=\"$testid\",surface=~\"$surface\"}[$__range]))",
+          "expr": "sum(last_over_time(k6_perfpulse_cleanup_failed_total{testid=\"$testid\",surface=~\"$surface\"}[$__range]))",
           "legendFormat": "cleanup failures",
           "refId": "A"
         }
