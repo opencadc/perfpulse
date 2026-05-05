@@ -11,6 +11,7 @@ export interface RunEvidenceInput {
   acceptedWorkCount: number;
   activeHypothesis?: string;
   admittedKueueWorkloadCount?: number;
+  artifactLinks?: EvidenceLink[];
   cleanupResult: CleanupResult;
   completedWorkCount: number;
   dashboardLinks?: EvidenceLink[];
@@ -71,6 +72,7 @@ export function createRunEvidenceReport(input: RunEvidenceInput): string {
     ...input.thresholdsUsed.map((threshold) => `- \`${threshold}\``),
     ...linkSection("Dashboard Links", input.dashboardLinks),
     ...linkSection("Prometheus Query Links", input.prometheusLinks),
+    ...linkSection("Artifacts", input.artifactLinks),
     "",
   ];
 

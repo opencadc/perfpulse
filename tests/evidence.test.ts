@@ -5,6 +5,12 @@ describe("run evidence report", () => {
   test("renders a Confluence-ready Markdown note with canonical run evidence fields", () => {
     const report = createRunEvidenceReport({
       acceptedWorkCount: 1,
+      artifactLinks: [
+        {
+          label: "raw run archive",
+          url: "https://artifacts.example.test/perfpulse/spot-20260501-180000.tar.gz",
+        },
+      ],
       cleanupResult: "succeeded",
       completedWorkCount: 1,
       dashboardLinks: [
@@ -56,6 +62,10 @@ describe("run evidence report", () => {
     );
     expect(report).toContain(
       "- [submitted jobs](https://prometheus.example.test/graph?g0.expr=perfpulse_jobs_submitted%7Btestid%3D%22spot-20260501-180000%22%7D)",
+    );
+    expect(report).toContain("## Artifacts");
+    expect(report).toContain(
+      "- [raw run archive](https://artifacts.example.test/perfpulse/spot-20260501-180000.tar.gz)",
     );
   });
 
@@ -112,6 +122,40 @@ describe("run evidence report", () => {
       targetNamespaces: ["canfar-workloads"],
       testid: "spot-20260501-180000",
       thresholdsUsed: [secret],
+      visibleWorkCount: 1,
+      workloadModel: "closed" as const,
+    };
+
+    expect(() => createRunEvidenceReport(input)).toThrow("run evidence contains a sensitive value");
+    try {
+      createRunEvidenceReport(input);
+    } catch (error) {
+      expect(String(error)).not.toContain(secret);
+    }
+  });
+
+  test("rejects sensitive values in artifact links without echoing the secret", () => {
+    const secret = "https://artifacts.example.test/perfpulse?token=abc123";
+    const input = {
+      acceptedWorkCount: 1,
+      artifactLinks: [
+        {
+          label: "raw run archive",
+          url: secret,
+        },
+      ],
+      cleanupResult: "succeeded" as const,
+      completedWorkCount: 1,
+      executor: "shared-iterations",
+      imageTag: "ghcr.io/opencadc/perfpulse:v1",
+      profile: "spot-direct-tiny",
+      runClass: "spot" as const,
+      runnerImage: "ghcr.io/opencadc/perfpulse:v1",
+      scenario: "single-bulk-user",
+      surface: "k8s-direct",
+      targetNamespaces: ["canfar-workloads"],
+      testid: "spot-20260501-180000",
+      thresholdsUsed: ["http_req_failed rate<0.01"],
       visibleWorkCount: 1,
       workloadModel: "closed" as const,
     };

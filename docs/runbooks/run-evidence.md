@@ -28,7 +28,7 @@ Required fields:
 
 Include `admittedKueueWorkloadCount` when the Kueue surface is enabled.
 
-Include `dashboardLinks` and `prometheusLinks` when those query links are available.
+Include `dashboardLinks`, `prometheusLinks`, and `artifactLinks` when those links are available.
 
 Benchmark and stress run notes must include `activeHypothesis`. Spot runs do not require it.
 
@@ -50,11 +50,29 @@ import { createRunEvidenceReport } from "./src/evidence";
 
 const markdown = createRunEvidenceReport({
   acceptedWorkCount: 1,
+  artifactLinks: [
+    {
+      label: "raw run archive",
+      url: "https://artifacts.example.test/perfpulse/spot-20260501-180000.tar.gz",
+    },
+  ],
   cleanupResult: "succeeded",
   completedWorkCount: 1,
+  dashboardLinks: [
+    {
+      label: "PerfPulse overview",
+      url: "https://grafana.example.test/d/perfpulse?var-testid=spot-20260501-180000",
+    },
+  ],
   executor: "shared-iterations",
   gitSha: "abc1234",
   profile: "spot-direct-tiny",
+  prometheusLinks: [
+    {
+      label: "submitted jobs",
+      url: "https://prometheus.example.test/graph?g0.expr=perfpulse_jobs_submitted%7Btestid%3D%22spot-20260501-180000%22%7D",
+    },
+  ],
   runClass: "spot",
   runnerImage: "ghcr.io/opencadc/perfpulse:v1",
   scenario: "single-bulk-user",
