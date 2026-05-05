@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/opencadc/perfpulse/compare/v0.1.1...v0.1.2) (2026-05-05)
+
+
+### Bug Fixes
+
+* satisfy prod restricted security policy ([48d0fa8](https://github.com/opencadc/perfpulse/commit/48d0fa82d4f1d8701e46a83497f0e720c306290e))
+
 ## [0.1.1](https://github.com/opencadc/perfpulse/compare/v0.1.0...v0.1.1) (2026-05-04)
 
 
