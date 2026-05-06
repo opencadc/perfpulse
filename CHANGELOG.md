@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.7](https://github.com/opencadc/perfpulse/compare/v0.1.6...v0.1.7) (2026-05-06)
+
+
+### Features
+
+* **perfpulse:** add spot benchmark and stress TestRuns ([a9f14fb](https://github.com/opencadc/perfpulse/commit/a9f14fb822619fd5d414855fd8745e391beac02d))
+* **perfpulse:** working skaha, k8s, kueue spot / benchmarks ([b242636](https://github.com/opencadc/perfpulse/commit/b242636b8619c8c5c30d1a13199f934e4dcfb7f4))
+
 ## [0.1.6](https://github.com/opencadc/perfpulse/compare/v0.1.5...v0.1.6) (2026-05-05)
 
 
