@@ -32,6 +32,9 @@ const deleteStatuses: number[] = [];
 const sessionGetStatuses: number[] = [];
 let listJobsStatus: number | undefined;
 let iterationInTest = 0;
+let workloadAdmitted = true;
+let jobConditionType: "Complete" | "Failed" | undefined = "Complete";
+let sessionStatus = "Completed";
 
 Reflect.set(globalThis, "__ENV", {
   PERF_PULSE_CLIENT_MODE: "kubernetes",
@@ -100,7 +103,7 @@ mock.module("k6/http", () => ({
         const status = sessionGetStatuses.shift() ?? 200;
         return {
           body:
-            status === 200 ? JSON.stringify({ id: "session-runtime", status: "Completed" }) : "",
+            status === 200 ? JSON.stringify({ id: "session-runtime", status: sessionStatus }) : "",
           status,
         };
       }
@@ -114,7 +117,7 @@ mock.module("k6/http", () => ({
                   ownerReferences: [{ kind: "Job", name: jobName }],
                 },
                 status: {
-                  conditions: [{ status: "True", type: "Admitted" }],
+                  conditions: [{ status: workloadAdmitted ? "True" : "False", type: "Admitted" }],
                 },
               },
             ],
@@ -138,7 +141,10 @@ mock.module("k6/http", () => ({
         body: JSON.stringify({
           items: jobs.map((job) => ({
             metadata: { labels: job.labels, name: job.name },
-            status: { conditions: [{ status: "True", type: "Complete" }] },
+            status: {
+              conditions:
+                jobConditionType === undefined ? [] : [{ status: "True", type: jobConditionType }],
+            },
           })),
         }),
         status: 200,
@@ -185,6 +191,9 @@ describe("PerfPulse k6 runtime dispatch", () => {
     sessionGetStatuses.length = 0;
     listJobsStatus = undefined;
     iterationInTest = 0;
+    workloadAdmitted = true;
+    jobConditionType = "Complete";
+    sessionStatus = "Completed";
   });
 
   test("runs the Kueue Kubernetes surface when runtime config selects k8s-kueue", async () => {
@@ -259,6 +268,39 @@ describe("PerfPulse k6 runtime dispatch", () => {
     expect(sleepCalls).toEqual([]);
   });
 
+  test("records stress Kueue visibility without hard-failing non-admission", async () => {
+    workloadAdmitted = false;
+    const config = resolveRunConfig({
+      CONFIRM_STRESS: "true",
+      KUEUE_ADMISSION_GATE_SECONDS: "1",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      POLL_INTERVAL_SECONDS: "1",
+      PROFILE: "stress-high",
+      SURFACE: "k8s-kueue",
+      TESTID: "stress-kueue",
+    });
+    const runtime = await import("../src/perfpulse");
+
+    expect(() => runtime.default(config)).not.toThrow();
+
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.jobsSubmitted,
+      tags: expect.objectContaining({ surface: "k8s-kueue", testid: "stress-kueue" }),
+      value: 1,
+    });
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.jobsVisible,
+      tags: expect.objectContaining({ surface: "k8s-kueue", testid: "stress-kueue" }),
+      value: 1,
+    });
+    expect(metricRecords).not.toContainEqual(
+      expect.objectContaining({
+        metric: METRIC_NAMES.kueueWorkloadsAdmissionFailed,
+        value: 1,
+      }),
+    );
+  });
+
   test("uses the k6 global iteration index for direct Kubernetes Job identity", async () => {
     iterationInTest = 75;
     const config = resolveRunConfig({
@@ -284,6 +326,39 @@ describe("PerfPulse k6 runtime dispatch", () => {
     );
     expect(JSON.stringify(metricRecords)).not.toContain("perfpulse-direct-benchmark-direct-75");
     expect(sleepCalls).toEqual([]);
+  });
+
+  test("records stress direct visibility without hard-failing incomplete Jobs", async () => {
+    jobConditionType = undefined;
+    const config = resolveRunConfig({
+      COMPLETION_GATE_SECONDS: "1",
+      CONFIRM_STRESS: "true",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      POLL_INTERVAL_SECONDS: "1",
+      PROFILE: "stress-medium",
+      SURFACE: "k8s-direct",
+      TESTID: "stress-direct",
+    });
+    const runtime = await import("../src/perfpulse");
+
+    expect(() => runtime.default(config)).not.toThrow();
+
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.jobsSubmitted,
+      tags: expect.objectContaining({ surface: "k8s-direct", testid: "stress-direct" }),
+      value: 1,
+    });
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.jobsVisible,
+      tags: expect.objectContaining({ surface: "k8s-direct", testid: "stress-direct" }),
+      value: 1,
+    });
+    expect(metricRecords).not.toContainEqual(
+      expect.objectContaining({
+        metric: METRIC_NAMES.jobsCompletionFailed,
+        value: 1,
+      }),
+    );
   });
 
   test("passes the derived user bucket into Kueue Job identity", async () => {
@@ -446,6 +521,40 @@ describe("PerfPulse k6 runtime dispatch", () => {
     expect(url.searchParams.get("name")).toBe("perfpulse-skaha-benchmark-skaha-75");
     expect(url.searchParams.getAll("env")).toEqual(["PERF_PULSE_TESTID=skaha-benchmark"]);
     expect(JSON.stringify(metricRecords)).not.toContain("perfpulse-skaha-benchmark-skaha-75");
+  });
+
+  test("records stress Skaha visibility without hard-failing running sessions", async () => {
+    sessionStatus = "Running";
+    const config = resolveRunConfig({
+      COMPLETION_GATE_SECONDS: "1",
+      CONFIRM_STRESS: "true",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      POLL_INTERVAL_SECONDS: "1",
+      PROFILE: "stress-medium",
+      SKAHA_API_URL: "https://ws.example/skaha/v1",
+      SURFACE: "skaha",
+      TESTID: "stress-skaha",
+    });
+    const runtime = await import("../src/perfpulse");
+
+    expect(() => runtime.default({ config, skahaBearerToken: "runtime-token" })).not.toThrow();
+
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.jobsSubmitted,
+      tags: expect.objectContaining({ surface: "skaha", testid: "stress-skaha" }),
+      value: 1,
+    });
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.jobsVisible,
+      tags: expect.objectContaining({ surface: "skaha", testid: "stress-skaha" }),
+      value: 1,
+    });
+    expect(metricRecords).not.toContainEqual(
+      expect.objectContaining({
+        metric: METRIC_NAMES.jobsCompletionFailed,
+        value: 1,
+      }),
+    );
   });
 
   test("applies deterministic Skaha submission stagger before session create", async () => {

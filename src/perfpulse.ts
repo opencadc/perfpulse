@@ -195,8 +195,10 @@ function runDirectKubernetes(data: RunConfig, tags: MetricTags): void {
     fail(result.failure.message);
   }
 
-  jobsCompleted.add(1, tags);
-  if (result.completionLatencyMs !== undefined) {
+  if (result.completed) {
+    jobsCompleted.add(1, tags);
+  }
+  if (result.completed && result.completionLatencyMs !== undefined) {
     completionLatency.add(result.completionLatencyMs, tags);
   }
 }
@@ -239,8 +241,10 @@ function runKueueKubernetes(data: RunConfig, tags: MetricTags): void {
     fail(result.failure.message);
   }
 
-  kueueWorkloadsAdmitted.add(1, tags);
-  if (result.admissionLatencyMs !== undefined) {
+  if (result.admitted) {
+    kueueWorkloadsAdmitted.add(1, tags);
+  }
+  if (result.admitted && result.admissionLatencyMs !== undefined) {
     kueueAdmissionLatency.add(result.admissionLatencyMs, tags);
   }
 }
@@ -258,6 +262,7 @@ function runSkaha(runtimeData: RuntimeData, data: RunConfig, tags: MetricTags): 
     {
       completionGateSeconds: data.completionGateSeconds,
       pollIntervalSeconds: data.kubernetes.pollIntervalSeconds,
+      requireCompletion: data.runClass !== "stress",
       session: {
         args: data.workload.args,
         cmd: data.workload.command?.join(" ") ?? "stress-ng",
@@ -297,8 +302,10 @@ function runSkaha(runtimeData: RuntimeData, data: RunConfig, tags: MetricTags): 
     fail(result.failure.message);
   }
 
-  jobsCompleted.add(1, tags);
-  if (result.completionLatencyMs !== undefined) {
+  if (result.completed) {
+    jobsCompleted.add(1, tags);
+  }
+  if (result.completed && result.completionLatencyMs !== undefined) {
     completionLatency.add(result.completionLatencyMs, tags);
   }
   cleanupSkahaSession(runtimeData, data, tags, result.createResponse.sessionId);

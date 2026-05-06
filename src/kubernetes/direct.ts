@@ -83,6 +83,16 @@ export function runDirectKubernetesSurface(
   }
 
   const visibilityLatencyMs = now() - submittedAt;
+  if (config.runClass === "stress") {
+    return {
+      completed: false,
+      createResponse,
+      submissionDurationMs,
+      visible: true,
+      visibilityLatencyMs,
+    };
+  }
+
   const completeList = pollUntil(
     config.completionGateSeconds,
     config.kubernetes.pollIntervalSeconds,

@@ -96,6 +96,7 @@ export interface SkahaSurfaceFailure {
 export interface SkahaSurfaceConfig {
   completionGateSeconds: number;
   pollIntervalSeconds: number;
+  requireCompletion?: boolean;
   session: SkahaCreateSessionParams;
   visibilityGateSeconds: number;
 }
@@ -243,6 +244,16 @@ export function runSkahaSurface(
   }
 
   const visibilityLatencyMs = now() - submittedAt;
+  if (config.requireCompletion === false) {
+    return {
+      completed: false,
+      createResponse,
+      submissionDurationMs,
+      visible: true,
+      visibilityLatencyMs,
+    };
+  }
+
   const completedSession = pollUntil(
     config.completionGateSeconds,
     config.pollIntervalSeconds,

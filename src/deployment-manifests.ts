@@ -76,6 +76,16 @@ export interface ManualSpotKueueTinyOptions {
   testid: string;
 }
 
+export interface ManualSpotTinyOptions {
+  imageTag: string;
+  otlpCredentialsSecretName?: string;
+  otlpHttpExporterEndpoint?: string;
+  otlpHttpExporterUrlPath?: string;
+  skahaApiUrl?: string;
+  skahaCredentialsSecretName?: string;
+  testid: string;
+}
+
 export interface ManualBenchmarkSmallDirectKueueOptions {
   imageTag: string;
   otlpCredentialsSecretName?: string;
@@ -83,6 +93,34 @@ export interface ManualBenchmarkSmallDirectKueueOptions {
   otlpHttpExporterUrlPath?: string;
   skahaApiUrl?: string;
   skahaCredentialsSecretName?: string;
+  testid: string;
+}
+
+export interface ManualBenchmarkMediumOptions {
+  imageTag: string;
+  otlpCredentialsSecretName?: string;
+  otlpHttpExporterEndpoint?: string;
+  otlpHttpExporterUrlPath?: string;
+  skahaApiUrl?: string;
+  skahaCredentialsSecretName?: string;
+  testid: string;
+}
+
+export interface ManualStressMediumOptions {
+  imageTag: string;
+  otlpCredentialsSecretName?: string;
+  otlpHttpExporterEndpoint?: string;
+  otlpHttpExporterUrlPath?: string;
+  skahaApiUrl?: string;
+  skahaCredentialsSecretName?: string;
+  testid: string;
+}
+
+export interface ManualStressHighOptions {
+  imageTag: string;
+  otlpCredentialsSecretName?: string;
+  otlpHttpExporterEndpoint?: string;
+  otlpHttpExporterUrlPath?: string;
   testid: string;
 }
 
@@ -104,6 +142,8 @@ export interface HourlySpotTinyScheduleOptions {
   otlpCredentialsSecretName?: string;
   otlpHttpExporterEndpoint?: string;
   otlpHttpExporterUrlPath?: string;
+  skahaApiUrl?: string;
+  skahaCredentialsSecretName?: string;
 }
 
 export function buildManualSpotDirectTinyDeployment(
@@ -198,6 +238,101 @@ export function buildManualSpotKueueTinyDeployment(
         name: "perfpulse-spot-kueue-tiny",
         profile: "spot-tiny",
         secretNames: [options.otlpCredentialsSecretName],
+        testid: options.testid,
+      }),
+    ],
+  };
+}
+
+export function buildManualSpotTinyDeployment(options: ManualSpotTinyOptions): DeploymentContract {
+  const directConfigMapName = "perfpulse-spot-tiny-direct-config";
+  const kueueConfigMapName = "perfpulse-spot-tiny-kueue-config";
+  const skahaConfigMapName = "perfpulse-spot-tiny-skaha-config";
+  const labels = contractLabels("spot-tiny");
+  const skahaCredentialsSecretName =
+    options.skahaCredentialsSecretName ?? DEFAULT_SKAHA_CREDENTIALS_SECRET_NAME;
+
+  return {
+    resources: [
+      namespace(CONTROL_NAMESPACE),
+      namespace(WORKLOAD_NAMESPACE),
+      serviceAccount(labels),
+      workloadRole(labels, true),
+      workloadRoleBinding(labels),
+      {
+        apiVersion: "v1",
+        data: {
+          ...spotTinySurfaceConfig(options, "k8s-direct"),
+          WORKLOAD_NAMESPACE,
+        },
+        kind: "ConfigMap",
+        metadata: {
+          labels,
+          name: directConfigMapName,
+          namespace: CONTROL_NAMESPACE,
+        },
+      },
+      {
+        apiVersion: "v1",
+        data: {
+          ...spotTinySurfaceConfig(options, "k8s-kueue"),
+          KUEUE_ADMISSION_GATE_SECONDS: "120",
+          KUEUE_PRIORITY_CLASS: "low",
+          KUEUE_QUEUE_NAME: "cadc-default",
+          WORKLOAD_NAMESPACE,
+        },
+        kind: "ConfigMap",
+        metadata: {
+          labels,
+          name: kueueConfigMapName,
+          namespace: CONTROL_NAMESPACE,
+        },
+      },
+      {
+        apiVersion: "v1",
+        data: {
+          ...spotTinySurfaceConfig(options, "skaha"),
+          SKAHA_API_URL: options.skahaApiUrl ?? DEFAULT_SKAHA_API_URL,
+          SKAHA_LOGIN_URL: "https://ws-cadc.canfar.net/ac/login",
+          SKAHA_PASSWORD_PATH: "/var/run/secrets/perfpulse/skaha-auth/password",
+          SKAHA_USERNAME_PATH: "/var/run/secrets/perfpulse/skaha-auth/username",
+        },
+        kind: "ConfigMap",
+        metadata: {
+          labels,
+          name: skahaConfigMapName,
+          namespace: CONTROL_NAMESPACE,
+        },
+      },
+      testRun({
+        arguments: "-o opentelemetry",
+        configMapName: directConfigMapName,
+        image: `${DEFAULT_IMAGE_REPOSITORY}:${options.imageTag}`,
+        labels,
+        name: "perfpulse-spot-tiny-direct",
+        profile: "spot-tiny",
+        secretNames: [options.otlpCredentialsSecretName],
+        testid: options.testid,
+      }),
+      testRun({
+        arguments: "-o opentelemetry",
+        configMapName: kueueConfigMapName,
+        image: `${DEFAULT_IMAGE_REPOSITORY}:${options.imageTag}`,
+        labels,
+        name: "perfpulse-spot-tiny-kueue",
+        profile: "spot-tiny",
+        secretNames: [options.otlpCredentialsSecretName],
+        testid: options.testid,
+      }),
+      testRun({
+        arguments: "-o opentelemetry",
+        configMapName: skahaConfigMapName,
+        image: `${DEFAULT_IMAGE_REPOSITORY}:${options.imageTag}`,
+        labels,
+        name: "perfpulse-spot-tiny-skaha",
+        profile: "spot-tiny",
+        secretNames: [options.otlpCredentialsSecretName],
+        skahaCredentialsSecretName,
         testid: options.testid,
       }),
     ],
@@ -336,6 +471,264 @@ export function buildManualBenchmarkSmallDirectKueueDeployment(
   };
 }
 
+export function buildManualBenchmarkMediumDeployment(
+  options: ManualBenchmarkMediumOptions,
+): DeploymentContract {
+  const directConfigMapName = "perfpulse-benchmark-medium-direct-config";
+  const kueueConfigMapName = "perfpulse-benchmark-medium-kueue-config";
+  const skahaConfigMapName = "perfpulse-benchmark-medium-skaha-config";
+  const labels = contractLabels("benchmark-medium");
+  const skahaCredentialsSecretName =
+    options.skahaCredentialsSecretName ?? DEFAULT_SKAHA_CREDENTIALS_SECRET_NAME;
+
+  return {
+    resources: [
+      namespace(CONTROL_NAMESPACE),
+      namespace(WORKLOAD_NAMESPACE),
+      serviceAccount(labels),
+      workloadRole(labels, true),
+      workloadRoleBinding(labels),
+      {
+        apiVersion: "v1",
+        data: {
+          ...benchmarkMediumSurfaceConfig(options, "k8s-direct"),
+          K6_OTEL_SERVICE_NAME: "perfpulse-benchmark-medium-direct",
+          WORKLOAD_NAMESPACE,
+        },
+        kind: "ConfigMap",
+        metadata: {
+          labels,
+          name: directConfigMapName,
+          namespace: CONTROL_NAMESPACE,
+        },
+      },
+      {
+        apiVersion: "v1",
+        data: {
+          ...benchmarkMediumSurfaceConfig(options, "k8s-kueue"),
+          K6_OTEL_SERVICE_NAME: "perfpulse-benchmark-medium-kueue",
+          KUEUE_ADMISSION_GATE_SECONDS: "900",
+          KUEUE_PRIORITY_CLASS: "low",
+          KUEUE_QUEUE_NAME: "cadc-default",
+          WORKLOAD_NAMESPACE,
+        },
+        kind: "ConfigMap",
+        metadata: {
+          labels,
+          name: kueueConfigMapName,
+          namespace: CONTROL_NAMESPACE,
+        },
+      },
+      {
+        apiVersion: "v1",
+        data: {
+          ...benchmarkMediumSurfaceConfig(options, "skaha"),
+          K6_OTEL_SERVICE_NAME: "perfpulse-benchmark-medium-skaha",
+          SKAHA_API_URL: options.skahaApiUrl ?? DEFAULT_SKAHA_API_URL,
+          SKAHA_LOGIN_URL: "https://ws-cadc.canfar.net/ac/login",
+          SKAHA_PASSWORD_PATH: "/var/run/secrets/perfpulse/skaha-auth/password",
+          SKAHA_REQUEST_TIMEOUT_SECONDS: "120",
+          SKAHA_USERNAME_PATH: "/var/run/secrets/perfpulse/skaha-auth/username",
+          SUBMISSION_STAGGER_SECONDS: "1",
+        },
+        kind: "ConfigMap",
+        metadata: {
+          labels,
+          name: skahaConfigMapName,
+          namespace: CONTROL_NAMESPACE,
+        },
+      },
+      testRun({
+        arguments: "-o opentelemetry",
+        configMapName: directConfigMapName,
+        image: `${DEFAULT_IMAGE_REPOSITORY}:${options.imageTag}`,
+        labels,
+        name: "perfpulse-benchmark-medium-direct",
+        profile: "benchmark-medium",
+        secretNames: [options.otlpCredentialsSecretName],
+        testid: options.testid,
+      }),
+      testRun({
+        arguments: "-o opentelemetry",
+        configMapName: kueueConfigMapName,
+        image: `${DEFAULT_IMAGE_REPOSITORY}:${options.imageTag}`,
+        labels,
+        name: "perfpulse-benchmark-medium-kueue",
+        profile: "benchmark-medium",
+        secretNames: [options.otlpCredentialsSecretName],
+        testid: options.testid,
+      }),
+      testRun({
+        arguments: "-o opentelemetry",
+        configMapName: skahaConfigMapName,
+        image: `${DEFAULT_IMAGE_REPOSITORY}:${options.imageTag}`,
+        labels,
+        name: "perfpulse-benchmark-medium-skaha",
+        profile: "benchmark-medium",
+        secretNames: [options.otlpCredentialsSecretName],
+        skahaCredentialsSecretName,
+        testid: options.testid,
+      }),
+    ],
+  };
+}
+
+export function buildManualStressMediumDeployment(
+  options: ManualStressMediumOptions,
+): DeploymentContract {
+  const directConfigMapName = "perfpulse-stress-medium-direct-config";
+  const kueueConfigMapName = "perfpulse-stress-medium-kueue-config";
+  const skahaConfigMapName = "perfpulse-stress-medium-skaha-config";
+  const labels = contractLabels("stress-medium");
+  const skahaCredentialsSecretName =
+    options.skahaCredentialsSecretName ?? DEFAULT_SKAHA_CREDENTIALS_SECRET_NAME;
+
+  return {
+    resources: [
+      namespace(CONTROL_NAMESPACE),
+      namespace(WORKLOAD_NAMESPACE),
+      serviceAccount(labels),
+      workloadRole(labels, true),
+      workloadRoleBinding(labels),
+      {
+        apiVersion: "v1",
+        data: {
+          ...stressMediumSurfaceConfig(options, "k8s-direct"),
+          K6_OTEL_SERVICE_NAME: "perfpulse-stress-medium-direct",
+          WORKLOAD_NAMESPACE,
+        },
+        kind: "ConfigMap",
+        metadata: {
+          labels,
+          name: directConfigMapName,
+          namespace: CONTROL_NAMESPACE,
+        },
+      },
+      {
+        apiVersion: "v1",
+        data: {
+          ...stressMediumSurfaceConfig(options, "k8s-kueue"),
+          K6_OTEL_SERVICE_NAME: "perfpulse-stress-medium-kueue",
+          KUEUE_ADMISSION_GATE_SECONDS: "900",
+          KUEUE_PRIORITY_CLASS: "low",
+          KUEUE_QUEUE_NAME: "cadc-default",
+          WORKLOAD_NAMESPACE,
+        },
+        kind: "ConfigMap",
+        metadata: {
+          labels,
+          name: kueueConfigMapName,
+          namespace: CONTROL_NAMESPACE,
+        },
+      },
+      {
+        apiVersion: "v1",
+        data: {
+          ...stressMediumSurfaceConfig(options, "skaha"),
+          K6_OTEL_SERVICE_NAME: "perfpulse-stress-medium-skaha",
+          SKAHA_API_URL: options.skahaApiUrl ?? DEFAULT_SKAHA_API_URL,
+          SKAHA_LOGIN_URL: "https://ws-cadc.canfar.net/ac/login",
+          SKAHA_PASSWORD_PATH: "/var/run/secrets/perfpulse/skaha-auth/password",
+          SKAHA_REQUEST_TIMEOUT_SECONDS: "120",
+          SKAHA_USERNAME_PATH: "/var/run/secrets/perfpulse/skaha-auth/username",
+        },
+        kind: "ConfigMap",
+        metadata: {
+          labels,
+          name: skahaConfigMapName,
+          namespace: CONTROL_NAMESPACE,
+        },
+      },
+      testRun({
+        arguments: "-o opentelemetry",
+        configMapName: directConfigMapName,
+        image: `${DEFAULT_IMAGE_REPOSITORY}:${options.imageTag}`,
+        labels,
+        name: "perfpulse-stress-medium-direct",
+        profile: "stress-medium",
+        secretNames: [options.otlpCredentialsSecretName],
+        testid: options.testid,
+      }),
+      testRun({
+        arguments: "-o opentelemetry",
+        configMapName: kueueConfigMapName,
+        image: `${DEFAULT_IMAGE_REPOSITORY}:${options.imageTag}`,
+        labels,
+        name: "perfpulse-stress-medium-kueue",
+        profile: "stress-medium",
+        secretNames: [options.otlpCredentialsSecretName],
+        testid: options.testid,
+      }),
+      testRun({
+        arguments: "-o opentelemetry",
+        configMapName: skahaConfigMapName,
+        image: `${DEFAULT_IMAGE_REPOSITORY}:${options.imageTag}`,
+        labels,
+        name: "perfpulse-stress-medium-skaha",
+        profile: "stress-medium",
+        secretNames: [options.otlpCredentialsSecretName],
+        skahaCredentialsSecretName,
+        testid: options.testid,
+      }),
+    ],
+  };
+}
+
+export function buildManualStressHighDeployment(
+  options: ManualStressHighOptions,
+): DeploymentContract {
+  const configMapName = "perfpulse-stress-high-kueue-config";
+  const labels = contractLabels("stress-high");
+
+  return {
+    resources: [
+      namespace(CONTROL_NAMESPACE),
+      namespace(WORKLOAD_NAMESPACE),
+      serviceAccount(labels),
+      workloadRole(labels, true),
+      workloadRoleBinding(labels),
+      {
+        apiVersion: "v1",
+        data: {
+          CLEANUP: "true",
+          CONFIRM_STRESS: "true",
+          ...otlpConfig(options, "perfpulse-stress-high-kueue"),
+          K6_OTEL_EXPORT_INTERVAL: "30s",
+          KUEUE_ADMISSION_GATE_SECONDS: "1800",
+          KUEUE_PRIORITY_CLASS: "low",
+          KUEUE_QUEUE_NAME: "cadc-default",
+          LOGICAL_USERS: "100",
+          PERF_PULSE_CLIENT_MODE: "kubernetes",
+          PRESERVE_ON_FAILURE: "false",
+          PROFILE: "stress-high",
+          RUN_CLASS: "stress",
+          SCENARIO: "throughput-stress",
+          SURFACE: "k8s-kueue",
+          TOTAL_JOBS: "100000",
+          VISIBILITY_GATE_SECONDS: "1800",
+          WORKLOAD_NAMESPACE,
+        },
+        kind: "ConfigMap",
+        metadata: {
+          labels,
+          name: configMapName,
+          namespace: CONTROL_NAMESPACE,
+        },
+      },
+      testRun({
+        arguments: "-o opentelemetry",
+        configMapName,
+        image: `${DEFAULT_IMAGE_REPOSITORY}:${options.imageTag}`,
+        labels,
+        name: "perfpulse-stress-high-kueue",
+        profile: "stress-high",
+        secretNames: [options.otlpCredentialsSecretName],
+        testid: options.testid,
+      }),
+    ],
+  };
+}
+
 export function buildManualSpotSkahaTinyDeployment(
   options: ManualSpotSkahaTinyOptions,
 ): DeploymentContract {
@@ -390,9 +783,13 @@ export function buildManualSpotSkahaTinyDeployment(
 export function buildHourlySpotTinySchedule(
   options: HourlySpotTinyScheduleOptions,
 ): DeploymentContract {
-  const configMapName = "perfpulse-spot-tiny-config";
+  const directConfigMapName = "perfpulse-spot-tiny-direct-config";
+  const kueueConfigMapName = "perfpulse-spot-tiny-kueue-config";
+  const skahaConfigMapName = "perfpulse-spot-tiny-skaha-config";
   const labels = contractLabels("spot-tiny");
   const image = `${DEFAULT_IMAGE_REPOSITORY}:${options.imageTag}`;
+  const skahaCredentialsSecretName =
+    options.skahaCredentialsSecretName ?? DEFAULT_SKAHA_CREDENTIALS_SECRET_NAME;
   const secretRefs = [options.otlpCredentialsSecretName]
     .filter((name): name is string => name !== undefined)
     .map((name) => `      - secretRef:\n          name: ${name}\n          optional: true`)
@@ -403,26 +800,52 @@ export function buildHourlySpotTinySchedule(
       namespace(CONTROL_NAMESPACE),
       namespace(WORKLOAD_NAMESPACE),
       serviceAccount(labels),
-      workloadRole(labels, false),
+      workloadRole(labels, true),
       workloadRoleBinding(labels),
       testRunWriterRole(labels),
       testRunWriterRoleBinding(labels),
       {
         apiVersion: "v1",
         data: {
-          CLEANUP: "true",
-          COMPLETION_GATE_SECONDS: "120",
-          ...otlpConfig(options),
-          PERF_PULSE_CLIENT_MODE: "kubernetes",
-          PROFILE: "spot-tiny",
-          RUN_CLASS: "spot",
-          VISIBILITY_GATE_SECONDS: "60",
+          ...spotTinySurfaceConfig(options, "k8s-direct"),
           WORKLOAD_NAMESPACE,
         },
         kind: "ConfigMap",
         metadata: {
           labels,
-          name: configMapName,
+          name: directConfigMapName,
+          namespace: CONTROL_NAMESPACE,
+        },
+      },
+      {
+        apiVersion: "v1",
+        data: {
+          ...spotTinySurfaceConfig(options, "k8s-kueue"),
+          KUEUE_ADMISSION_GATE_SECONDS: "120",
+          KUEUE_PRIORITY_CLASS: "low",
+          KUEUE_QUEUE_NAME: "cadc-default",
+          WORKLOAD_NAMESPACE,
+        },
+        kind: "ConfigMap",
+        metadata: {
+          labels,
+          name: kueueConfigMapName,
+          namespace: CONTROL_NAMESPACE,
+        },
+      },
+      {
+        apiVersion: "v1",
+        data: {
+          ...spotTinySurfaceConfig(options, "skaha"),
+          SKAHA_API_URL: options.skahaApiUrl ?? DEFAULT_SKAHA_API_URL,
+          SKAHA_LOGIN_URL: "https://ws-cadc.canfar.net/ac/login",
+          SKAHA_PASSWORD_PATH: "/var/run/secrets/perfpulse/skaha-auth/password",
+          SKAHA_USERNAME_PATH: "/var/run/secrets/perfpulse/skaha-auth/username",
+        },
+        kind: "ConfigMap",
+        metadata: {
+          labels,
+          name: skahaConfigMapName,
           namespace: CONTROL_NAMESPACE,
         },
       },
@@ -450,9 +873,26 @@ export function buildHourlySpotTinySchedule(
                     {
                       args: [
                         scheduledTestRunApplyCommand({
-                          configMapName,
                           image,
                           secretRefs,
+                          testRuns: [
+                            {
+                              configMapName: directConfigMapName,
+                              namePrefix: "perfpulse-spot-tiny-direct",
+                              surface: "k8s-direct",
+                            },
+                            {
+                              configMapName: kueueConfigMapName,
+                              namePrefix: "perfpulse-spot-tiny-kueue",
+                              surface: "k8s-kueue",
+                            },
+                            {
+                              configMapName: skahaConfigMapName,
+                              namePrefix: "perfpulse-spot-tiny-skaha",
+                              skahaCredentialsSecretName,
+                              surface: "skaha",
+                            },
+                          ],
                         }),
                       ],
                       command: ["/bin/sh", "-c"],
@@ -718,6 +1158,73 @@ function otlpConfig(
   };
 }
 
+function spotTinySurfaceConfig(
+  options: {
+    otlpHttpExporterEndpoint?: string;
+    otlpHttpExporterUrlPath?: string;
+  },
+  surface: "k8s-direct" | "k8s-kueue" | "skaha",
+): Record<string, string> {
+  return {
+    CLEANUP: "true",
+    COMPLETION_GATE_SECONDS: "120",
+    ...otlpConfig(options),
+    K6_OTEL_EXPORT_INTERVAL: "1s",
+    PERF_PULSE_CLIENT_MODE: "kubernetes",
+    PROFILE: "spot-tiny",
+    RUN_CLASS: "spot",
+    SURFACE: surface,
+    VISIBILITY_GATE_SECONDS: "60",
+  };
+}
+
+function benchmarkMediumSurfaceConfig(
+  options: {
+    otlpHttpExporterEndpoint?: string;
+    otlpHttpExporterUrlPath?: string;
+  },
+  surface: "k8s-direct" | "k8s-kueue" | "skaha",
+): Record<string, string> {
+  return {
+    CLEANUP: "true",
+    COMPLETION_GATE_SECONDS: "900",
+    ...otlpConfig(options),
+    K6_OTEL_EXPORT_INTERVAL: "5s",
+    LOGICAL_USERS: "100",
+    PERF_PULSE_CLIENT_MODE: "kubernetes",
+    PROFILE: "benchmark-medium",
+    RUN_CLASS: "benchmark",
+    SCENARIO: "many-small-users",
+    SURFACE: surface,
+    TOTAL_JOBS: "1000",
+    VISIBILITY_GATE_SECONDS: "300",
+  };
+}
+
+function stressMediumSurfaceConfig(
+  options: {
+    otlpHttpExporterEndpoint?: string;
+    otlpHttpExporterUrlPath?: string;
+  },
+  surface: "k8s-direct" | "k8s-kueue" | "skaha",
+): Record<string, string> {
+  return {
+    CLEANUP: "true",
+    CONFIRM_STRESS: "true",
+    ...otlpConfig(options),
+    K6_OTEL_EXPORT_INTERVAL: "15s",
+    LOGICAL_USERS: "100",
+    PERF_PULSE_CLIENT_MODE: "kubernetes",
+    PRESERVE_ON_FAILURE: "false",
+    PROFILE: "stress-medium",
+    RUN_CLASS: "stress",
+    SCENARIO: "throughput-stress",
+    SURFACE: surface,
+    TOTAL_JOBS: "10000",
+    VISIBILITY_GATE_SECONDS: "900",
+  };
+}
+
 function renderYaml(value: unknown, indent: number): string {
   if (Array.isArray(value)) {
     return renderArray(value, indent);
@@ -822,24 +1329,63 @@ function needsQuoting(value: string): boolean {
 }
 
 function scheduledTestRunApplyCommand(options: {
-  configMapName: string;
   image: string;
   secretRefs: string;
+  testRuns: Array<{
+    configMapName: string;
+    namePrefix: string;
+    skahaCredentialsSecretName?: string;
+    surface: "k8s-direct" | "k8s-kueue" | "skaha";
+  }>;
 }): string {
-  const secretRefs = options.secretRefs.length > 0 ? `\n${options.secretRefs}` : "";
+  const documents = options.testRuns
+    .map((testRun) =>
+      scheduledTestRunDocument({
+        ...testRun,
+        image: options.image,
+        secretRefs: options.secretRefs,
+      }),
+    )
+    .join("---\n");
 
   return `set -eu
 TESTID="spot-tiny-$(date -u +%Y%m%d%H%M%S)"
 cat <<YAML | kubectl apply -f -
-apiVersion: k6.io/v1alpha1
+${documents}YAML`;
+}
+
+function scheduledTestRunDocument(options: {
+  configMapName: string;
+  image: string;
+  namePrefix: string;
+  secretRefs: string;
+  skahaCredentialsSecretName?: string;
+  surface: "k8s-direct" | "k8s-kueue" | "skaha";
+}): string {
+  const secretRefs = options.secretRefs.length > 0 ? `\n${options.secretRefs}` : "";
+  const skahaVolumeMount =
+    options.skahaCredentialsSecretName === undefined
+      ? ""
+      : `
+    volumeMounts:
+      - mountPath: /var/run/secrets/perfpulse/skaha-auth
+        name: skaha-auth-credentials
+        readOnly: true
+    volumes:
+      - name: skaha-auth-credentials
+        secret:
+          secretName: ${options.skahaCredentialsSecretName}`;
+
+  return `apiVersion: k6.io/v1alpha1
 kind: TestRun
 metadata:
-  name: perfpulse-spot-tiny-\${TESTID}
+  name: ${options.namePrefix}-\${TESTID}
   namespace: ${CONTROL_NAMESPACE}
   labels:
     app.kubernetes.io/name: perfpulse
     app.kubernetes.io/part-of: perfpulse
     perfpulse.opencadc.org/profile: spot-tiny
+    perfpulse.opencadc.org/surface: ${options.surface}
     perfpulse.opencadc.org/testid: \${TESTID}
 spec:
   cleanup: post
@@ -890,7 +1436,7 @@ spec:
         value: \${TESTID}
     envFrom:
       - configMapRef:
-          name: ${options.configMapName}${secretRefs}
+          name: ${options.configMapName}${secretRefs}${skahaVolumeMount}
   starter:
     serviceAccountName: ${RUNNER_SERVICE_ACCOUNT}
     securityContext:
@@ -909,5 +1455,5 @@ spec:
       runAsUser: 1000
       seccompProfile:
         type: RuntimeDefault
-YAML`;
+`;
 }

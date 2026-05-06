@@ -144,6 +144,21 @@ export function runKueueKubernetesSurface(
   }
 
   const workloadVisibilityLatencyMs = now() - submittedAt;
+  if (config.runClass === "stress") {
+    const workload = findWorkloadForJob(workloadVisibleList, config.jobName);
+    const admitted = isWorkloadAdmitted(workload);
+    return {
+      admitted,
+      ...(admitted ? { admissionLatencyMs: now() - submittedAt } : {}),
+      createResponse,
+      jobVisible: true,
+      submissionDurationMs,
+      visibilityLatencyMs,
+      workloadVisible: true,
+      workloadVisibilityLatencyMs,
+    };
+  }
+
   const admittedList = pollUntil(
     options.admissionGateSeconds,
     config.kubernetes.pollIntervalSeconds,

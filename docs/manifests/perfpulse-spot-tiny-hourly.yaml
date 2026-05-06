@@ -38,6 +38,14 @@ rules:
       - delete
       - get
       - list
+  -
+    apiGroups:
+      - kueue.x-k8s.io
+    resources:
+      - workloads
+    verbs:
+      - get
+      - list
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -109,10 +117,11 @@ data:
   K6_OTEL_HTTP_EXPORTER_URL_PATH: /api/v1/otlp/v1/metrics
   K6_OTEL_METRIC_PREFIX: k6_
   K6_OTEL_SERVICE_NAME: perfpulse
-  K6_OTEL_EXPORT_INTERVAL: 5s
+  K6_OTEL_EXPORT_INTERVAL: 1s
   PERF_PULSE_CLIENT_MODE: kubernetes
   PROFILE: spot-tiny
   RUN_CLASS: spot
+  SURFACE: k8s-direct
   VISIBILITY_GATE_SECONDS: "60"
   WORKLOAD_NAMESPACE: canfar-workloads
 kind: ConfigMap
@@ -121,7 +130,65 @@ metadata:
     app.kubernetes.io/name: perfpulse
     app.kubernetes.io/part-of: perfpulse
     perfpulse.opencadc.org/profile: spot-tiny
-  name: perfpulse-spot-tiny-config
+  name: perfpulse-spot-tiny-direct-config
+  namespace: canfar-perfpulse
+---
+apiVersion: v1
+data:
+  CLEANUP: "true"
+  COMPLETION_GATE_SECONDS: "120"
+  K6_OTEL_EXPORTER_PROTOCOL: http/protobuf
+  K6_OTEL_HTTP_EXPORTER_INSECURE: "true"
+  K6_OTEL_HTTP_EXPORTER_ENDPOINT: kube-prometheus-stack-prometheus.monitoring:9090
+  K6_OTEL_HTTP_EXPORTER_URL_PATH: /api/v1/otlp/v1/metrics
+  K6_OTEL_METRIC_PREFIX: k6_
+  K6_OTEL_SERVICE_NAME: perfpulse
+  K6_OTEL_EXPORT_INTERVAL: 1s
+  PERF_PULSE_CLIENT_MODE: kubernetes
+  PROFILE: spot-tiny
+  RUN_CLASS: spot
+  SURFACE: k8s-kueue
+  VISIBILITY_GATE_SECONDS: "60"
+  KUEUE_ADMISSION_GATE_SECONDS: "120"
+  KUEUE_PRIORITY_CLASS: low
+  KUEUE_QUEUE_NAME: cadc-default
+  WORKLOAD_NAMESPACE: canfar-workloads
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/name: perfpulse
+    app.kubernetes.io/part-of: perfpulse
+    perfpulse.opencadc.org/profile: spot-tiny
+  name: perfpulse-spot-tiny-kueue-config
+  namespace: canfar-perfpulse
+---
+apiVersion: v1
+data:
+  CLEANUP: "true"
+  COMPLETION_GATE_SECONDS: "120"
+  K6_OTEL_EXPORTER_PROTOCOL: http/protobuf
+  K6_OTEL_HTTP_EXPORTER_INSECURE: "true"
+  K6_OTEL_HTTP_EXPORTER_ENDPOINT: kube-prometheus-stack-prometheus.monitoring:9090
+  K6_OTEL_HTTP_EXPORTER_URL_PATH: /api/v1/otlp/v1/metrics
+  K6_OTEL_METRIC_PREFIX: k6_
+  K6_OTEL_SERVICE_NAME: perfpulse
+  K6_OTEL_EXPORT_INTERVAL: 1s
+  PERF_PULSE_CLIENT_MODE: kubernetes
+  PROFILE: spot-tiny
+  RUN_CLASS: spot
+  SURFACE: skaha
+  VISIBILITY_GATE_SECONDS: "60"
+  SKAHA_API_URL: http://canfar-skaha-staging-skaha-tomcat-svc.canfar-system-staging.svc.keel-prod.local:8080/skaha/v1
+  SKAHA_LOGIN_URL: https://ws-cadc.canfar.net/ac/login
+  SKAHA_PASSWORD_PATH: /var/run/secrets/perfpulse/skaha-auth/password
+  SKAHA_USERNAME_PATH: /var/run/secrets/perfpulse/skaha-auth/username
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/name: perfpulse
+    app.kubernetes.io/part-of: perfpulse
+    perfpulse.opencadc.org/profile: spot-tiny
+  name: perfpulse-spot-tiny-skaha-config
   namespace: canfar-perfpulse
 ---
 apiVersion: batch/v1
@@ -157,12 +224,13 @@ spec:
                   apiVersion: k6.io/v1alpha1
                   kind: TestRun
                   metadata:
-                    name: perfpulse-spot-tiny-${TESTID}
+                    name: perfpulse-spot-tiny-direct-${TESTID}
                     namespace: canfar-perfpulse
                     labels:
                       app.kubernetes.io/name: perfpulse
                       app.kubernetes.io/part-of: perfpulse
                       perfpulse.opencadc.org/profile: spot-tiny
+                      perfpulse.opencadc.org/surface: k8s-direct
                       perfpulse.opencadc.org/testid: ${TESTID}
                   spec:
                     cleanup: post
@@ -213,10 +281,184 @@ spec:
                           value: ${TESTID}
                       envFrom:
                         - configMapRef:
-                            name: perfpulse-spot-tiny-config
+                            name: perfpulse-spot-tiny-direct-config
                         - secretRef:
                             name: perfpulse-otlp-credentials
                             optional: true
+                    starter:
+                      serviceAccountName: canfar-perfpulse
+                      securityContext:
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      containerSecurityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                  ---
+                  apiVersion: k6.io/v1alpha1
+                  kind: TestRun
+                  metadata:
+                    name: perfpulse-spot-tiny-kueue-${TESTID}
+                    namespace: canfar-perfpulse
+                    labels:
+                      app.kubernetes.io/name: perfpulse
+                      app.kubernetes.io/part-of: perfpulse
+                      perfpulse.opencadc.org/profile: spot-tiny
+                      perfpulse.opencadc.org/surface: k8s-kueue
+                      perfpulse.opencadc.org/testid: ${TESTID}
+                  spec:
+                    cleanup: post
+                    parallelism: 1
+                    arguments: "-o opentelemetry"
+                    script:
+                      localFile: /test/perfpulse.js
+                    initializer:
+                      image: images.opencadc.org/platform/perfpulse:TAG
+                      serviceAccountName: canfar-perfpulse
+                      securityContext:
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      containerSecurityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                    runner:
+                      image: images.opencadc.org/platform/perfpulse:TAG
+                      serviceAccountName: canfar-perfpulse
+                      securityContext:
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      containerSecurityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      env:
+                        - name: TESTID
+                          value: ${TESTID}
+                      envFrom:
+                        - configMapRef:
+                            name: perfpulse-spot-tiny-kueue-config
+                        - secretRef:
+                            name: perfpulse-otlp-credentials
+                            optional: true
+                    starter:
+                      serviceAccountName: canfar-perfpulse
+                      securityContext:
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      containerSecurityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                  ---
+                  apiVersion: k6.io/v1alpha1
+                  kind: TestRun
+                  metadata:
+                    name: perfpulse-spot-tiny-skaha-${TESTID}
+                    namespace: canfar-perfpulse
+                    labels:
+                      app.kubernetes.io/name: perfpulse
+                      app.kubernetes.io/part-of: perfpulse
+                      perfpulse.opencadc.org/profile: spot-tiny
+                      perfpulse.opencadc.org/surface: skaha
+                      perfpulse.opencadc.org/testid: ${TESTID}
+                  spec:
+                    cleanup: post
+                    parallelism: 1
+                    arguments: "-o opentelemetry"
+                    script:
+                      localFile: /test/perfpulse.js
+                    initializer:
+                      image: images.opencadc.org/platform/perfpulse:TAG
+                      serviceAccountName: canfar-perfpulse
+                      securityContext:
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      containerSecurityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                    runner:
+                      image: images.opencadc.org/platform/perfpulse:TAG
+                      serviceAccountName: canfar-perfpulse
+                      securityContext:
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      containerSecurityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      env:
+                        - name: TESTID
+                          value: ${TESTID}
+                      envFrom:
+                        - configMapRef:
+                            name: perfpulse-spot-tiny-skaha-config
+                        - secretRef:
+                            name: perfpulse-otlp-credentials
+                            optional: true
+                      volumeMounts:
+                        - mountPath: /var/run/secrets/perfpulse/skaha-auth
+                          name: skaha-auth-credentials
+                          readOnly: true
+                      volumes:
+                        - name: skaha-auth-credentials
+                          secret:
+                            secretName: perfpulse-skaha-auth
                     starter:
                       serviceAccountName: canfar-perfpulse
                       securityContext:

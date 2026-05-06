@@ -93,6 +93,37 @@ Direct OTLP to Prometheus is only for M1 and small spot-check volume. Put Collec
 another metrics backend in front of benchmark and stress profiles before running those profiles at
 scale.
 
+## Manual `spot-tiny` Direct, Kueue, and Skaha
+
+The repo-managed manual all-surface spot contract is:
+
+```text
+docs/manifests/perfpulse-spot-tiny.yaml
+```
+
+Before applying it, replace:
+
+- `images.opencadc.org/platform/perfpulse:TAG` with the published runner image tag.
+
+Apply:
+
+```bash
+kubectl apply -f docs/manifests/perfpulse-spot-tiny.yaml
+```
+
+The manifest creates three k6 Operator `TestRun` resources:
+
+- `perfpulse-spot-tiny-direct`
+- `perfpulse-spot-tiny-kueue`
+- `perfpulse-spot-tiny-skaha`
+
+All three use `PROFILE=spot-tiny`, `RUN_CLASS=spot`, `CLEANUP=true`,
+`VISIBILITY_GATE_SECONDS=60`, `COMPLETION_GATE_SECONDS=120`, and
+`K6_OTEL_EXPORT_INTERVAL=1s`. Direct sets `SURFACE=k8s-direct`; Kueue sets
+`SURFACE=k8s-kueue`, `KUEUE_QUEUE_NAME=cadc-default`, `KUEUE_PRIORITY_CLASS=low`, and
+`KUEUE_ADMISSION_GATE_SECONDS=120`; Skaha sets `SURFACE=skaha` and mounts
+`perfpulse-skaha-auth` read-only at `/var/run/secrets/perfpulse/skaha-auth`.
+
 ## Manual `benchmark-small` Direct, Kueue, and Skaha
 
 The repo-managed manual Direct, Kueue, and Skaha benchmark contract is:
@@ -141,6 +172,60 @@ The Skaha ConfigMap sets `SURFACE=skaha`,
 their 100-concurrent submission shape. The Skaha `TestRun` mounts the existing
 `perfpulse-skaha-auth` Secret read-only at that path. Run `bun run skaha-auth-setup` before applying
 if the Secret is not already present.
+
+## Manual `benchmark-medium` Direct, Kueue, and Skaha
+
+The repo-managed medium benchmark contract is:
+
+```text
+docs/manifests/perfpulse-benchmark-medium.yaml
+```
+
+Apply:
+
+```bash
+kubectl apply -f docs/manifests/perfpulse-benchmark-medium.yaml
+```
+
+This is a manual operator-run campaign, not a schedule. It creates Direct, Kueue, and Skaha
+`TestRun` resources sharing `TESTID=benchmark-medium-manual` in the checked-in example. Each
+surface runs `PROFILE=benchmark-medium`, `RUN_CLASS=benchmark`, `SCENARIO=many-small-users`,
+`TOTAL_JOBS=1000`, `LOGICAL_USERS=100`, `CLEANUP=true`, `VISIBILITY_GATE_SECONDS=300`,
+`COMPLETION_GATE_SECONDS=900`, and `K6_OTEL_EXPORT_INTERVAL=5s`. Kueue additionally sets
+`KUEUE_ADMISSION_GATE_SECONDS=900`; Skaha keeps `SUBMISSION_STAGGER_SECONDS=1`.
+
+Benchmark thresholds should stay baseline-free until repeated successful runs establish real
+operator-reviewed envelopes.
+
+## Manual stress campaigns
+
+The repo-managed stress contracts are:
+
+```text
+docs/manifests/perfpulse-stress-medium.yaml
+docs/manifests/perfpulse-stress-high.yaml
+```
+
+Apply only in an approved quiet window:
+
+```bash
+kubectl apply -f docs/manifests/perfpulse-stress-medium.yaml
+kubectl apply -f docs/manifests/perfpulse-stress-high.yaml
+```
+
+`stress-medium` creates Direct, Kueue, and Skaha `TestRun` resources with
+`PROFILE=stress-medium`, `RUN_CLASS=stress`, `SCENARIO=throughput-stress`, `TOTAL_JOBS=10000`,
+`LOGICAL_USERS=100`, `CONFIRM_STRESS=true`, `PRESERVE_ON_FAILURE=false`,
+`VISIBILITY_GATE_SECONDS=900`, and `K6_OTEL_EXPORT_INTERVAL=15s`.
+
+`stress-high` is Kueue-only by default and uses `PROFILE=stress-high`, `RUN_CLASS=stress`,
+`TOTAL_JOBS=100000`, `LOGICAL_USERS=100`, `CONFIRM_STRESS=true`,
+`KUEUE_ADMISSION_GATE_SECONDS=1800`, `VISIBILITY_GATE_SECONDS=1800`, and
+`K6_OTEL_EXPORT_INTERVAL=30s`.
+
+Stress success focuses on accepted and visible work, observability, and cleanup. Completion and
+Kueue admission are recorded when they happen but are not hard runtime gates for stress profiles.
+Do not schedule stress profiles by default.
 
 ## Manual Skaha `spot-tiny`
 
@@ -200,7 +285,7 @@ kubectl apply -f docs/manifests/perfpulse-spot-tiny-hourly.yaml
 ```
 
 The CronJob runs in `canfar-perfpulse`, uses `concurrencyPolicy: Forbid`, and creates one bounded
-`spot-tiny` k6 Operator `TestRun` per hour with a generated `testid`:
+Direct, Kueue, and Skaha `spot-tiny` k6 Operator `TestRun` set per hour with a generated `testid`:
 
 ```text
 spot-tiny-YYYYMMDDHHMMSS
@@ -216,7 +301,9 @@ A 30-minute cadence is a later option only after the hourly production check is 
 low-risk. Do not schedule benchmark or stress profiles by default; those remain manual operator-run
 campaigns.
 
-The embedded scheduled `TestRun` follows the same pod contract as the manual M1 run: custom
+Each embedded scheduled `TestRun` follows the same pod contract as the manual M1 run: custom
 PerfPulse image for initializer and runner, no custom starter image, `canfar-perfpulse` service
 account on initializer/runner/starter, and restricted security contexts on each operator pod
-template. The CronJob creator pod also runs with restricted pod and container security contexts.
+template. The scheduled Skaha runner mounts `perfpulse-skaha-auth`; the scheduled Kueue runner has
+Workload list/get RBAC. The CronJob creator pod also runs with restricted pod and container
+security contexts.
