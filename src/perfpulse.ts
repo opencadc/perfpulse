@@ -1,20 +1,36 @@
 import { check, fail, sleep } from "k6";
+import { b64encode } from "k6/encoding";
+import * as exec from "k6/execution";
 import http from "k6/http";
 import { Counter, Trend } from "k6/metrics";
-import { type RunConfig, resolveRunConfig } from "./config";
+import { deriveRunConfigForJob, type RunConfig, resolveRunConfig } from "./config";
 import { createKubernetesClient, pollUntil } from "./kubernetes/api";
 import { runDirectKubernetesSurface } from "./kubernetes/direct";
 import { runKueueKubernetesSurface } from "./kubernetes/kueue";
+import type { JobLike, JobListLike } from "./kubernetes/status";
+import { KUBERNETES_LABEL_KEYS } from "./labels";
 import { METRIC_NAMES, type MetricTags, metricTags } from "./metrics-contract";
 import { createOptions } from "./options";
 import { createSkahaClient, runSkahaSurface } from "./skaha";
+
+interface RuntimeData {
+  config: RunConfig;
+  skahaBearerToken?: string;
+  skahaRegistryAuthHeader?: string;
+}
 
 const config = resolveRunConfig(__ENV);
 const serviceAccountToken =
   config.clientMode === "kubernetes" && config.surface !== "skaha"
     ? String(open(config.kubernetes.tokenPath)).trim()
     : "";
-let skahaSessionIdForTeardown: string | undefined;
+const skahaCredentials =
+  config.clientMode === "kubernetes" && config.surface === "skaha"
+    ? {
+        password: String(open(config.skaha.passwordPath)),
+        username: String(open(config.skaha.usernamePath)).trim(),
+      }
+    : undefined;
 
 export const options = createOptions(config);
 
@@ -33,53 +49,90 @@ const visibilityLatency = new Trend(METRIC_NAMES.visibilityLatencyMs);
 const completionLatency = new Trend(METRIC_NAMES.completionLatencyMs);
 const kueueAdmissionLatency = new Trend(METRIC_NAMES.kueueAdmissionLatencyMs);
 
-export function setup(): RunConfig {
+export function setup(): RuntimeData {
   console.log(
     `PerfPulse ${config.profile}: mode=${config.clientMode} surface=${config.surface} testid=${config.testid}`,
   );
   console.log(
     "Executor rationale: shared-iterations closed model because spot-direct-tiny creates one bounded workload and exits.",
   );
-  return config;
+  if (config.clientMode === "kubernetes" && config.surface === "skaha") {
+    return {
+      config,
+      skahaBearerToken: createSkahaBearerToken(config),
+      skahaRegistryAuthHeader: createSkahaRegistryAuthHeader(),
+    };
+  }
+  return { config };
 }
 
-export default function (data: RunConfig): void {
-  const tags = metricTags(data);
+export default function (data: RunConfig | RuntimeData): void {
+  const runtimeData = normalizeRuntimeData(data);
+  const runConfig = deriveRuntimeConfig(runtimeData.config);
+  const tags = metricTags(runConfig);
   seedFailureCounters(tags);
 
-  if (data.clientMode === "noop") {
-    runNoop(data, tags);
+  if (runConfig.clientMode === "noop") {
+    runNoop(runConfig, tags);
     return;
   }
 
-  runKubernetesSurface(data, tags);
+  runKubernetesSurface(runtimeData, runConfig, tags);
 }
 
-export function teardown(data: RunConfig): void {
-  const tags = metricTags(data);
-  if (!data.cleanup || data.clientMode !== "kubernetes") {
+export function teardown(data: RunConfig | RuntimeData): void {
+  const runtimeData = normalizeRuntimeData(data);
+  const runConfig = runtimeData.config;
+  const tags = metricTags(runConfig);
+  if (!runConfig.cleanup || runConfig.clientMode !== "kubernetes") {
     cleanupFailed.add(0, tags);
     return;
   }
 
-  if (data.surface === "skaha") {
-    cleanupSkaha(data, tags);
+  if (runConfig.surface === "skaha") {
+    cleanupFailed.add(0, tags);
     return;
   }
 
-  const client = createKubernetesClient(data, serviceAccountToken);
-  const response = client.deleteJob(data.jobName);
-  const cleanupOk = response.status === 200 || response.status === 202 || response.status === 404;
-  check(response, {
-    "cleanup delete accepted or already gone": () => cleanupOk,
-  });
-
-  if (response.status === 200 || response.status === 202) {
-    cleanupDeleted.add(1, tags);
-  }
-  if (!cleanupOk) {
+  const client = createKubernetesClient(runConfig, serviceAccountToken);
+  let jobs: JobListLike;
+  try {
+    jobs = client.listJobsByTestId();
+  } catch (error) {
+    cleanupDeleted.add(0, tags);
     cleanupFailed.add(1, tags);
-    fail(`Cleanup failed for ${data.jobName}: HTTP ${response.status}`);
+    fail(
+      `Cleanup failed while listing Kubernetes Jobs for testid ${runConfig.testid} surface ${runConfig.surface}: ${boundedMessage(error)}`,
+    );
+    return;
+  }
+  const failures: string[] = [];
+  let deletedCount = 0;
+
+  for (const job of (jobs.items ?? []).filter((job) => isCurrentSurfaceJob(job, runConfig))) {
+    const jobName = job.metadata?.name;
+    if (jobName === undefined) {
+      continue;
+    }
+
+    const response = client.deleteJob(jobName);
+    const cleanupOk = isKubernetesCleanupOk(response.status);
+    check(response, {
+      "cleanup delete accepted or already gone": () => cleanupOk,
+    });
+
+    if (response.status === 200 || response.status === 202) {
+      deletedCount += 1;
+    }
+    if (!cleanupOk) {
+      failures.push(`${jobName} HTTP ${response.status}`);
+    }
+  }
+
+  cleanupDeleted.add(deletedCount, tags);
+  if (failures.length > 0) {
+    cleanupFailed.add(1, tags);
+    fail(`Cleanup failed for ${failures.length} Kubernetes Job(s): ${failures.join(", ")}`);
   }
 }
 
@@ -99,7 +152,7 @@ function runNoop(data: RunConfig, tags: MetricTags): void {
   sleep(data.noopSleepSeconds);
 }
 
-function runKubernetesSurface(data: RunConfig, tags: MetricTags): void {
+function runKubernetesSurface(runtimeData: RuntimeData, data: RunConfig, tags: MetricTags): void {
   switch (data.surface) {
     case "k8s-direct":
       runDirectKubernetes(data, tags);
@@ -108,7 +161,7 @@ function runKubernetesSurface(data: RunConfig, tags: MetricTags): void {
       runKueueKubernetes(data, tags);
       return;
     case "skaha":
-      runSkaha(data, tags);
+      runSkaha(runtimeData, data, tags);
   }
 }
 
@@ -150,7 +203,12 @@ function runDirectKubernetes(data: RunConfig, tags: MetricTags): void {
 
 function runKueueKubernetes(data: RunConfig, tags: MetricTags): void {
   const client = createKubernetesClient(data, serviceAccountToken);
-  const result = runKueueKubernetesSurface(data, data.kueue, client, pollUntil);
+  const result = runKueueKubernetesSurface(
+    data,
+    { ...data.kueue, userBucketIndex: data.userBucketIndex },
+    client,
+    pollUntil,
+  );
   submissionDuration.add(result.submissionDurationMs, tags);
 
   if (result.failure?.stage === "submission") {
@@ -187,11 +245,14 @@ function runKueueKubernetes(data: RunConfig, tags: MetricTags): void {
   }
 }
 
-function runSkaha(data: RunConfig, tags: MetricTags): void {
+function runSkaha(runtimeData: RuntimeData, data: RunConfig, tags: MetricTags): void {
+  applySubmissionStagger(data);
   const client = createSkahaClient({
     apiUrl: data.skaha.apiUrl,
     http,
-    token: data.skaha.token,
+    registryAuthHeader: runtimeData.skahaRegistryAuthHeader,
+    runConfig: data,
+    token: resolveSkahaBearerToken(runtimeData, data),
   });
   const result = runSkahaSurface(
     {
@@ -210,10 +271,10 @@ function runSkaha(data: RunConfig, tags: MetricTags): void {
     pollUntil,
   );
   submissionDuration.add(result.submissionDurationMs, tags);
-  skahaSessionIdForTeardown = result.createResponse.sessionId;
 
   if (result.failure?.stage === "submission") {
     jobsSubmissionFailed.add(1, tags);
+    cleanupSkahaSession(runtimeData, data, tags, result.createResponse.sessionId);
     fail(result.failure.message);
   }
 
@@ -221,6 +282,7 @@ function runSkaha(data: RunConfig, tags: MetricTags): void {
 
   if (result.failure?.stage === "visibility") {
     jobsVisibilityFailed.add(1, tags);
+    cleanupSkahaSession(runtimeData, data, tags, result.createResponse.sessionId);
     fail(result.failure.message);
   }
 
@@ -231,6 +293,7 @@ function runSkaha(data: RunConfig, tags: MetricTags): void {
 
   if (result.failure?.stage === "completion") {
     jobsCompletionFailed.add(1, tags);
+    cleanupSkahaSession(runtimeData, data, tags, result.createResponse.sessionId);
     fail(result.failure.message);
   }
 
@@ -238,32 +301,53 @@ function runSkaha(data: RunConfig, tags: MetricTags): void {
   if (result.completionLatencyMs !== undefined) {
     completionLatency.add(result.completionLatencyMs, tags);
   }
+  cleanupSkahaSession(runtimeData, data, tags, result.createResponse.sessionId);
 }
 
-function cleanupSkaha(data: RunConfig, tags: MetricTags): void {
-  if (skahaSessionIdForTeardown === undefined) {
+function cleanupSkahaSession(
+  runtimeData: RuntimeData,
+  data: RunConfig,
+  tags: MetricTags,
+  sessionId: string | undefined,
+): void {
+  if (!data.cleanup) {
+    cleanupDeleted.add(0, tags);
+    cleanupFailed.add(0, tags);
+    return;
+  }
+  if (sessionId === undefined) {
     cleanupFailed.add(1, tags);
-    fail("Skaha cleanup could not run because no session id is available at teardown");
     return;
   }
 
   const client = createSkahaClient({
     apiUrl: data.skaha.apiUrl,
     http,
-    token: data.skaha.token,
+    registryAuthHeader: runtimeData.skahaRegistryAuthHeader,
+    runConfig: data,
+    token: resolveSkahaBearerToken(runtimeData, data),
   });
-  const result = client.deleteSession(skahaSessionIdForTeardown);
+  const result = client.deleteSession(sessionId);
+  const cleanupSucceeded =
+    result.cleanupSucceeded || isSkahaSessionVerifiedGone(client.getSession(sessionId));
   check(result, {
-    "skaha cleanup delete accepted or already gone": (cleanup) => cleanup.cleanupSucceeded,
+    "skaha cleanup delete accepted or already gone": () => cleanupSucceeded,
   });
 
   if (result.deleted) {
     cleanupDeleted.add(1, tags);
   }
-  if (!result.cleanupSucceeded) {
+  if (!cleanupSucceeded) {
     cleanupFailed.add(1, tags);
     fail(`Skaha cleanup failed with HTTP ${result.statusCode}`);
   }
+  if (!result.cleanupSucceeded) {
+    cleanupFailed.add(0, tags);
+  }
+}
+
+function isSkahaSessionVerifiedGone(result: { found: boolean; statusCode: number }): boolean {
+  return !result.found && result.statusCode === 404;
 }
 
 function seedFailureCounters(tags: MetricTags): void {
@@ -272,4 +356,108 @@ function seedFailureCounters(tags: MetricTags): void {
   jobsCompletionFailed.add(0, tags);
   kueueWorkloadsAdmissionFailed.add(0, tags);
   cleanupFailed.add(0, tags);
+}
+
+function isKubernetesCleanupOk(status: number): boolean {
+  return status === 200 || status === 202 || status === 404;
+}
+
+function isCurrentSurfaceJob(job: JobLike, data: RunConfig): boolean {
+  return job.metadata?.labels?.[KUBERNETES_LABEL_KEYS.surface] === data.surface;
+}
+
+function boundedMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.slice(0, 300);
+}
+
+function normalizeRuntimeData(data: RunConfig | RuntimeData): RuntimeData {
+  return "config" in data ? data : { config: data };
+}
+
+function createSkahaBearerToken(data: RunConfig): string {
+  if (skahaCredentials === undefined) {
+    fail("Skaha credentials are required");
+  }
+  const body = encodeFormEntries([
+    ["username", skahaCredentials.username],
+    ["password", skahaCredentials.password],
+  ]);
+  const response = http.post(data.skaha.loginUrl, body.toString(), {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    tags: { name: "skaha_login", ...metricTags(data) },
+    timeout: `${data.skaha.requestTimeoutSeconds}s`,
+  });
+  if (response.status < 200 || response.status >= 300) {
+    fail(`Skaha login failed with HTTP ${response.status}`);
+  }
+  const token = normalizeSkahaLoginToken(String(response.body ?? ""));
+  if (token.length === 0) {
+    fail("Skaha login returned an empty bearer token");
+  }
+  return token;
+}
+
+function createSkahaRegistryAuthHeader(): string {
+  if (skahaCredentials === undefined) {
+    fail("Skaha credentials are required");
+  }
+  return b64encode(`${skahaCredentials.username}:${skahaCredentials.password}`);
+}
+
+function normalizeSkahaLoginToken(responseBody: string): string {
+  const trimmed = responseBody.trim();
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (typeof parsed === "string") {
+      return parsed.trim();
+    }
+    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const token = (parsed as { access_token?: unknown; token?: unknown }).token;
+      const accessToken = (parsed as { access_token?: unknown; token?: unknown }).access_token;
+      if (typeof token === "string") {
+        return token.trim();
+      }
+      if (typeof accessToken === "string") {
+        return accessToken.trim();
+      }
+    }
+  } catch {
+    // Plain text token responses are valid.
+  }
+  return trimmed;
+}
+
+function resolveSkahaBearerToken(runtimeData: RuntimeData, data: RunConfig): string {
+  if (data.clientMode !== "kubernetes" || data.surface !== "skaha") {
+    return "";
+  }
+  if (runtimeData.skahaBearerToken !== undefined) {
+    return runtimeData.skahaBearerToken;
+  }
+  return "";
+}
+
+function encodeFormEntries(entries: Array<readonly [string, string]>): string {
+  return entries
+    .map(([key, value]) => `${encodeFormComponent(key)}=${encodeFormComponent(value)}`)
+    .join("&");
+}
+
+function encodeFormComponent(value: string): string {
+  return encodeURIComponent(value).replace(/%20/gu, "+");
+}
+
+function applySubmissionStagger(data: RunConfig): void {
+  if (data.skaha.submissionStaggerSeconds === 0) {
+    return;
+  }
+  sleep(data.jobIndex * data.skaha.submissionStaggerSeconds);
+}
+
+function deriveRuntimeConfig(data: RunConfig): RunConfig {
+  if (data.clientMode !== "kubernetes") {
+    return data;
+  }
+  return deriveRunConfigForJob(data, exec.scenario.iterationInTest);
 }

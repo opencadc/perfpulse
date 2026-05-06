@@ -1,3 +1,6 @@
+import type { RunConfig } from "./config";
+import { type MetricTags, metricTags } from "./metrics-contract";
+
 export interface SkahaHttpResponseLike {
   body?: unknown;
   status: number;
@@ -5,7 +8,7 @@ export interface SkahaHttpResponseLike {
 
 export interface SkahaHttpRequestOptions {
   headers: Record<string, string>;
-  tags: { name: string };
+  tags: { name: string } & MetricTags;
   timeout: string;
 }
 
@@ -18,6 +21,8 @@ export interface SkahaHttpClientLike {
 export interface SkahaClientConfig {
   apiUrl: string;
   http: SkahaHttpClientLike;
+  registryAuthHeader?: string | undefined;
+  runConfig: RunConfig;
   token: string;
 }
 
@@ -107,32 +112,43 @@ export interface SkahaSurfaceResult {
 
 export function createSkahaClient(config: SkahaClientConfig): SkahaClient {
   const sessionUrl = `${config.apiUrl.replace(/\/+$/u, "")}/session`;
-  const headers = {
+  const tags = metricTags(config.runConfig);
+  const token = config.token.trim();
+  const timeout = `${config.runConfig.skaha.requestTimeoutSeconds}s`;
+  if (token.length === 0) {
+    throw new Error("Skaha bearer token is required");
+  }
+  const headers: Record<string, string> = {
     Accept: "application/json",
-    Authorization: `Bearer ${config.token}`,
+    Authorization: `Bearer ${token}`,
     "Content-Type": "application/x-www-form-urlencoded",
     "X-Skaha-Authentication-Type": "RUNTIME-TOKEN",
   };
+  const registryAuthHeader = config.registryAuthHeader?.trim();
+  if (registryAuthHeader !== undefined && registryAuthHeader.length > 0) {
+    headers["X-Skaha-Registry-Auth"] = registryAuthHeader;
+  }
 
   return {
     createSession(params) {
-      const response = config.http.post(sessionUrl, encodeCreateSessionForm(params), {
+      const response = config.http.post(createSessionUrl(sessionUrl, params), "", {
         headers,
-        tags: { name: "skaha_create_session" },
-        timeout: "30s",
+        tags: requestTags("skaha_create_session", tags),
+        timeout,
       });
       const sessionId = String(response.body ?? "").trim();
+      const accepted = response.status >= 200 && response.status < 300 && sessionId.length > 0;
       return {
-        accepted: response.status >= 200 && response.status < 300 && sessionId.length > 0,
-        sessionId,
+        accepted,
+        ...(accepted ? { sessionId } : {}),
         statusCode: response.status,
       };
     },
     deleteSession(sessionId) {
       const response = config.http.del(`${sessionUrl}/${encodeURIComponent(sessionId)}`, null, {
         headers,
-        tags: { name: "skaha_delete_session" },
-        timeout: "30s",
+        tags: requestTags("skaha_delete_session", tags),
+        timeout,
       });
       const cleanupSucceeded =
         response.status === 200 ||
@@ -152,8 +168,8 @@ export function createSkahaClient(config: SkahaClientConfig): SkahaClient {
     getSession(sessionId) {
       const response = config.http.get(`${sessionUrl}/${encodeURIComponent(sessionId)}`, {
         headers,
-        tags: { name: "skaha_get_session" },
-        timeout: "30s",
+        tags: requestTags("skaha_get_session", tags),
+        timeout,
       });
       if (response.status !== 200) {
         return { found: false, statusCode: response.status };
@@ -175,15 +191,24 @@ export function createSkahaClient(config: SkahaClientConfig): SkahaClient {
   };
 }
 
+function createSessionUrl(sessionUrl: string, params: SkahaCreateSessionParams): string {
+  return `${sessionUrl}?${encodeCreateSessionParams(params)}`;
+}
+
+function requestTags(name: string, tags: MetricTags): { name: string } & MetricTags {
+  return { name, ...tags };
+}
+
 export function runSkahaSurface(
   config: SkahaSurfaceConfig,
   client: SkahaSurfaceClient,
   pollUntil: SkahaPollUntil,
   now: () => number = Date.now,
 ): SkahaSurfaceResult {
-  const submittedAt = now();
+  const createStartedAt = now();
   const createResponse = client.createSession(config.session);
-  const submissionDurationMs = now() - submittedAt;
+  const submittedAt = now();
+  const submissionDurationMs = submittedAt - createStartedAt;
 
   if (!createResponse.accepted || createResponse.sessionId === undefined) {
     return {
@@ -222,15 +247,16 @@ export function runSkahaSurface(
     config.completionGateSeconds,
     config.pollIntervalSeconds,
     () => client.getSession(createResponse.sessionId as string),
-    (result) => result.status === "Completed" || isTerminalFailureStatus(result.status),
+    (result) =>
+      isSuccessfulCompletionStatus(result.status) || isTerminalFailureStatus(result.status),
   );
 
-  if (completedSession?.status !== "Completed") {
+  if (!isSuccessfulCompletionStatus(completedSession?.status)) {
     return {
       completed: false,
       createResponse,
       failure: {
-        message: `Skaha session did not reach Completed within ${config.completionGateSeconds}s`,
+        message: `Skaha session did not reach Succeeded or Completed within ${config.completionGateSeconds}s`,
         stage: "completion",
       },
       submissionDurationMs,
@@ -249,19 +275,30 @@ export function runSkahaSurface(
   };
 }
 
-function encodeCreateSessionForm(params: SkahaCreateSessionParams): string {
-  const form = new URLSearchParams();
-  form.append("name", params.name);
-  form.append("image", params.image);
-  form.append("type", "headless");
-  form.append("cores", String(Math.max(1, params.cores ?? 1)));
-  form.append("ram", String(Math.max(1, params.ram ?? 1)));
-  form.append("cmd", params.cmd);
-  form.append("args", params.args.join(" "));
+function encodeCreateSessionParams(params: SkahaCreateSessionParams): string {
+  const form: Array<[string, string]> = [
+    ["name", params.name],
+    ["image", params.image],
+    ["type", "headless"],
+    ["cores", String(Math.max(1, params.cores ?? 1))],
+    ["ram", String(Math.max(1, params.ram ?? 1))],
+    ["cmd", params.cmd],
+    ["args", params.args.join(" ")],
+  ];
   for (const [key, value] of Object.entries(params.env ?? {})) {
-    form.append("env", `${key}=${value}`);
+    form.push(["env", `${key}=${value}`]);
   }
-  return form.toString();
+  return encodeFormEntries(form);
+}
+
+function encodeFormEntries(entries: Array<readonly [string, string]>): string {
+  return entries
+    .map(([key, value]) => `${encodeFormComponent(key)}=${encodeFormComponent(value)}`)
+    .join("&");
+}
+
+function encodeFormComponent(value: string): string {
+  return encodeURIComponent(value).replace(/%20/gu, "+");
 }
 
 function parseSessionBody(body: unknown): SkahaSessionLike | undefined {
@@ -289,4 +326,8 @@ function parseSkahaStatus(value: string | undefined): SkahaSessionStatus | undef
 
 function isTerminalFailureStatus(status: SkahaSessionStatus | undefined): boolean {
   return status === "Error" || status === "Failed";
+}
+
+function isSuccessfulCompletionStatus(status: SkahaSessionStatus | undefined): boolean {
+  return status === "Completed" || status === "Succeeded";
 }

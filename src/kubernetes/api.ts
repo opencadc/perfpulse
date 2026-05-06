@@ -2,6 +2,7 @@ import { sleep } from "k6";
 import http, { type RefinedResponse, type ResponseType } from "k6/http";
 import type { RunConfig } from "../config";
 import { testidSelector } from "../labels";
+import { type MetricTags, metricTags } from "../metrics-contract";
 import type { DirectKubernetesClient } from "./direct";
 import type { KubernetesJobManifest } from "./job";
 import type { WorkloadListLike } from "./kueue";
@@ -17,6 +18,7 @@ export interface KubernetesClient extends DirectKubernetesClient {
 }
 
 export function createKubernetesClient(config: RunConfig, token: string): KubernetesClient {
+  const tags = metricTags(config);
   const headers = {
     Accept: "application/json",
     Authorization: `Bearer ${token}`,
@@ -30,7 +32,7 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
     createJob(manifest: KubernetesJobManifest): JsonResponse {
       return http.post(jobsUrl, JSON.stringify(manifest), {
         headers,
-        tags: { name: "k8s_create_job" },
+        tags: requestTags("k8s_create_job", tags),
         timeout: "30s",
       });
     },
@@ -38,7 +40,7 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
       const deleteUrl = `${jobsUrl}/${encodeURIComponent(name)}?propagationPolicy=Background`;
       return http.del(deleteUrl, null, {
         headers,
-        tags: { name: "k8s_delete_job" },
+        tags: requestTags("k8s_delete_job", tags),
         timeout: "30s",
       });
     },
@@ -46,7 +48,7 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
       const selector = encodeURIComponent(testidSelector(config));
       const response = http.get(`${jobsUrl}?labelSelector=${selector}`, {
         headers,
-        tags: { name: "k8s_list_jobs" },
+        tags: requestTags("k8s_list_jobs", tags),
         timeout: "30s",
       });
       if (response.status !== 200) {
@@ -59,7 +61,7 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
     listWorkloadsByTestId(): WorkloadListLike {
       const response = http.get(workloadsUrl, {
         headers,
-        tags: { name: "k8s_list_workloads" },
+        tags: requestTags("k8s_list_workloads", tags),
         timeout: "30s",
       });
       if (response.status !== 200) {
@@ -70,6 +72,10 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
       return JSON.parse(String(response.body ?? "{}")) as WorkloadListLike;
     },
   };
+}
+
+function requestTags(name: string, tags: MetricTags): { name: string } & MetricTags {
+  return { name, ...tags };
 }
 
 export function pollUntil<T>(

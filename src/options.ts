@@ -1,6 +1,8 @@
 import type { Options } from "k6/options";
 import type { RunConfig } from "./config";
-import { METRIC_NAMES } from "./metrics-contract";
+import { METRIC_NAMES, metricTags } from "./metrics-contract";
+
+export type ReadTextFile = (path: string) => string;
 
 export function createOptions(config: RunConfig): Options {
   return {
@@ -8,6 +10,7 @@ export function createOptions(config: RunConfig): Options {
     insecureSkipTLSVerify: config.kubernetes.insecureSkipTLSVerify,
     scenarios: createScenarios(config),
     systemTags: ["status", "method", "name", "scenario", "group", "check"],
+    tags: metricTags(config),
     thresholds: createThresholds(config),
     userAgent: "perfpulse/0.1.0",
   };

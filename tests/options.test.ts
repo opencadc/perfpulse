@@ -71,4 +71,43 @@ describe("k6 options contract", () => {
 
     expect(options.systemTags).toEqual(["status", "method", "name", "scenario", "group", "check"]);
   });
+
+  test("adds low-cardinality run tags to built-in k6 metrics", () => {
+    const options = createOptions(
+      resolveRunConfig({
+        LOGICAL_USERS: "100",
+        PROFILE: "benchmark-small",
+        SCENARIO: "many-small-users",
+        SURFACE: "k8s-kueue",
+        TESTID: "Benchmark Small Manual",
+        TOTAL_JOBS: "100",
+      }),
+    );
+
+    expect(options.tags).toEqual({
+      cohort: "baseline",
+      job_profile: "small",
+      namespace: "canfar-workloads",
+      profile: "benchmark-small",
+      run_class: "benchmark",
+      scenario: "many-small-users",
+      surface: "k8s-kueue",
+      testid: "benchmark-small-manual",
+      user_shape: "100x1",
+    });
+  });
+
+  test("does not configure TLS client certificates for Skaha bearer-token auth", () => {
+    const options = createOptions(
+      resolveRunConfig({
+        PERF_PULSE_CLIENT_MODE: "kubernetes",
+        SKAHA_API_URL: "https://ws.example/skaha/v1",
+        SKAHA_PASSWORD_PATH: "/mnt/skaha/password",
+        SKAHA_USERNAME_PATH: "/mnt/skaha/username",
+        SURFACE: "skaha",
+      }),
+    );
+
+    expect(options.tlsAuth).toBeUndefined();
+  });
 });

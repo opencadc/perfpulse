@@ -79,9 +79,10 @@ export function runKueueKubernetesSurface(
   now: () => number = Date.now,
 ): KueueSurfaceResult {
   const manifest = buildKueueJobManifest(config, options);
-  const submittedAt = now();
+  const createStartedAt = now();
   const createResponse = client.createJob(manifest);
-  const submissionDurationMs = now() - submittedAt;
+  const submittedAt = now();
+  const submissionDurationMs = submittedAt - createStartedAt;
 
   if (createResponse.status !== 201) {
     return {

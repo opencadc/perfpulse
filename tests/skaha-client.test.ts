@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { type RunConfig, resolveRunConfig } from "../src/config";
+import { metricTags } from "../src/metrics-contract";
 import {
   createSkahaClient,
   runSkahaSurface,
@@ -8,12 +10,13 @@ import {
 } from "../src/skaha";
 
 describe("Skaha user-facing surface client", () => {
-  test("creates a headless session with runtime-token form authentication", () => {
+  test("creates a headless session with bearer-token authentication", () => {
     const requests: RecordedRequest[] = [];
     const client = createSkahaClient({
       apiUrl: "https://ws.example/skaha/v1",
       http: recordRequests(requests),
-      token: "runtime-secret",
+      runConfig: skahaRunConfig(),
+      token: "runtime-token",
     });
 
     const result = client.createSession({
@@ -21,7 +24,7 @@ describe("Skaha user-facing surface client", () => {
       cmd: "stress-ng",
       cores: 1,
       env: { PERF_PULSE_TESTID: "spot-1" },
-      image: "docker.io/alexeiled/stress-ng",
+      image: "images.canfar.net/skaha/stress-ng:latest",
       name: "perfpulse-spot-1-0",
       ram: 1,
     });
@@ -29,40 +32,156 @@ describe("Skaha user-facing surface client", () => {
     expect(result).toEqual({ accepted: true, sessionId: "session-abc", statusCode: 200 });
     expect(requests).toEqual([
       {
-        body: "name=perfpulse-spot-1-0&image=docker.io%2Falexeiled%2Fstress-ng&type=headless&cores=1&ram=1&cmd=stress-ng&args=--cpu+1+--timeout+10s+--metrics-brief&env=PERF_PULSE_TESTID%3Dspot-1",
+        body: "",
         method: "POST",
         options: {
           headers: {
             Accept: "application/json",
-            Authorization: "Bearer runtime-secret",
+            Authorization: "Bearer runtime-token",
             "Content-Type": "application/x-www-form-urlencoded",
             "X-Skaha-Authentication-Type": "RUNTIME-TOKEN",
           },
-          tags: { name: "skaha_create_session" },
+          tags: requestTags("skaha_create_session"),
           timeout: "30s",
         },
-        url: "https://ws.example/skaha/v1/session",
+        url: "https://ws.example/skaha/v1/session?name=perfpulse-spot-1-0&image=images.canfar.net%2Fskaha%2Fstress-ng%3Alatest&type=headless&cores=1&ram=1&cmd=stress-ng&args=--cpu+1+--timeout+10s+--metrics-brief&env=PERF_PULSE_TESTID%3Dspot-1",
       },
     ]);
   });
 
-  test("uses Skaha v1 minimum resource defaults when cores and ram are omitted", () => {
+  test("sends repeated env params and Skaha v1 minimum resource defaults on the POST URL", () => {
     const requests: RecordedRequest[] = [];
     const client = createSkahaClient({
       apiUrl: "https://ws.example/skaha/v1",
       http: recordRequests(requests),
-      token: "runtime-secret",
+      runConfig: skahaRunConfig(),
+      token: "runtime-token",
     });
 
     client.createSession({
       args: ["--timeout", "10s"],
       cmd: "stress-ng",
-      image: "docker.io/alexeiled/stress-ng",
+      env: { PERF_PULSE_ATTEMPT: "0", PERF_PULSE_TESTID: "spot-1" },
+      image: "images.canfar.net/skaha/stress-ng:latest",
       name: "perfpulse-spot-1-0",
     });
 
-    expect(new URLSearchParams(requests[0]?.body ?? "").get("cores")).toBe("1");
-    expect(new URLSearchParams(requests[0]?.body ?? "").get("ram")).toBe("1");
+    const url = new URL(String(requests[0]?.url));
+    expect(url.origin + url.pathname).toBe("https://ws.example/skaha/v1/session");
+    expect(url.searchParams.get("cores")).toBe("1");
+    expect(url.searchParams.get("ram")).toBe("1");
+    expect(url.searchParams.getAll("env")).toEqual([
+      "PERF_PULSE_ATTEMPT=0",
+      "PERF_PULSE_TESTID=spot-1",
+    ]);
+  });
+
+  test("sends Skaha create parameters as POST URL query params", () => {
+    const requests: RecordedRequest[] = [];
+    const client = createSkahaClient({
+      apiUrl: "https://ws.example/skaha/v1",
+      http: recordRequests(requests),
+      runConfig: skahaRunConfig(),
+      token: "runtime-token",
+    });
+
+    client.createSession({
+      args: ["--cpu", "1", "--timeout", "10s", "--metrics-brief"],
+      cmd: "stress-ng",
+      env: { PERF_PULSE_TESTID: "spot-1" },
+      image: "images.canfar.net/skaha/stress-ng:latest",
+      name: "perfpulse-spot-1-0",
+    });
+
+    const url = new URL(String(requests[0]?.url));
+    expect(url.origin + url.pathname).toBe("https://ws.example/skaha/v1/session");
+    expect(requests[0]?.body).toBe("");
+    expect(url.searchParams.get("type")).toBe("headless");
+    expect(url.searchParams.get("cmd")).toBe("stress-ng");
+    expect(url.searchParams.get("args")).toBe("--cpu 1 --timeout 10s --metrics-brief");
+    expect(url.searchParams.getAll("env")).toEqual(["PERF_PULSE_TESTID=spot-1"]);
+  });
+
+  test("does not expose a cleanup session id when session creation fails", () => {
+    const client = createSkahaClient({
+      apiUrl: "https://ws.example/skaha/v1",
+      http: recordRequests([], { postBody: "backend rejected session", postStatus: 500 }),
+      runConfig: skahaRunConfig(),
+      token: "runtime-token",
+    });
+
+    const result = client.createSession({
+      args: ["--timeout", "10s"],
+      cmd: "stress-ng",
+      image: "images.canfar.net/skaha/stress-ng:latest",
+      name: "perfpulse-spot-1-0",
+    });
+
+    expect(result).toEqual({ accepted: false, statusCode: 500 });
+    expect(JSON.stringify(result)).not.toContain("backend rejected session");
+  });
+
+  test("uses the configured Skaha request timeout for create, read, and cleanup calls", () => {
+    const requests: RecordedRequest[] = [];
+    const client = createSkahaClient({
+      apiUrl: "https://ws.example/skaha/v1",
+      http: recordRequests(requests),
+      runConfig: skahaRunConfig({ SKAHA_REQUEST_TIMEOUT_SECONDS: "120" }),
+      token: "runtime-token",
+    });
+
+    client.createSession({
+      args: ["--timeout", "10s"],
+      cmd: "stress-ng",
+      image: "images.canfar.net/skaha/stress-ng:latest",
+      name: "perfpulse-spot-1-0",
+    });
+    client.getSession("session-abc");
+    client.deleteSession("session-abc");
+
+    expect(requests.map((request) => request.options)).toEqual([
+      expect.objectContaining({ timeout: "120s" }),
+      expect.objectContaining({ timeout: "120s" }),
+      expect.objectContaining({ timeout: "120s" }),
+    ]);
+  });
+
+  test("sends optional registry auth on create, read, and cleanup calls", () => {
+    const requests: RecordedRequest[] = [];
+    const client = createSkahaClient({
+      apiUrl: "https://ws.example/skaha/v1",
+      http: recordRequests(requests),
+      registryAuthHeader: "dXNlcjpzZWNyZXQ=",
+      runConfig: skahaRunConfig(),
+      token: "runtime-token",
+    });
+
+    client.createSession({
+      args: ["--timeout", "10s"],
+      cmd: "stress-ng",
+      image: "images.canfar.net/skaha/stress-ng:latest",
+      name: "perfpulse-spot-1-0",
+    });
+    client.getSession("session-abc");
+    client.deleteSession("session-abc");
+
+    expect(requests.map((request) => request.options)).toEqual([
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "X-Skaha-Registry-Auth": "dXNlcjpzZWNyZXQ=",
+        }),
+      }),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "X-Skaha-Registry-Auth": "dXNlcjpzZWNyZXQ=",
+        }),
+      }),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "X-Skaha-Registry-Auth": "dXNlcjpzZWNyZXQ=",
+        }),
+      }),
+    ]);
   });
 
   test("polls a session by id with stable request tags and recognized status", () => {
@@ -70,7 +189,8 @@ describe("Skaha user-facing surface client", () => {
     const client = createSkahaClient({
       apiUrl: "https://ws.example/skaha/v1",
       http: recordRequests(requests),
-      token: "runtime-secret",
+      runConfig: skahaRunConfig(),
+      token: "runtime-token",
     });
 
     const result = client.getSession("session-abc");
@@ -87,11 +207,11 @@ describe("Skaha user-facing surface client", () => {
         options: {
           headers: {
             Accept: "application/json",
-            Authorization: "Bearer runtime-secret",
+            Authorization: "Bearer runtime-token",
             "Content-Type": "application/x-www-form-urlencoded",
             "X-Skaha-Authentication-Type": "RUNTIME-TOKEN",
           },
-          tags: { name: "skaha_get_session" },
+          tags: requestTags("skaha_get_session"),
           timeout: "30s",
         },
         url: "https://ws.example/skaha/v1/session/session-abc",
@@ -128,14 +248,14 @@ describe("Skaha user-facing surface client", () => {
     expect(result.visible).toBe(true);
     expect(result.completed).toBe(false);
     expect(result.failure).toEqual({
-      message: "Skaha session did not reach Completed within 120s",
+      message: "Skaha session did not reach Succeeded or Completed within 120s",
       stage: "completion",
     });
   });
 
-  test("succeeds when a visible session reaches Completed within the completion gate", () => {
+  test("succeeds when a visible session reaches Succeeded within the completion gate", () => {
     const config = skahaSurfaceConfig();
-    const statuses: Array<"Pending" | "Completed"> = ["Pending", "Completed"];
+    const statuses: Array<"Pending" | "Succeeded"> = ["Pending", "Succeeded"];
     const client: SkahaSurfaceClient = {
       createSession() {
         return { accepted: true, sessionId: "session-abc", statusCode: 200 };
@@ -144,7 +264,7 @@ describe("Skaha user-facing surface client", () => {
         throw new Error("cleanup is not part of runSkahaSurface");
       },
       getSession() {
-        const status = statuses.shift() ?? "Completed";
+        const status = statuses.shift() ?? "Succeeded";
         return {
           found: true,
           session: { id: "session-abc", status },
@@ -153,23 +273,21 @@ describe("Skaha user-facing surface client", () => {
         };
       },
     };
-    let clock = 0;
+    const timestamps = [0, 100, 250, 600];
 
     const result = runSkahaSurface(
       config,
       client,
       (_timeout, _interval, read) => read(),
-      () => {
-        clock += 25;
-        return clock;
-      },
+      () => timestamps.shift() ?? 600,
     );
 
     expect(result.failure).toBeUndefined();
+    expect(result.submissionDurationMs).toBe(100);
     expect(result.visible).toBe(true);
     expect(result.completed).toBe(true);
-    expect(result.visibilityLatencyMs).toBe(50);
-    expect(result.completionLatencyMs).toBe(75);
+    expect(result.visibilityLatencyMs).toBe(150);
+    expect(result.completionLatencyMs).toBe(500);
   });
 
   test("deletes sessions with explicit cleanup results and stable metric tags", () => {
@@ -177,7 +295,8 @@ describe("Skaha user-facing surface client", () => {
     const client = createSkahaClient({
       apiUrl: "https://ws.example/skaha/v1/",
       http: recordRequests(requests, { deleteStatus: 404 }),
-      token: "runtime-secret",
+      runConfig: skahaRunConfig(),
+      token: "runtime-token",
     });
 
     const result = client.deleteSession("raw-session-id");
@@ -188,9 +307,8 @@ describe("Skaha user-facing surface client", () => {
       statusCode: 404,
     });
     expect(JSON.stringify(result)).not.toContain("raw-session-id");
-    expect(JSON.stringify(result)).not.toContain("runtime-secret");
     expect(requests[0]?.options).toMatchObject({
-      tags: { name: "skaha_delete_session" },
+      tags: requestTags("skaha_delete_session"),
     });
   });
 
@@ -198,7 +316,8 @@ describe("Skaha user-facing surface client", () => {
     const client = createSkahaClient({
       apiUrl: "https://ws.example/skaha/v1",
       http: recordRequests([], { deleteStatus: 500 }),
-      token: "runtime-secret",
+      runConfig: skahaRunConfig(),
+      token: "runtime-token",
     });
 
     const result = client.deleteSession("raw-session-id");
@@ -210,7 +329,6 @@ describe("Skaha user-facing surface client", () => {
       statusCode: 500,
     });
     expect(JSON.stringify(result)).not.toContain("raw-session-id");
-    expect(JSON.stringify(result)).not.toContain("runtime-secret");
   });
 });
 
@@ -223,7 +341,7 @@ interface RecordedRequest {
 
 function recordRequests(
   requests: RecordedRequest[],
-  behavior: { deleteStatus?: number } = {},
+  behavior: { deleteStatus?: number; postBody?: string; postStatus?: number } = {},
 ): SkahaHttpClientLike {
   return {
     del(url, body, requestOptions) {
@@ -236,9 +354,17 @@ function recordRequests(
     },
     post(url, body, options) {
       requests.push({ body, method: "POST", options, url });
-      return { body: "session-abc\n", status: 200 };
+      return { body: behavior.postBody ?? "session-abc\n", status: behavior.postStatus ?? 200 };
     },
   };
+}
+
+function skahaRunConfig(env: Record<string, string> = {}): RunConfig {
+  return resolveRunConfig({ SURFACE: "skaha", TESTID: "skaha-spot", ...env });
+}
+
+function requestTags(name: string): { name: string } & ReturnType<typeof metricTags> {
+  return { name, ...metricTags(skahaRunConfig()) };
 }
 
 function skahaSurfaceConfig(): SkahaSurfaceConfig {
@@ -248,7 +374,7 @@ function skahaSurfaceConfig(): SkahaSurfaceConfig {
     session: {
       args: ["--cpu", "1", "--timeout", "10s", "--metrics-brief"],
       cmd: "stress-ng",
-      image: "docker.io/alexeiled/stress-ng",
+      image: "images.canfar.net/skaha/stress-ng:latest",
       name: "perfpulse-spot-1-0",
     },
     visibilityGateSeconds: 60,

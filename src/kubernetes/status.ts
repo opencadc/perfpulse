@@ -5,6 +5,7 @@ interface JobCondition {
 
 export interface JobLike {
   metadata?: {
+    labels?: Record<string, string>;
     name?: string;
   };
   status?: {

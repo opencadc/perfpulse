@@ -1,17 +1,22 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildHourlySpotTinySchedule,
+  buildManualBenchmarkSmallDirectKueueDeployment,
   buildManualSpotDirectTinyDeployment,
   buildManualSpotKueueTinyDeployment,
+  buildManualSpotSkahaTinyDeployment,
+  DEFAULT_SKAHA_API_URL,
   renderManifestDocuments,
 } from "../src/deployment-manifests";
+
+const EXPECTED_DEFAULT_SKAHA_API_URL =
+  "http://canfar-skaha-staging-skaha-tomcat-svc.canfar-system-staging.svc.keel-prod.local:8080/skaha/v1";
 
 describe("deployment manifest contracts", () => {
   test("builds the manual M1 spot-direct-tiny TestRun contract", () => {
     const contract = buildManualSpotDirectTinyDeployment({
       imageTag: "2026.05.04",
       otlpCredentialsSecretName: "perfpulse-otlp-credentials",
-      skahaSecretName: "perfpulse-skaha-runtime-token",
       testid: "spot-direct-tiny-manual",
     });
 
@@ -53,7 +58,12 @@ describe("deployment manifest contracts", () => {
       SURFACE: "k8s-direct",
       WORKLOAD_NAMESPACE: "canfar-workloads",
     });
-    expect(Object.keys(configMap.data ?? {}).join("\n")).not.toMatch(/TOKEN|PASSWORD|SECRET/u);
+    expect(Object.keys(configMap.data ?? {}).join("\n")).not.toMatch(
+      /SECRET|AUTHORIZATION|BEARER/u,
+    );
+    expect(Object.values(configMap.data ?? {}).join("\n")).not.toMatch(
+      /runtime-password|runtime-user|Bearer/u,
+    );
     expect(Object.keys(configMap.data ?? {}).join("\n")).not.toMatch(/PROMETHEUS_RW/u);
 
     expect(testRun.metadata.namespace).toBe("canfar-perfpulse");
@@ -96,7 +106,6 @@ describe("deployment manifest contracts", () => {
     expect(testRunSpec.runner.envFrom).toEqual([
       { configMapRef: { name: "perfpulse-spot-direct-tiny-config" } },
       { secretRef: { name: "perfpulse-otlp-credentials", optional: true } },
-      { secretRef: { name: "perfpulse-skaha-runtime-token", optional: true } },
     ]);
     expect(renderManifestDocuments(contract)).not.toMatch(
       /experimental-prometheus-rw|K6_PROMETHEUS_RW/u,
@@ -163,12 +172,259 @@ describe("deployment manifest contracts", () => {
     ]);
   });
 
+  test("builds the manual benchmark-small Direct, Kueue, and Skaha TestRun contract", () => {
+    const contract = buildManualBenchmarkSmallDirectKueueDeployment({
+      imageTag: "2026.05.04",
+      otlpCredentialsSecretName: "perfpulse-otlp-credentials",
+      testid: "benchmark-small-manual",
+    });
+
+    const resources = contract.resources;
+    const role = resource(resources, "Role", "perfpulse-workload-writer");
+    const directConfig = resource(
+      resources,
+      "ConfigMap",
+      "perfpulse-benchmark-small-direct-config",
+    );
+    const kueueConfig = resource(resources, "ConfigMap", "perfpulse-benchmark-small-kueue-config");
+    const skahaConfig = resource(resources, "ConfigMap", "perfpulse-benchmark-small-skaha-config");
+    const directTestRun = resource(resources, "TestRun", "perfpulse-benchmark-small-direct");
+    const kueueTestRun = resource(resources, "TestRun", "perfpulse-benchmark-small-kueue");
+    const skahaTestRun = resource(resources, "TestRun", "perfpulse-benchmark-small-skaha");
+
+    expect(role.metadata.namespace).toBe("canfar-workloads");
+    expect(role.rules).toContainEqual({
+      apiGroups: ["batch"],
+      resources: ["jobs"],
+      verbs: ["create", "delete", "get", "list"],
+    });
+    expect(role.rules).toContainEqual({
+      apiGroups: ["kueue.x-k8s.io"],
+      resources: ["workloads"],
+      verbs: ["get", "list"],
+    });
+
+    for (const configMap of [directConfig, kueueConfig]) {
+      expect(configMap.metadata.namespace).toBe("canfar-perfpulse");
+      expect(configMap.data).toMatchObject({
+        CLEANUP: "true",
+        COMPLETION_GATE_SECONDS: "300",
+        K6_OTEL_EXPORTER_PROTOCOL: "http/protobuf",
+        K6_OTEL_HTTP_EXPORTER_ENDPOINT: "kube-prometheus-stack-prometheus.monitoring:9090",
+        K6_OTEL_HTTP_EXPORTER_INSECURE: "true",
+        K6_OTEL_HTTP_EXPORTER_URL_PATH: "/api/v1/otlp/v1/metrics",
+        K6_OTEL_METRIC_PREFIX: "k6_",
+        K6_OTEL_EXPORT_INTERVAL: "1s",
+        LOGICAL_USERS: "100",
+        PERF_PULSE_CLIENT_MODE: "kubernetes",
+        PROFILE: "benchmark-small",
+        RUN_CLASS: "benchmark",
+        SCENARIO: "many-small-users",
+        TOTAL_JOBS: "100",
+        VISIBILITY_GATE_SECONDS: "120",
+        WORKLOAD_NAMESPACE: "canfar-workloads",
+      });
+    }
+    expect(directConfig.data).toMatchObject({
+      K6_OTEL_SERVICE_NAME: "perfpulse-benchmark-small-direct",
+      SURFACE: "k8s-direct",
+    });
+    expect(kueueConfig.data).toMatchObject({
+      K6_OTEL_SERVICE_NAME: "perfpulse-benchmark-small-kueue",
+      KUEUE_ADMISSION_GATE_SECONDS: "300",
+      KUEUE_PRIORITY_CLASS: "low",
+      KUEUE_QUEUE_NAME: "cadc-default",
+      SURFACE: "k8s-kueue",
+    });
+    expect(skahaConfig.data).toMatchObject({
+      K6_OTEL_SERVICE_NAME: "perfpulse-benchmark-small-skaha",
+      SKAHA_API_URL: EXPECTED_DEFAULT_SKAHA_API_URL,
+      SKAHA_LOGIN_URL: "https://ws-cadc.canfar.net/ac/login",
+      SKAHA_PASSWORD_PATH: "/var/run/secrets/perfpulse/skaha-auth/password",
+      SKAHA_REQUEST_TIMEOUT_SECONDS: "120",
+      SKAHA_USERNAME_PATH: "/var/run/secrets/perfpulse/skaha-auth/username",
+      SUBMISSION_STAGGER_SECONDS: "1",
+      SURFACE: "skaha",
+    });
+    expect(Object.keys(directConfig.data ?? {}).join("\n")).not.toMatch(/KUEUE_/u);
+    expect(Object.keys(skahaConfig.data ?? {}).join("\n")).not.toMatch(/KUEUE_|WORKLOAD/u);
+
+    for (const testRun of [directTestRun, kueueTestRun, skahaTestRun]) {
+      expect(testRun.metadata.namespace).toBe("canfar-perfpulse");
+      expect(testRun.spec).toMatchObject({
+        arguments: "-o opentelemetry",
+        parallelism: 1,
+        runner: {
+          image: "images.opencadc.org/platform/perfpulse:2026.05.04",
+          serviceAccountName: "canfar-perfpulse",
+        },
+      });
+      const testRunSpec = testRun.spec as {
+        runner: {
+          env: Array<{ name: string; value: string }>;
+          envFrom: Array<Record<string, unknown>>;
+        };
+      };
+      expect(testRunSpec.runner.env).toContainEqual({
+        name: "TESTID",
+        value: "benchmark-small-manual",
+      });
+      expect(testRunSpec.runner.envFrom).toContainEqual({
+        secretRef: { name: "perfpulse-otlp-credentials", optional: true },
+      });
+    }
+    expect(
+      (directTestRun.spec?.runner as { envFrom: Array<Record<string, unknown>> }).envFrom,
+    ).toContainEqual({
+      configMapRef: { name: "perfpulse-benchmark-small-direct-config" },
+    });
+    expect(
+      (kueueTestRun.spec?.runner as { envFrom: Array<Record<string, unknown>> }).envFrom,
+    ).toContainEqual({
+      configMapRef: { name: "perfpulse-benchmark-small-kueue-config" },
+    });
+    const skahaRunner = skahaTestRun.spec?.runner as {
+      envFrom: Array<Record<string, unknown>>;
+      volumeMounts?: Array<Record<string, unknown>>;
+      volumes?: Array<Record<string, unknown>>;
+    };
+    expect(skahaRunner.envFrom).toContainEqual({
+      configMapRef: { name: "perfpulse-benchmark-small-skaha-config" },
+    });
+    expect(skahaRunner.volumeMounts).toContainEqual({
+      mountPath: "/var/run/secrets/perfpulse/skaha-auth",
+      name: "skaha-auth-credentials",
+      readOnly: true,
+    });
+    expect(skahaRunner.volumes).toContainEqual({
+      name: "skaha-auth-credentials",
+      secret: { secretName: "perfpulse-skaha-auth" },
+    });
+    expect(renderManifestDocuments(contract)).not.toMatch(/Authorization|kind: Secret/u);
+  });
+
+  test("builds the manual Skaha spot-tiny TestRun contract", () => {
+    const contract = buildManualSpotSkahaTinyDeployment({
+      imageTag: "2026.05.04",
+      otlpCredentialsSecretName: "perfpulse-otlp-credentials",
+      testid: "spot-skaha-tiny-manual",
+    });
+
+    const resources = contract.resources;
+    const controlNamespace = resource(resources, "Namespace", "canfar-perfpulse");
+    const workloadRole = resources.find(
+      (item) =>
+        item.kind === "Role" &&
+        item.metadata.namespace === "canfar-workloads" &&
+        item.metadata.name === "perfpulse-workload-writer",
+    );
+    const serviceAccount = resource(resources, "ServiceAccount", "canfar-perfpulse");
+    const configMap = resource(resources, "ConfigMap", "perfpulse-spot-skaha-tiny-config");
+    const testRun = resource(resources, "TestRun", "perfpulse-spot-skaha-tiny");
+
+    expect(controlNamespace.metadata.namespace).toBeUndefined();
+    expect(workloadRole).toBeUndefined();
+    expect(serviceAccount.metadata.namespace).toBe("canfar-perfpulse");
+
+    expect(configMap.metadata.namespace).toBe("canfar-perfpulse");
+    expect(configMap.data).toMatchObject({
+      CLEANUP: "true",
+      COMPLETION_GATE_SECONDS: "120",
+      K6_OTEL_EXPORTER_PROTOCOL: "http/protobuf",
+      K6_OTEL_HTTP_EXPORTER_ENDPOINT: "kube-prometheus-stack-prometheus.monitoring:9090",
+      K6_OTEL_HTTP_EXPORTER_INSECURE: "true",
+      K6_OTEL_HTTP_EXPORTER_URL_PATH: "/api/v1/otlp/v1/metrics",
+      K6_OTEL_METRIC_PREFIX: "k6_",
+      K6_OTEL_SERVICE_NAME: "perfpulse",
+      K6_OTEL_EXPORT_INTERVAL: "1s",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "spot-tiny",
+      RUN_CLASS: "spot",
+      SKAHA_API_URL: EXPECTED_DEFAULT_SKAHA_API_URL,
+      SKAHA_LOGIN_URL: "https://ws-cadc.canfar.net/ac/login",
+      SKAHA_PASSWORD_PATH: "/var/run/secrets/perfpulse/skaha-auth/password",
+      SKAHA_USERNAME_PATH: "/var/run/secrets/perfpulse/skaha-auth/username",
+      SURFACE: "skaha",
+      VISIBILITY_GATE_SECONDS: "60",
+    });
+    expect(DEFAULT_SKAHA_API_URL).toBe(EXPECTED_DEFAULT_SKAHA_API_URL);
+    expect(Object.keys(configMap.data ?? {}).join("\n")).not.toMatch(
+      /SECRET|AUTHORIZATION|BEARER/u,
+    );
+    expect(Object.values(configMap.data ?? {}).join("\n")).not.toMatch(
+      /runtime-password|runtime-user|Bearer/u,
+    );
+
+    expect(testRun.metadata.namespace).toBe("canfar-perfpulse");
+    expect(testRun.spec).toMatchObject({
+      arguments: "-o opentelemetry",
+      initializer: {
+        containerSecurityContext: restrictedContainerSecurityContext,
+        image: "images.opencadc.org/platform/perfpulse:2026.05.04",
+        securityContext: restrictedPodSecurityContext,
+        serviceAccountName: "canfar-perfpulse",
+      },
+      parallelism: 1,
+      runner: {
+        containerSecurityContext: restrictedContainerSecurityContext,
+        image: "images.opencadc.org/platform/perfpulse:2026.05.04",
+        securityContext: restrictedPodSecurityContext,
+        serviceAccountName: "canfar-perfpulse",
+      },
+      script: {
+        localFile: "/test/perfpulse.js",
+      },
+      starter: {
+        containerSecurityContext: restrictedContainerSecurityContext,
+        securityContext: restrictedPodSecurityContext,
+        serviceAccountName: "canfar-perfpulse",
+      },
+    });
+    const testRunSpec = testRun.spec as {
+      runner: {
+        env: Array<{ name: string; value: string }>;
+        envFrom: Array<Record<string, unknown>>;
+        volumeMounts?: Array<Record<string, unknown>>;
+        volumes?: Array<Record<string, unknown>>;
+      };
+    };
+    expect(testRunSpec.runner.env).toContainEqual({
+      name: "TESTID",
+      value: "spot-skaha-tiny-manual",
+    });
+    expect(testRunSpec.runner.envFrom).toEqual([
+      { configMapRef: { name: "perfpulse-spot-skaha-tiny-config" } },
+      { secretRef: { name: "perfpulse-otlp-credentials", optional: true } },
+    ]);
+    expect(testRunSpec.runner.volumeMounts).toContainEqual({
+      mountPath: "/var/run/secrets/perfpulse/skaha-auth",
+      name: "skaha-auth-credentials",
+      readOnly: true,
+    });
+    expect(testRunSpec.runner.volumes).toContainEqual({
+      name: "skaha-auth-credentials",
+      secret: { secretName: "perfpulse-skaha-auth" },
+    });
+    expect(renderManifestDocuments(contract)).not.toMatch(/Authorization|kind: Secret/u);
+  });
+
+  test("preserves an explicit Skaha API URL override in the manual Skaha manifest", () => {
+    const contract = buildManualSpotSkahaTinyDeployment({
+      imageTag: "2026.05.04",
+      skahaApiUrl: "https://ws.example/skaha/v1",
+      testid: "spot-skaha-tiny-manual",
+    });
+
+    const configMap = resource(contract.resources, "ConfigMap", "perfpulse-spot-skaha-tiny-config");
+
+    expect(configMap.data?.SKAHA_API_URL).toBe("https://ws.example/skaha/v1");
+  });
+
   test("builds an hourly non-overlapping spot-tiny CronJob contract", () => {
     const contract = buildHourlySpotTinySchedule({
       imageTag: "2026.05.04",
       kubectlImage: "docker.io/bitnami/kubectl:1.31",
       otlpCredentialsSecretName: "perfpulse-otlp-credentials",
-      skahaSecretName: "perfpulse-skaha-runtime-token",
     });
 
     const resources = contract.resources;
@@ -248,14 +504,17 @@ describe("deployment manifest contracts", () => {
   test("keeps checked-in YAML examples synchronized with the public contract", async () => {
     const manualYaml = await Bun.file("docs/manifests/perfpulse-m1-spot-direct-tiny.yaml").text();
     const kueueYaml = await Bun.file("docs/manifests/perfpulse-m2-spot-kueue-tiny.yaml").text();
+    const benchmarkSmallYaml = await Bun.file(
+      "docs/manifests/perfpulse-benchmark-small-direct-kueue.yaml",
+    ).text();
     const hourlyYaml = await Bun.file("docs/manifests/perfpulse-spot-tiny-hourly.yaml").text();
+    const skahaYaml = await Bun.file("docs/manifests/perfpulse-skaha-spot-tiny.yaml").text();
 
     expect(manualYaml).toBe(
       renderManifestDocuments(
         buildManualSpotDirectTinyDeployment({
           imageTag: "TAG",
           otlpCredentialsSecretName: "perfpulse-otlp-credentials",
-          skahaSecretName: "perfpulse-skaha-runtime-token",
           testid: "spot-direct-tiny-manual",
         }),
       ),
@@ -266,7 +525,6 @@ describe("deployment manifest contracts", () => {
           imageTag: "TAG",
           kubectlImage: "docker.io/bitnami/kubectl:1.31",
           otlpCredentialsSecretName: "perfpulse-otlp-credentials",
-          skahaSecretName: "perfpulse-skaha-runtime-token",
         }),
       ),
     );
@@ -279,12 +537,32 @@ describe("deployment manifest contracts", () => {
         }),
       ),
     );
+    expect(benchmarkSmallYaml).toBe(
+      renderManifestDocuments(
+        buildManualBenchmarkSmallDirectKueueDeployment({
+          imageTag: "TAG",
+          otlpCredentialsSecretName: "perfpulse-otlp-credentials",
+          testid: "benchmark-small-manual",
+        }),
+      ),
+    );
+    expect(skahaYaml).toBe(
+      renderManifestDocuments(
+        buildManualSpotSkahaTinyDeployment({
+          imageTag: "TAG",
+          otlpCredentialsSecretName: "perfpulse-otlp-credentials",
+          testid: "spot-skaha-tiny-manual",
+        }),
+      ),
+    );
   });
 });
 
 type ContractResource =
+  | ReturnType<typeof buildManualBenchmarkSmallDirectKueueDeployment>["resources"][number]
   | ReturnType<typeof buildManualSpotDirectTinyDeployment>["resources"][number]
   | ReturnType<typeof buildManualSpotKueueTinyDeployment>["resources"][number]
+  | ReturnType<typeof buildManualSpotSkahaTinyDeployment>["resources"][number]
   | ReturnType<typeof buildHourlySpotTinySchedule>["resources"][number];
 
 const restrictedPodSecurityContext = {

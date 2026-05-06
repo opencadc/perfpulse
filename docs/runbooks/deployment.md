@@ -86,12 +86,104 @@ K6_OTEL_SERVICE_NAME=perfpulse
 K6_OTEL_EXPORT_INTERVAL=5s
 ```
 
-Keep Skaha tokens, OTLP headers, bearer tokens, and basic-auth material out of the ConfigMap. Put
-credentials only in the referenced Secrets.
+Keep Skaha bearer tokens, OTLP headers, passwords, and basic-auth material out of the ConfigMap.
+Put credentials only in the referenced Secrets.
 
 Direct OTLP to Prometheus is only for M1 and small spot-check volume. Put Collector, Alloy, or
 another metrics backend in front of benchmark and stress profiles before running those profiles at
 scale.
+
+## Manual `benchmark-small` Direct, Kueue, and Skaha
+
+The repo-managed manual Direct, Kueue, and Skaha benchmark contract is:
+
+```text
+docs/manifests/perfpulse-benchmark-small-direct-kueue.yaml
+```
+
+Before applying it, replace:
+
+- `images.opencadc.org/platform/perfpulse:TAG` with the published runner image tag.
+
+Apply:
+
+```bash
+kubectl apply -f docs/manifests/perfpulse-benchmark-small-direct-kueue.yaml
+```
+
+The manifest creates three k6 Operator `TestRun` resources:
+
+- `perfpulse-benchmark-small-direct`
+- `perfpulse-benchmark-small-kueue`
+- `perfpulse-benchmark-small-skaha`
+
+All three use the same operator-provided `TESTID` value, `benchmark-small-manual` in the checked-in
+example, so Grafana can compare the Direct, Kueue, and Skaha surfaces by one selected test id after
+the benchmark dashboard is available. Change all three `TESTID` values together before applying if
+you need a unique manual run id.
+
+Each surface runs `PROFILE=benchmark-small`, `RUN_CLASS=benchmark`, `SCENARIO=many-small-users`,
+`TOTAL_JOBS=100`, `LOGICAL_USERS=100`, `PERF_PULSE_CLIENT_MODE=kubernetes`, `CLEANUP=true`,
+`K6_OTEL_EXPORT_INTERVAL=1s`, `COMPLETION_GATE_SECONDS=300`, and `VISIBILITY_GATE_SECONDS=120`.
+
+The Direct ConfigMap sets `SURFACE=k8s-direct` and
+`K6_OTEL_SERVICE_NAME=perfpulse-benchmark-small-direct`. The Kueue ConfigMap sets
+`SURFACE=k8s-kueue`, `K6_OTEL_SERVICE_NAME=perfpulse-benchmark-small-kueue`,
+`KUEUE_QUEUE_NAME=cadc-default`, `KUEUE_PRIORITY_CLASS=low`, and
+`KUEUE_ADMISSION_GATE_SECONDS=300`. Direct and Kueue also set
+`WORKLOAD_NAMESPACE=canfar-workloads`.
+
+The Skaha ConfigMap sets `SURFACE=skaha`,
+`K6_OTEL_SERVICE_NAME=perfpulse-benchmark-small-skaha`, the internal staging `SKAHA_API_URL`,
+`SKAHA_LOGIN_URL=https://ws-cadc.canfar.net/ac/login`,
+`SKAHA_REQUEST_TIMEOUT_SECONDS=120`, `SUBMISSION_STAGGER_SECONDS=1`, and credential file paths under
+`/var/run/secrets/perfpulse/skaha-auth`. Direct and Kueue do not set stagger controls, so they retain
+their 100-concurrent submission shape. The Skaha `TestRun` mounts the existing
+`perfpulse-skaha-auth` Secret read-only at that path. Run `bun run skaha-auth-setup` before applying
+if the Secret is not already present.
+
+## Manual Skaha `spot-tiny`
+
+The repo-managed manual Skaha surface manifest contract is:
+
+```text
+docs/manifests/perfpulse-skaha-spot-tiny.yaml
+```
+
+Before applying it, replace:
+
+- `images.opencadc.org/platform/perfpulse:TAG` with the published runner image tag.
+
+The checked-in Skaha ConfigMap uses the internal staging service URL:
+
+```text
+http://canfar-skaha-staging-skaha-tomcat-svc.canfar-system-staging.svc.keel-prod.local:8080/skaha/v1
+```
+
+The default Skaha spot workload uses `images.canfar.net/skaha/stress-ng:latest` as a headless
+session and runs the same command shape as Direct/Kueue: `stress-ng --cpu 1 --timeout
+<duration-seconds>s --metrics-brief`. Direct/Kueue keep their Docker Hub default image
+`docker.io/alexeiled/stress-ng`; only Skaha pivots to the CANFAR registry image.
+
+Before running Skaha load tests, run the explicit auth setup:
+
+```bash
+bun run skaha-auth-setup
+```
+
+This command prompts for CANFAR username and password and creates or updates
+`perfpulse-skaha-auth` in the `canfar-perfpulse` namespace with `username` and `password` keys. It
+does not authenticate during setup, does not create a bearer token, and does not print the password.
+
+The checked-in manifest intentionally stores only non-secret Skaha config in a ConfigMap and
+mounts `perfpulse-skaha-auth` as a Secret volume. The runtime generates a bearer token from the
+mounted credentials for each Skaha test run. Do not commit bearer tokens or passwords.
+
+After a Skaha validation run, remove the auth Secret with:
+
+```bash
+bun run skaha-auth-cleanup
+```
 
 ## Scheduled `spot-tiny`
 

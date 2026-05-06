@@ -34,9 +34,9 @@ Benchmark and stress run notes must include `activeHypothesis`. Spot runs do not
 
 ## Secret Handling
 
-Run evidence must not include bearer tokens, Skaha tokens, OTLP headers, basic-auth
-URLs, or similar sensitive values. The evidence report generator rejects sensitive input instead
-of rendering a redacted report, so fix the structured input and regenerate the note.
+Run evidence must not include bearer tokens, Skaha passwords, OTLP headers, basic-auth URLs, or
+similar sensitive values. The evidence report generator rejects sensitive input instead of rendering
+a redacted report, so fix the structured input and regenerate the note.
 
 Keep credentials in Secrets and runtime-only environment values. Do not paste token headers,
 OTLP credentials, or raw exception messages into run evidence.

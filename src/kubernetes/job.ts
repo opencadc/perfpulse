@@ -90,8 +90,8 @@ export function buildKueueJobManifest(
   config: RunConfig,
   options: KueueJobOptions,
 ): KubernetesJobManifest {
-  const labels = workloadLabels(config);
-  const userBucketIndex = options.userBucketIndex ?? 0;
+  const userBucketIndex = options.userBucketIndex ?? config.userBucketIndex;
+  const labels = workloadLabels(config, `bucket-${userBucketIndex}`);
 
   return buildJobManifest(
     config,

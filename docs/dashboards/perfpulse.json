@@ -1,0 +1,2453 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Submitted"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Visible"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Target state"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #D"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Submit failed"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #E"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Visible failed"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #F"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Target failed"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #G"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Cleanup failed"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "submitted",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "visible",
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_completed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=~\"k8s-direct|skaha\"}[$__range])) or sum by (surface) (last_over_time(k6_perfpulse_kueue_workloads_admitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=\"k8s-kueue\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "target-state",
+          "refId": "C"
+        },
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_submission_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "submit-failed",
+          "refId": "D"
+        },
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visibility_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "visible-failed",
+          "refId": "E"
+        },
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_completion_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=~\"k8s-direct|skaha\"}[$__range])) or sum by (surface) (last_over_time(k6_perfpulse_kueue_workloads_admission_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=\"k8s-kueue\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "target-failed",
+          "refId": "F"
+        },
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "cleanup-failed",
+          "refId": "G"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        }
+      ],
+      "title": "Diagnosis Matrix",
+      "type": "table",
+      "description": "Surface-level funnel counts shown as one table. Submitted is the accepted create response count; Visible is work observed after that response; Target state is direct/Skaha completion or Kueue Workload admission."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Data present",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "No data",
+                  "color": "red"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "(absent(sum(last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))) or vector(0))",
+          "legendFormat": "no data warning",
+          "refId": "A"
+        }
+      ],
+      "title": "No Data Warning",
+      "type": "stat",
+      "description": "Warns when selected filters have no PerfPulse job-submission samples in the dashboard time range."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 10
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "(sum(last_over_time(k6_perfpulse_jobs_completed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])) or vector(0)) + (sum(last_over_time(k6_perfpulse_kueue_workloads_admitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])) or vector(0))",
+          "legendFormat": "run outcome",
+          "refId": "A"
+        }
+      ],
+      "title": "Run Outcome",
+      "type": "stat",
+      "description": "Direct/Skaha work that reached terminal completion plus Kueue Workloads that reached admission for selected filters."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 10
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "jobs submitted",
+          "refId": "A"
+        }
+      ],
+      "title": "Jobs Submitted",
+      "type": "stat",
+      "description": "Accepted create responses from the selected surface. This is a count; submission duration is measured separately as request start to create response."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 10
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "jobs visible",
+          "refId": "A"
+        }
+      ],
+      "title": "Jobs Visible",
+      "type": "stat",
+      "description": "Work observed through the selected surface after the accepted create response."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 10
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum(last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "cleanup failures",
+          "refId": "A"
+        }
+      ],
+      "title": "Cleanup Failures",
+      "type": "stat",
+      "description": "Cleanup failures recorded by PerfPulse for selected filters."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Jobs / workloads",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (testid, surface) (k6_perfpulse_jobs_completed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"})",
+          "legendFormat": "{{testid}} {{surface}} completed",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (testid, surface) (k6_perfpulse_kueue_workloads_admitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"})",
+          "legendFormat": "{{testid}} {{surface}} admitted",
+          "refId": "B"
+        }
+      ],
+      "title": "Run Outcome Trend",
+      "type": "timeseries",
+      "description": "Target-state counts by test and surface over time: direct/Skaha completion and Kueue Workload admission."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Target-state count",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 22
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_completed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=~\"k8s-direct|skaha\"}[$__range]))",
+          "legendFormat": "{{surface}} completed",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_kueue_workloads_admitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=\"k8s-kueue\"}[$__range]))",
+          "legendFormat": "{{surface}} admitted",
+          "refId": "B"
+        }
+      ],
+      "title": "Target State Reached",
+      "type": "timeseries",
+      "description": "Target-state success counts by surface. Direct and Skaha target state is completion; Kueue target state is Workload admission."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Failure count",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 22
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_completion_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=~\"k8s-direct|skaha\"}[$__range]))",
+          "legendFormat": "{{surface}} completion failed",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_kueue_workloads_admission_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=\"k8s-kueue\"}[$__range]))",
+          "legendFormat": "{{surface}} admission failed",
+          "refId": "B"
+        }
+      ],
+      "title": "Target State Failures",
+      "type": "timeseries",
+      "description": "Target-state failure counts by surface. Direct and Skaha failures are completion-gate failures; Kueue failures are admission-gate failures."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms",
+          "custom": {
+            "axisLabel": "Latency (ms)",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 29
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_submission_duration_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "legendFormat": "p50 {{surface}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_submission_duration_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "legendFormat": "p95 {{surface}}",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_submission_duration_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "legendFormat": "p99 {{surface}}",
+          "refId": "C"
+        }
+      ],
+      "title": "Submission Latency",
+      "type": "timeseries",
+      "description": "Create request duration by surface, measured from request start until the create response returns. This does not include later visibility, admission, or completion time."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms",
+          "custom": {
+            "axisLabel": "Latency (ms)",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 29
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_visibility_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "legendFormat": "p50 {{surface}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_visibility_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "legendFormat": "p95 {{surface}}",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_visibility_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "legendFormat": "p99 {{surface}}",
+          "refId": "C"
+        }
+      ],
+      "title": "Visibility Latency",
+      "type": "timeseries",
+      "description": "Post-submit visibility latency by surface, measured from accepted create response until the Job, Kueue Workload, or Skaha session is visible. This excludes submission duration."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms",
+          "custom": {
+            "axisLabel": "Latency (ms)",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 37
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "legendFormat": "p50 {{surface}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "legendFormat": "p95 {{surface}}",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "legendFormat": "p99 {{surface}}",
+          "refId": "C"
+        }
+      ],
+      "title": "Completion Latency",
+      "type": "timeseries",
+      "description": "Post-submit completion latency for direct and Skaha spot work, measured from accepted create response until terminal completion. This excludes submission duration."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms",
+          "custom": {
+            "axisLabel": "Latency (ms)",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 37
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_kueue_admission_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "legendFormat": "p50 {{surface}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_kueue_admission_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "legendFormat": "p95 {{surface}}",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_kueue_admission_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "legendFormat": "p99 {{surface}}",
+          "refId": "C"
+        }
+      ],
+      "title": "Kueue Admission Latency",
+      "type": "timeseries",
+      "description": "Post-submit Kueue admission latency, measured from accepted create response until the Kueue Workload is admitted. This excludes submission duration."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Cleanup count",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 45
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_deleted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "{{surface}} deleted",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "{{surface}} failed",
+          "refId": "B"
+        }
+      ],
+      "title": "Cleanup",
+      "type": "timeseries",
+      "description": "Cleanup delete and failure counts by surface."
+    },
+    {
+      "collapsed": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "id": 15,
+      "panels": [],
+      "title": "k6 Runtime",
+      "type": "row",
+      "description": "k6 runtime load and execution health panels."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Iterations",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 53
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (testid, scenario) (last_over_time(k6_dropped_iterations_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "{{testid}} {{scenario}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Dropped Iterations",
+      "type": "timeseries",
+      "description": "Dropped k6 iterations by test and scenario."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Iterations",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 53
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (testid, scenario) (last_over_time(k6_iterations_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "{{testid}} {{scenario}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Iterations",
+      "type": "timeseries",
+      "description": "Completed k6 iterations by test and scenario."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Virtual users",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 53
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "max by (testid, scenario) (last_over_time(k6_vus{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "{{testid}} {{scenario}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Virtual Users",
+      "type": "timeseries",
+      "description": "Active virtual users by test and scenario."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "custom": {
+            "axisLabel": "Check ratio",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 59
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",condition=\"nonzero\"}[$__rate_interval])) / (sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",condition=~\"zero|nonzero\"}[$__rate_interval])) + 1e-12)",
+          "legendFormat": "checks passed",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",condition=\"zero\"}[$__rate_interval])) / (sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",condition=~\"zero|nonzero\"}[$__rate_interval])) + 1e-12)",
+          "legendFormat": "checks failed",
+          "refId": "B"
+        }
+      ],
+      "title": "Checks Pass Rate",
+      "type": "timeseries",
+      "description": "k6 check pass and failure ratios for selected filters."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "Bps",
+          "custom": {
+            "axisLabel": "Bytes/sec",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 16,
+        "x": 8,
+        "y": 59
+      },
+      "id": 20,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum(rate(k6_data_sent_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "sent",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(k6_data_received_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "received",
+          "refId": "B"
+        }
+      ],
+      "title": "Data IO",
+      "type": "timeseries",
+      "description": "k6 network data sent and received rates."
+    },
+    {
+      "collapsed": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 65
+      },
+      "id": 21,
+      "panels": [],
+      "title": "HTTP Analytics",
+      "type": "row",
+      "description": "HTTP request rate, failure, and duration panels."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Requests/sec",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 66
+      },
+      "id": 22,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (name) (rate(k6_http_reqs_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",name=~\"$request_name\"}[$__rate_interval]))",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP Requests",
+      "type": "timeseries",
+      "description": "HTTP request rate by request name."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Failures/sec",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 66
+      },
+      "id": 23,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (name) (rate(k6_http_req_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",name=~\"$request_name\"}[$__rate_interval]))",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP Failure Rate",
+      "type": "timeseries",
+      "description": "HTTP failure rate by request name."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms",
+          "custom": {
+            "axisLabel": "Latency (ms)",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 66
+      },
+      "id": 24,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, name) (rate(k6_http_req_duration_milliseconds_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",name=~\"$request_name\"}[$__rate_interval])))",
+          "legendFormat": "{{name}} p95",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP Duration p95",
+      "type": "timeseries",
+      "description": "p95 HTTP request duration by request name."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 72
+      },
+      "id": 25,
+      "options": {
+        "calculate": false,
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "mode": "scheme",
+          "reverse": false,
+          "scale": "exponential",
+          "scheme": "Spectral",
+          "steps": 64
+        },
+        "legend": {
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "tooltip": {
+          "show": true,
+          "yHistogram": true
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "reverse": false,
+          "unit": "ms"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (le) (rate(k6_http_req_duration_milliseconds_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",name=~\"$request_name\"}[$__rate_interval]))",
+          "format": "heatmap",
+          "legendFormat": "{{le}}",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP Duration Heatmap",
+      "type": "heatmap",
+      "description": "HTTP request duration distribution by bucket."
+    },
+    {
+      "collapsed": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 80
+      },
+      "id": 26,
+      "panels": [],
+      "title": "Kueue Cluster State",
+      "type": "row",
+      "description": "Best-effort cluster-wide Kueue queue and controller health panels."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Workloads",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 81
+      },
+      "id": 27,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (cluster_queue) (kueue_admitted_workloads_total{cluster_queue=~\".+\"})",
+          "legendFormat": "{{cluster_queue}} admitted",
+          "refId": "A"
+        }
+      ],
+      "title": "Kueue Workloads Admitted",
+      "type": "timeseries",
+      "description": "Admitted workload count by cluster queue."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Workloads",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 81
+      },
+      "id": 28,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (cluster_queue, status) (kueue_pending_workloads{cluster_queue=~\".+\"})",
+          "legendFormat": "{{cluster_queue}} {{status}} pending",
+          "refId": "A"
+        }
+      ],
+      "title": "Kueue Workloads Pending",
+      "type": "timeseries",
+      "description": "Pending workload count by cluster queue and status."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Restarts",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 81
+      },
+      "id": 29,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum (increase(kube_pod_container_status_restarts_total{namespace=~\"kueue-system|openshift-kueue-operator\",pod=~\".*kueue.*\"}[$__range]))",
+          "legendFormat": "kueue controller restarts",
+          "refId": "A"
+        }
+      ],
+      "title": "Kueue Controller Restarts",
+      "type": "timeseries",
+      "description": "Total Kueue controller container restarts over selected range."
+    },
+    {
+      "collapsed": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 87
+      },
+      "id": 30,
+      "panels": [],
+      "title": "Kubernetes API State",
+      "type": "row",
+      "description": "Kubernetes API request and workload pod state panels."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Requests/sec",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 88
+      },
+      "id": 31,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (verb, resource) (rate(apiserver_request_total{resource=~\"jobs|workloads\",verb=~\"create|list|delete|get\"}[$__rate_interval]))",
+          "legendFormat": "{{verb}} {{resource}}",
+          "refId": "A"
+        }
+      ],
+      "title": "API Server Request Rate",
+      "type": "timeseries",
+      "description": "API server request rate for job and workload operations."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s",
+          "custom": {
+            "axisLabel": "Latency (s)",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 88
+      },
+      "id": 32,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, verb, resource) (rate(apiserver_request_duration_seconds_bucket{resource=~\"jobs|workloads\",verb=~\"create|list|delete|get\"}[$__rate_interval])))",
+          "legendFormat": "{{verb}} {{resource}}",
+          "refId": "A"
+        }
+      ],
+      "title": "API Server p95 Latency",
+      "type": "timeseries",
+      "description": "p95 API server latency for job and workload operations."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisLabel": "Pods",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 88
+      },
+      "id": 33,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum by (namespace) (kube_pod_status_phase{namespace=~\"$namespace\",phase=\"Running\"})",
+          "legendFormat": "{{namespace}} running",
+          "refId": "A"
+        }
+      ],
+      "title": "Workload Pods Running",
+      "type": "timeseries",
+      "description": "Running workload pods by selected namespace."
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "tags": [
+    "perfpulse",
+    "overview"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_perfpulse_jobs_submitted_total, testid)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "testid",
+        "multi": true,
+        "name": "testid",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_perfpulse_jobs_submitted_total, testid)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query",
+        "description": "PerfPulse test id filter."
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_perfpulse_jobs_submitted_total, run_class)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "run_class",
+        "multi": true,
+        "name": "run_class",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_perfpulse_jobs_submitted_total, run_class)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query",
+        "description": "PerfPulse run class filter."
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_perfpulse_jobs_submitted_total, profile)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "profile",
+        "multi": true,
+        "name": "profile",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_perfpulse_jobs_submitted_total, profile)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query",
+        "description": "PerfPulse profile filter."
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_perfpulse_jobs_submitted_total, surface)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "surface",
+        "multi": true,
+        "name": "surface",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_perfpulse_jobs_submitted_total, surface)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query",
+        "description": "Execution surface filter."
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_perfpulse_jobs_submitted_total, scenario)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "scenario",
+        "multi": true,
+        "name": "scenario",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_perfpulse_jobs_submitted_total, scenario)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query",
+        "description": "k6 scenario filter."
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_perfpulse_jobs_submitted_total, cohort)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "cohort",
+        "multi": true,
+        "name": "cohort",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_perfpulse_jobs_submitted_total, cohort)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query",
+        "description": "PerfPulse cohort filter."
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_perfpulse_jobs_submitted_total, job_profile)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "job_profile",
+        "multi": true,
+        "name": "job_profile",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_perfpulse_jobs_submitted_total, job_profile)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query",
+        "description": "Job profile filter."
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_perfpulse_jobs_submitted_total, namespace)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "namespace",
+        "multi": true,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_perfpulse_jobs_submitted_total, namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query",
+        "description": "Kubernetes namespace filter."
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_http_reqs_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}, name)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "request_name",
+        "multi": true,
+        "name": "request_name",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_http_reqs_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}, name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query",
+        "description": "HTTP request name filter."
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "PerfPulse Overview",
+  "uid": "perfpulse",
+  "version": 1,
+  "weekStart": "",
+  "description": "Operator overview for PerfPulse run health, workload progress, k6 runtime behavior, HTTP behavior, and cluster signals. Submission latency is create request duration; visibility, completion, and Kueue admission latency start after the accepted create response."
+}

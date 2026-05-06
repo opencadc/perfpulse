@@ -217,9 +217,6 @@ spec:
                         - secretRef:
                             name: perfpulse-otlp-credentials
                             optional: true
-                        - secretRef:
-                            name: perfpulse-skaha-runtime-token
-                            optional: true
                     starter:
                       serviceAccountName: canfar-perfpulse
                       securityContext:

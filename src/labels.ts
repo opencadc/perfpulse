@@ -13,7 +13,10 @@ export const KUBERNETES_LABEL_KEYS = {
   userBucket: "perfpulse.opencadc.org/user-bucket",
 } as const;
 
-export function workloadLabels(config: RunConfig, userBucket = "bucket-0"): Record<string, string> {
+export function workloadLabels(
+  config: RunConfig,
+  userBucket = config.userBucket,
+): Record<string, string> {
   return {
     [KUBERNETES_LABEL_KEYS.appName]: "perfpulse",
     [KUBERNETES_LABEL_KEYS.managedBy]: "k6",

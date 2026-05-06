@@ -43,9 +43,10 @@ export function runDirectKubernetesSurface(
   now: () => number = Date.now,
 ): DirectKubernetesRunResult {
   const manifest = buildDirectJobManifest(config);
-  const submittedAt = now();
+  const createStartedAt = now();
   const createResponse = client.createJob(manifest);
-  const submissionDurationMs = now() - submittedAt;
+  const submittedAt = now();
+  const submissionDurationMs = submittedAt - createStartedAt;
 
   if (createResponse.status !== 201) {
     return {

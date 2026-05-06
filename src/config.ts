@@ -24,6 +24,10 @@ export const DEFAULT_SURFACE = "k8s-direct" as const;
 export const DEFAULT_JOB_PROFILE = "tiny" as const;
 export const DEFAULT_WORKLOAD_NAMESPACE = "canfar-workloads" as const;
 export const DEFAULT_WORKLOAD_IMAGE = "docker.io/alexeiled/stress-ng" as const;
+export const DEFAULT_SKAHA_WORKLOAD_IMAGE = "images.canfar.net/skaha/stress-ng:latest" as const;
+export const DEFAULT_SKAHA_API_URL =
+  "http://canfar-skaha-staging-skaha-tomcat-svc.canfar-system-staging.svc.keel-prod.local:8080/skaha/v1" as const;
+export const DEFAULT_SKAHA_LOGIN_URL = "https://ws-cadc.canfar.net/ac/login" as const;
 
 export type ClientMode = "noop" | "kubernetes";
 
@@ -57,7 +61,11 @@ export interface KueueConfig {
 
 export interface SkahaConfig {
   apiUrl: string;
-  token: string;
+  loginUrl: string;
+  passwordPath: string;
+  requestTimeoutSeconds: number;
+  submissionStaggerSeconds: number;
+  usernamePath: string;
 }
 
 export interface RunConfig {
@@ -65,6 +73,7 @@ export interface RunConfig {
   clientMode: ClientMode;
   cohort: "baseline";
   completionGateSeconds: number;
+  jobIndex: number;
   jobName: string;
   jobProfile: JobProfile;
   jobsPerLogicalUser: number;
@@ -84,12 +93,16 @@ export interface RunConfig {
   testid: string;
   testRunGrouping: TestRunGrouping;
   totalJobs: number;
+  userBucket: string;
+  userBucketIndex: number;
   userShape: string;
   visibilityGateSeconds: number;
   workload: WorkloadConfig;
 }
 
 const SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
+const DEFAULT_SKAHA_PASSWORD_PATH = "/var/run/secrets/perfpulse/skaha-auth/password";
+const DEFAULT_SKAHA_USERNAME_PATH = "/var/run/secrets/perfpulse/skaha-auth/username";
 
 export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   const clientMode = parseClientMode(env.PERF_PULSE_CLIENT_MODE ?? env.PERFPULSE_CLIENT_MODE);
@@ -132,15 +145,33 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   }
   const jobsPerLogicalUser = jobsPerSurface / logicalUsers;
   const skahaConfig: SkahaConfig = {
-    apiUrl: env.SKAHA_API_URL ?? "",
-    token: env.SKAHA_TOKEN ?? "",
+    apiUrl: env.SKAHA_API_URL ?? DEFAULT_SKAHA_API_URL,
+    loginUrl: env.SKAHA_LOGIN_URL ?? DEFAULT_SKAHA_LOGIN_URL,
+    passwordPath: env.SKAHA_PASSWORD_PATH ?? DEFAULT_SKAHA_PASSWORD_PATH,
+    requestTimeoutSeconds: parsePositiveInteger(
+      env.SKAHA_REQUEST_TIMEOUT_SECONDS,
+      30,
+      "SKAHA_REQUEST_TIMEOUT_SECONDS",
+    ),
+    submissionStaggerSeconds: parseNonNegativeInteger(
+      env.SUBMISSION_STAGGER_SECONDS,
+      0,
+      "SUBMISSION_STAGGER_SECONDS",
+    ),
+    usernamePath: env.SKAHA_USERNAME_PATH ?? DEFAULT_SKAHA_USERNAME_PATH,
   };
   if (clientMode !== "noop" && surfaces.includes("skaha")) {
-    if (skahaConfig.apiUrl.length === 0) {
+    if (env.SKAHA_API_URL === "" || skahaConfig.apiUrl.length === 0) {
       throw new Error("SKAHA_API_URL is required when the skaha surface is selected");
     }
-    if (skahaConfig.token.length === 0) {
-      throw new Error("SKAHA_TOKEN is required when the skaha surface is selected");
+    if (env.SKAHA_LOGIN_URL === "" || skahaConfig.loginUrl.length === 0) {
+      throw new Error("SKAHA_LOGIN_URL is required when the skaha surface is selected");
+    }
+    if (skahaConfig.usernamePath.length === 0) {
+      throw new Error("SKAHA_USERNAME_PATH is required when the skaha surface is selected");
+    }
+    if (skahaConfig.passwordPath.length === 0) {
+      throw new Error("SKAHA_PASSWORD_PATH is required when the skaha surface is selected");
     }
   }
   const workloadDurationSeconds = parsePositiveInteger(
@@ -150,19 +181,18 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   );
 
   const workloadCommand = parseOptionalStringArray(env.WORKLOAD_COMMAND, "WORKLOAD_COMMAND");
+  const defaultWorkloadArgs = defaultStressNgArgs(workloadDurationSeconds);
   const workload: WorkloadConfig = {
     activeDeadlineSeconds: parsePositiveInteger(
       env.WORKLOAD_ACTIVE_DEADLINE_SECONDS,
       180,
       "WORKLOAD_ACTIVE_DEADLINE_SECONDS",
     ),
-    args: parseStringArray(
-      env.WORKLOAD_ARGS,
-      defaultStressNgArgs(workloadDurationSeconds),
-      "WORKLOAD_ARGS",
-    ),
+    args: parseStringArray(env.WORKLOAD_ARGS, defaultWorkloadArgs, "WORKLOAD_ARGS"),
     durationSeconds: workloadDurationSeconds,
-    image: env.WORKLOAD_IMAGE ?? DEFAULT_WORKLOAD_IMAGE,
+    image:
+      env.WORKLOAD_IMAGE ??
+      (surface === "skaha" ? DEFAULT_SKAHA_WORKLOAD_IMAGE : DEFAULT_WORKLOAD_IMAGE),
     imagePullPolicy: parseImagePullPolicy(env.WORKLOAD_IMAGE_PULL_POLICY),
     ttlSecondsAfterFinished: parsePositiveInteger(
       env.WORKLOAD_TTL_SECONDS_AFTER_FINISHED,
@@ -183,7 +213,8 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
       profileDefinition.completionGateSeconds ?? 120,
       "COMPLETION_GATE_SECONDS",
     ),
-    jobName: makeJobName(testid, 0),
+    jobIndex: 0,
+    jobName: makeJobName(testid, surface, 0),
     jobProfile,
     jobsPerLogicalUser,
     jobsPerSurface,
@@ -223,6 +254,8 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     testid,
     testRunGrouping: profileDefinition.testRunGrouping,
     totalJobs: jobsPerSurface,
+    userBucket: "bucket-0",
+    userBucketIndex: 0,
     userShape: `${logicalUsers}x${jobsPerLogicalUser}`,
     visibilityGateSeconds: parsePositiveInteger(
       env.VISIBILITY_GATE_SECONDS,
@@ -233,16 +266,46 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   };
 }
 
+export function deriveRunConfigForJob(config: RunConfig, jobIndex: number): RunConfig {
+  if (!Number.isInteger(jobIndex) || jobIndex < 0) {
+    throw new Error(`Job index must be a non-negative integer, got ${jobIndex}`);
+  }
+
+  const userBucketIndex = Math.min(
+    config.logicalUsers - 1,
+    Math.floor(jobIndex / config.jobsPerLogicalUser),
+  );
+
+  return {
+    ...config,
+    jobIndex,
+    jobName: makeJobName(config.testid, config.surface, jobIndex),
+    userBucket: `bucket-${userBucketIndex}`,
+    userBucketIndex,
+  };
+}
+
 export function defaultTestId(clientMode: ClientMode): string {
   return clientMode === "kubernetes" ? "kind-smoke" : "local-noop";
 }
 
-export function makeJobName(testid: string, index: number): string {
-  const suffix = `-${index}`;
+export function makeJobName(testid: string, surface: Surface, index: number): string {
+  const suffix = `-${jobNameSurfaceToken(surface)}-${index}`;
   const prefix = "perfpulse-";
   const budget = 63 - prefix.length - suffix.length;
   const compact = sanitizeDnsLabel(testid, "run").slice(0, budget).replace(/-+$/u, "");
   return `${prefix}${compact}${suffix}`;
+}
+
+function jobNameSurfaceToken(surface: Surface): string {
+  switch (surface) {
+    case "k8s-direct":
+      return "direct";
+    case "k8s-kueue":
+      return "kueue";
+    case "skaha":
+      return "skaha";
+  }
 }
 
 export function sanitizeDnsLabel(value: string, fallback: string): string {
@@ -345,6 +408,21 @@ function parsePositiveInteger(value: string | undefined, fallback: number, name:
   const parsed = Number.parseInt(value, 10);
   if (!Number.isInteger(parsed) || parsed <= 0 || `${parsed}` !== value) {
     throw new Error(`${name} must be a positive integer, got "${value}"`);
+  }
+  return parsed;
+}
+
+function parseNonNegativeInteger(
+  value: string | undefined,
+  fallback: number,
+  name: string,
+): number {
+  if (value === undefined || value === "") {
+    return fallback;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed < 0 || `${parsed}` !== value) {
+    throw new Error(`${name} must be a non-negative integer, got "${value}"`);
   }
   return parsed;
 }

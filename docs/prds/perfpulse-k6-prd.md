@@ -271,7 +271,7 @@ Purpose:
 
 Acceptance:
 
-- The runner authenticates to Skaha with runtime-token auth.
+- The runner authenticates to Skaha with a bearer token from `ac/login`.
 - One headless Skaha session is accepted, visible, and completed within the configured gate.
 - Skaha cleanup deletes the session.
 - Skaha metrics share the same surface, scenario, visibility, and cleanup contracts.
@@ -398,10 +398,19 @@ polling becomes too expensive.
 
 k6 will call the Skaha session API directly over HTTP.
 
-The v1 credential shape is runtime-token based:
+For staging validation, the default in-cluster API URL is:
+
+```text
+http://canfar-skaha-staging-skaha-tomcat-svc.canfar-system-staging.svc.keel-prod.local:8080/skaha/v1
+```
+
+The v1 credential shape is username/password Secret based, with a fresh bearer token minted by each
+k6 TestRun setup:
 
 - `SKAHA_API_URL`
-- `SKAHA_TOKEN`
+- `SKAHA_LOGIN_URL`
+- `SKAHA_USERNAME_PATH`
+- `SKAHA_PASSWORD_PATH`
 
 Every Skaha request should include:
 
@@ -411,6 +420,12 @@ X-Skaha-Authentication-Type: RUNTIME-TOKEN
 Content-Type: application/x-www-form-urlencoded
 Accept: application/json
 ```
+
+k6 should read the mounted username/password Secret paths during TestRun startup, call
+`SKAHA_LOGIN_URL` with form-encoded credentials, and send the returned value as an HTTP bearer token.
+Operators prepare that Secret with `bun run skaha-auth-setup`, which prompts for CANFAR username and
+password and stores only those credentials as `perfpulse-skaha-auth` in `canfar-perfpulse`. Setup
+does not generate or persist a bearer token, so every Skaha load-test fixture gets a fresh token.
 
 The v1 Skaha operations are:
 
@@ -440,7 +455,7 @@ PerfPulse should use four configuration layers:
 1. Image: versioned TypeScript code, scenarios, default profiles, helper modules.
 2. ConfigMap: non-secret environment config such as namespaces, queue defaults, Skaha URL,
    Prometheus OTLP endpoint, profile defaults, and threshold defaults.
-3. Secret: Skaha runtime token and any metrics-export credentials.
+3. Secret: Skaha username/password credentials and any metrics-export credentials.
 4. TestRun environment: run-specific overrides such as `TESTID`, `RUN_CLASS`, `SCENARIO`,
    `SURFACE`, profile, total job count, user shape, duration, metric profile, and cleanup mode.
 
@@ -582,27 +597,29 @@ This surface creates Skaha headless sessions through the Skaha API. It is the re
 Science Platform surface and should be treated as the primary production signal after the direct
 Kubernetes baseline and Kueue dependency surfaces are proven.
 
-The session should request the same logical `stress-ng` workload shape as direct Kubernetes
-surfaces, but exact Kubernetes manifests do not need to be byte-for-byte identical. Skaha
-should be evaluated as a platform API surface with its own auth, validation, translation,
-queueing, and status behavior.
+The session should request the same logical tiny-duration workload shape as direct Kubernetes
+surfaces, but exact Kubernetes manifests do not need to be byte-for-byte identical. Skaha should be
+evaluated as a platform API surface with its own auth, image validation, translation, queueing, and
+status behavior.
 
 Completion success means:
 
 - The create API returned a session ID.
 - `GET /session/{id}` returns a recognizable session object.
-- The session status is `Pending`, `Running`, `Completed`, or another expected Skaha status
+- The session status is `Pending`, `Running`, `Succeeded`, `Completed`, or another expected Skaha status
   that proves the session has entered the platform status model.
-- For spot profiles, the session reaches `Completed` within the configured completion gate.
+- For spot profiles, the session reaches `Succeeded` or `Completed` within the configured completion gate.
 
 For stress campaigns, `Pending` or queued visibility is enough for the primary success path,
 with completion recorded separately when feasible. For spot checks, completion is a hard gate.
 
 ## Workload Design
 
-All workload Jobs and sessions use `stress-ng`. The workload exists to consume bounded CPU
-and memory while keeping the primary measurement focused on submission, queueing, visibility,
-and status behavior.
+Direct Kubernetes, Kueue, and Skaha workload fixtures use bounded `stress-ng`. Direct Kubernetes
+and Kueue keep the Docker Hub image `docker.io/alexeiled/stress-ng`. Skaha uses the CANFAR registry
+image `images.canfar.net/skaha/stress-ng:latest` because the Skaha API rejects Docker Hub images in
+this environment. The workload exists to consume bounded time while keeping the primary measurement
+focused on submission, queueing, visibility, and status behavior.
 
 ### Direct Kubernetes Default Workload
 
@@ -636,7 +653,16 @@ ram: 1
 type: headless
 ```
 
-The command and args should still launch `stress-ng` with the same duration profile.
+Skaha accepts the same workload command shape through a headless API session:
+
+```text
+image: images.canfar.net/skaha/stress-ng:latest
+cmd: stress-ng
+args: --cpu 1 --timeout <duration-seconds>s --metrics-brief
+```
+
+Operators can override `WORKLOAD_IMAGE`, `WORKLOAD_COMMAND`, and `WORKLOAD_ARGS` for one-off
+campaigns, but default benchmark parity keeps all surfaces on the same `stress-ng` command/args.
 
 ### Duration Profiles
 
@@ -1164,7 +1190,7 @@ Grafana.
 The M1 artifact should live in the repository as:
 
 ```text
-docs/dashboards/perfpulse-m1-spot-direct-tiny.json
+docs/dashboards/perfpulse.json
 ```
 
 Variables:
@@ -1314,7 +1340,7 @@ by default even when they fail.
 
 ## User Identity Model
 
-v1 uses synthetic logical users, not a pool of real Skaha tokens.
+v1 uses synthetic logical users, not a pool of real Skaha credentials.
 
 Direct Kubernetes Jobs can label synthetic user buckets:
 
@@ -1323,12 +1349,12 @@ perfpulse-bucket-001
 perfpulse-bucket-002
 ```
 
-Skaha v1 uses one runtime token, so Skaha sees one real authenticated user. The many-user
-shape is simulated through k6 logical user buckets and metrics, not through real Skaha
-per-user auth and quota behavior.
+Skaha v1 uses one bearer token, so Skaha sees one real authenticated user. The many-user shape is
+simulated through k6 logical user buckets and metrics, not through real Skaha per-user auth and
+quota behavior.
 
 This is acceptable for v1 because the immediate goal is to establish the harness, metrics,
-dashboards, and surface comparison. Real multi-user Skaha token pools can be added later if
+dashboards, and surface comparison. Real multi-user Skaha credential pools can be added later if
 the benchmark must test per-user quotas, auth cost, or user-specific Skaha behavior.
 
 ## User Stories
@@ -1516,7 +1542,7 @@ before adding Kueue or Skaha.
 
 ### Excluded
 
-- Skaha runtime-token HTTP client.
+- Skaha bearer-token HTTP client.
 - Direct Kueue Job create/list/delete.
 - Skaha headless create/get/delete.
 - Multi-surface `spot-tiny`.
@@ -1586,7 +1612,7 @@ Kueue expansion is accepted when:
 
 Skaha expansion is accepted when:
 
-- The k6 runner can authenticate to Skaha with runtime-token auth.
+- The k6 runner can authenticate to Skaha with a bearer token.
 - One Skaha headless session is accepted, visible, and completed within the configured gate.
 - Skaha cleanup succeeds.
 - Skaha metrics use the same tag allowlist and dashboard dimensions as the Kubernetes surfaces.
@@ -1663,8 +1689,8 @@ metrics, and TTL safety nets.
 
 ### Real Multi-User Skaha Behavior
 
-v1 uses one runtime token and synthetic logical users. This does not test real per-user Skaha
-auth, quota, or fairness behavior. Add a token-pool mode later if that becomes a requirement.
+v1 uses one bearer token and synthetic logical users. This does not test real per-user Skaha auth,
+quota, or fairness behavior. Add a credential-pool mode later if that becomes a requirement.
 
 ## Out of Scope
 
