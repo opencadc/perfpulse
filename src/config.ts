@@ -1,24 +1,27 @@
 import {
   isJobProfile,
-  isProfile,
-  isRunClass,
   isScenario,
   isSurface,
   JOB_PROFILE_DURATIONS_SECONDS,
   type JobProfile,
   type MetricProfile,
-  PROFILE_DEFINITIONS,
-  type Profile,
-  type RunClass,
   type Scenario,
   type Surface,
   type TestRunGrouping,
 } from "./profiles";
 
-export type { JobProfile, Profile, RunClass, Scenario, Surface } from "./profiles";
+export type { JobProfile, Scenario, Surface } from "./profiles";
 
-export const DEFAULT_PROFILE = "spot-direct-tiny" as const;
-export const DEFAULT_RUN_CLASS = "spot" as const;
+export const RUN_CLASSES = ["cron", "campaign"] as const;
+export const CAMPAIGN_TYPES = ["benchmark", "stress"] as const;
+export const PROFILES = ["cron", "campaign"] as const;
+
+export type RunClass = (typeof RUN_CLASSES)[number];
+export type CampaignType = (typeof CAMPAIGN_TYPES)[number];
+export type Profile = (typeof PROFILES)[number];
+
+export const DEFAULT_PROFILE = "cron" as const;
+export const DEFAULT_RUN_CLASS = "cron" as const;
 export const DEFAULT_SCENARIO = "single-bulk-user" as const;
 export const DEFAULT_SURFACE = "k8s-direct" as const;
 export const DEFAULT_JOB_PROFILE = "tiny" as const;
@@ -69,6 +72,7 @@ export interface SkahaConfig {
 }
 
 export interface RunConfig {
+  campaignType?: CampaignType;
   cleanup: boolean;
   clientMode: ClientMode;
   cohort: "baseline";
@@ -107,41 +111,53 @@ const DEFAULT_SKAHA_USERNAME_PATH = "/var/run/secrets/perfpulse/skaha-auth/usern
 export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   const clientMode = parseClientMode(env.PERF_PULSE_CLIENT_MODE ?? env.PERFPULSE_CLIENT_MODE);
   const profile = parseProfile(env.PROFILE ?? DEFAULT_PROFILE);
-  const profileDefinition = PROFILE_DEFINITIONS[profile];
-  const runClass = parseOptionalRunClass(env.RUN_CLASS, profileDefinition.runClass);
-  if (runClass !== profileDefinition.runClass) {
+  const runClass = parseOptionalRunClass(env.RUN_CLASS, profile);
+  if (runClass !== profile) {
     throw new Error(
-      `RUN_CLASS "${runClass}" does not match profile "${profile}" run_class "${profileDefinition.runClass}"`,
+      `RUN_CLASS "${runClass}" does not match profile "${profile}" run_class "${profile}"`,
     );
   }
-  if (runClass === "stress" && env.CONFIRM_STRESS !== "true") {
-    throw new Error(
-      `Profile "${profile}" requires CONFIRM_STRESS=true before workloads are created`,
-    );
+  const campaignType = parseCampaignType(env.CAMPAIGN_TYPE, runClass);
+  if (campaignType === "stress" && env.CONFIRM_STRESS !== "true") {
+    throw new Error("Stress campaigns require CONFIRM_STRESS=true before workloads are created");
   }
 
   const surfaces = resolveSurfaces(env, profile);
   const surface = surfaces[0] ?? DEFAULT_SURFACE;
-  const scenario = parseOptionalScenario(env.SCENARIO, profileDefinition.scenario);
-  const jobProfile = parseOptionalJobProfile(env.JOB_PROFILE, profileDefinition.jobProfile);
+  const scenario = parseOptionalScenario(
+    env.SCENARIO,
+    campaignType === "stress" ? "throughput-stress" : DEFAULT_SCENARIO,
+  );
+  const jobProfile = parseOptionalJobProfile(
+    env.JOB_PROFILE,
+    campaignType === "benchmark" ? "small" : DEFAULT_JOB_PROFILE,
+  );
   const testid = sanitizeLabelValue(
     env.TESTID ?? env.testid ?? defaultTestId(clientMode),
     defaultTestId(clientMode),
   );
-  const logicalUsers = parsePositiveInteger(
-    env.LOGICAL_USERS,
-    profileDefinition.logicalUsers,
-    "LOGICAL_USERS",
-  );
+  if (
+    runClass === "campaign" &&
+    (env.TOTAL_JOBS === undefined || env.LOGICAL_USERS === undefined)
+  ) {
+    throw new Error("Campaign runs require TOTAL_JOBS and LOGICAL_USERS");
+  }
+  const logicalUsers = parsePositiveInteger(env.LOGICAL_USERS, 1, "LOGICAL_USERS");
   const jobsPerSurface = parsePositiveInteger(
     env.TOTAL_JOBS ?? env.JOBS_PER_SURFACE,
-    profileDefinition.jobsPerSurface,
+    1,
     env.TOTAL_JOBS === undefined ? "JOBS_PER_SURFACE" : "TOTAL_JOBS",
   );
   if (jobsPerSurface % logicalUsers !== 0) {
     throw new Error(
       `TOTAL_JOBS/JOBS_PER_SURFACE (${jobsPerSurface}) must divide evenly across LOGICAL_USERS (${logicalUsers})`,
     );
+  }
+  if (runClass === "campaign" && logicalUsers > 25 && env.CONFIRM_HIGH_USERS !== "true") {
+    throw new Error("Campaigns with more than 25 logical users require CONFIRM_HIGH_USERS=true");
+  }
+  if (runClass === "campaign" && jobsPerSurface > 10000 && campaignType !== "stress") {
+    throw new Error("Campaigns with more than 10000 jobs per surface require CAMPAIGN_TYPE=stress");
   }
   const jobsPerLogicalUser = jobsPerSurface / logicalUsers;
   const skahaConfig: SkahaConfig = {
@@ -205,12 +221,13 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   }
 
   return {
-    cleanup: parseBoolean(env.CLEANUP, profileDefinition.cleanup),
+    ...(campaignType === undefined ? {} : { campaignType }),
+    cleanup: parseBoolean(env.CLEANUP, true),
     clientMode,
     cohort: "baseline",
     completionGateSeconds: parsePositiveInteger(
       env.COMPLETION_GATE_SECONDS,
-      profileDefinition.completionGateSeconds ?? 120,
+      120,
       "COMPLETION_GATE_SECONDS",
     ),
     jobIndex: 0,
@@ -221,7 +238,7 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     kueue: {
       admissionGateSeconds: parsePositiveInteger(
         env.KUEUE_ADMISSION_GATE_SECONDS,
-        profileDefinition.completionGateSeconds ?? 120,
+        120,
         "KUEUE_ADMISSION_GATE_SECONDS",
       ),
       priorityClass: env.KUEUE_PRIORITY_CLASS ?? "low",
@@ -242,9 +259,9 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
       tokenPath: env.K8S_TOKEN_PATH ?? SERVICE_ACCOUNT_TOKEN_PATH,
     },
     logicalUsers,
-    metricProfile: profileDefinition.metricProfile,
+    metricProfile: campaignType === "stress" ? "lean" : "full",
     noopSleepSeconds: parsePositiveInteger(env.NOOP_SLEEP_SECONDS, 1, "NOOP_SLEEP_SECONDS"),
-    preserveOnFailure: parseBoolean(env.PRESERVE_ON_FAILURE, profileDefinition.preserveOnFailure),
+    preserveOnFailure: parseBoolean(env.PRESERVE_ON_FAILURE, false),
     profile,
     runClass,
     scenario,
@@ -252,14 +269,14 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     surfaces,
     skaha: skahaConfig,
     testid,
-    testRunGrouping: profileDefinition.testRunGrouping,
+    testRunGrouping: runClass === "campaign" ? "separate-per-surface" : "combined",
     totalJobs: jobsPerSurface,
     userBucket: "bucket-0",
     userBucketIndex: 0,
     userShape: `${logicalUsers}x${jobsPerLogicalUser}`,
     visibilityGateSeconds: parsePositiveInteger(
       env.VISIBILITY_GATE_SECONDS,
-      profileDefinition.visibilityGateSeconds ?? 60,
+      60,
       "VISIBILITY_GATE_SECONDS",
     ),
     workload,
@@ -338,7 +355,7 @@ function parseClientMode(value: string | undefined): ClientMode {
 }
 
 function parseProfile(value: string): Profile {
-  if (isProfile(value)) {
+  if (isProfileValue(value)) {
     return value;
   }
   throw new Error(`PROFILE has unsupported value "${value}"`);
@@ -348,10 +365,41 @@ function parseOptionalRunClass(value: string | undefined, fallback: RunClass): R
   if (value === undefined || value === "") {
     return fallback;
   }
-  if (isRunClass(value)) {
+  if (isRunClassValue(value)) {
     return value;
   }
   throw new Error(`RUN_CLASS has unsupported value "${value}"`);
+}
+
+function parseCampaignType(
+  value: string | undefined,
+  runClass: RunClass,
+): CampaignType | undefined {
+  if (runClass === "cron") {
+    if (value === undefined || value === "") {
+      return undefined;
+    }
+    throw new Error("CAMPAIGN_TYPE is only supported when RUN_CLASS/PROFILE is campaign");
+  }
+  if (value === undefined || value === "") {
+    throw new Error("Campaign runs require CAMPAIGN_TYPE benchmark or stress");
+  }
+  if (isCampaignTypeValue(value)) {
+    return value;
+  }
+  throw new Error(`CAMPAIGN_TYPE has unsupported value "${value}"`);
+}
+
+function isProfileValue(value: string): value is Profile {
+  return (PROFILES as readonly string[]).includes(value);
+}
+
+function isRunClassValue(value: string): value is RunClass {
+  return (RUN_CLASSES as readonly string[]).includes(value);
+}
+
+function isCampaignTypeValue(value: string): value is CampaignType {
+  return (CAMPAIGN_TYPES as readonly string[]).includes(value);
 }
 
 function parseOptionalScenario(value: string | undefined, fallback: Scenario): Scenario {
@@ -381,7 +429,7 @@ function resolveSurfaces(env: EnvSource, profile: Profile): Surface[] {
 
   const value = env.SURFACES ?? env.SURFACE;
   if (value === undefined || value === "") {
-    return [...PROFILE_DEFINITIONS[profile].surfaces];
+    return profile === "campaign" ? ["k8s-kueue", "k8s-direct", "skaha"] : [DEFAULT_SURFACE];
   }
 
   const surfaces = value.split(",").map((surface) => surface.trim());

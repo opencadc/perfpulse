@@ -18,7 +18,9 @@ describe("resolveRunConfig", () => {
     const config = resolveRunConfig({});
 
     expect(config.clientMode).toBe("noop");
-    expect(config.profile).toBe("spot-direct-tiny");
+    expect(config.profile).toBe("cron");
+    expect(config.runClass).toBe("cron");
+    expect(config.campaignType).toBeUndefined();
     expect(config.surface).toBe("k8s-direct");
     expect(config.testid).toBe("local-noop");
     expect(config.jobName).toBe("perfpulse-local-noop-direct-0");
@@ -41,12 +43,18 @@ describe("resolveRunConfig", () => {
     expect(config.workload.args).toEqual(["--cpu", "1", "--timeout", "10s", "--metrics-brief"]);
   });
 
-  test("resolves canned benchmark profiles without changing the default client mode", () => {
-    const config = resolveRunConfig({ PROFILE: "benchmark-small" });
+  test("resolves explicit benchmark campaigns without changing the default client mode", () => {
+    const config = resolveRunConfig({
+      CAMPAIGN_TYPE: "benchmark",
+      LOGICAL_USERS: "1",
+      PROFILE: "campaign",
+      TOTAL_JOBS: "100",
+    });
 
     expect(config.clientMode).toBe("noop");
-    expect(config.profile).toBe("benchmark-small");
-    expect(config.runClass).toBe("benchmark");
+    expect(config.profile).toBe("campaign");
+    expect(config.runClass).toBe("campaign");
+    expect(config.campaignType).toBe("benchmark");
     expect(config.surfaces).toEqual(["k8s-kueue", "k8s-direct", "skaha"]);
     expect(config.surface).toBe("k8s-kueue");
     expect(config.scenario).toBe("single-bulk-user");
@@ -58,32 +66,35 @@ describe("resolveRunConfig", () => {
     expect(config.workload.durationSeconds).toBe(30);
   });
 
-  test("resolves the PRD canned profile catalog through public configuration", () => {
+  test("resolves the runtime taxonomy through public configuration", () => {
     const profileInputs = [
-      { env: { PROFILE: "spot-direct-tiny" }, jobs: 1, runClass: "spot", surfaces: ["k8s-direct"] },
+      { env: { PROFILE: "cron" }, jobs: 1, runClass: "cron", surfaces: ["k8s-direct"] },
       {
-        env: { PROFILE: "spot-tiny" },
-        jobs: 1,
-        runClass: "spot",
-        surfaces: ["k8s-direct", "k8s-kueue", "skaha"],
-      },
-      {
-        env: { PROFILE: "benchmark-medium" },
+        campaignType: "benchmark",
+        env: {
+          CAMPAIGN_TYPE: "benchmark",
+          CONFIRM_HIGH_USERS: "true",
+          LOGICAL_USERS: "100",
+          PROFILE: "campaign",
+          TOTAL_JOBS: "1000",
+        },
         jobs: 1000,
-        runClass: "benchmark",
+        runClass: "campaign",
         surfaces: ["k8s-kueue", "k8s-direct", "skaha"],
       },
       {
-        env: { CONFIRM_STRESS: "true", PROFILE: "stress-medium" },
+        campaignType: "stress",
+        env: {
+          CAMPAIGN_TYPE: "stress",
+          CONFIRM_HIGH_USERS: "true",
+          CONFIRM_STRESS: "true",
+          LOGICAL_USERS: "100",
+          PROFILE: "campaign",
+          TOTAL_JOBS: "10000",
+        },
         jobs: 10000,
-        runClass: "stress",
+        runClass: "campaign",
         surfaces: ["k8s-kueue", "k8s-direct", "skaha"],
-      },
-      {
-        env: { CONFIRM_STRESS: "true", PROFILE: "stress-high" },
-        jobs: 100000,
-        runClass: "stress",
-        surfaces: ["k8s-kueue"],
       },
     ] as const;
 
@@ -91,33 +102,64 @@ describe("resolveRunConfig", () => {
       const config = resolveRunConfig(input.env);
 
       expect(config.runClass).toBe(input.runClass);
+      expect(config.campaignType).toBe("campaignType" in input ? input.campaignType : undefined);
       expect(config.surfaces).toEqual([...input.surfaces]);
       expect(config.jobsPerSurface).toBe(input.jobs);
     }
   });
 
-  test("rejects stress profiles unless the operator confirms the campaign", () => {
-    expect(() => resolveRunConfig({ PROFILE: "stress-medium" })).toThrow(
-      'Profile "stress-medium" requires CONFIRM_STRESS=true before workloads are created',
+  test("rejects stress campaigns unless the operator confirms the campaign", () => {
+    expect(() =>
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "stress",
+        LOGICAL_USERS: "100",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "10000",
+      }),
+    ).toThrow("Stress campaigns require CONFIRM_STRESS=true before workloads are created");
+  });
+
+  test("rejects campaigns without explicit total jobs and logical users", () => {
+    expect(() => resolveRunConfig({ CAMPAIGN_TYPE: "benchmark", PROFILE: "campaign" })).toThrow(
+      "Campaign runs require TOTAL_JOBS and LOGICAL_USERS",
     );
   });
 
-  test("keeps stress-high on Kueue unless optional surfaces are explicitly selected", () => {
-    const defaultConfig = resolveRunConfig({
-      CONFIRM_STRESS: "true",
-      PROFILE: "stress-high",
-    });
-    const explicitConfig = resolveRunConfig({
-      CONFIRM_STRESS: "true",
-      PROFILE: "stress-high",
-      SURFACES: "k8s-direct,skaha",
-    });
-
-    expect(defaultConfig.surfaces).toEqual(["k8s-kueue"]);
-    expect(defaultConfig.surface).toBe("k8s-kueue");
-    expect(defaultConfig.jobsPerSurface).toBe(100000);
-    expect(explicitConfig.surfaces).toEqual(["k8s-direct", "skaha"]);
-    expect(explicitConfig.surface).toBe("k8s-direct");
+  test("enforces campaign safety gates before work is created", () => {
+    expect(() =>
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        LOGICAL_USERS: "26",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "260",
+      }),
+    ).toThrow("Campaigns with more than 25 logical users require CONFIRM_HIGH_USERS=true");
+    expect(() =>
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        CONFIRM_HIGH_USERS: "true",
+        LOGICAL_USERS: "26",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "260",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        LOGICAL_USERS: "1",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "10001",
+      }),
+    ).toThrow("Campaigns with more than 10000 jobs per surface require CAMPAIGN_TYPE=stress");
+    expect(() =>
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "stress",
+        CONFIRM_STRESS: "true",
+        LOGICAL_USERS: "1",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "10001",
+      }),
+    ).not.toThrow();
   });
 
   test("accepts constrained run overrides and testid aliases", () => {
@@ -287,18 +329,26 @@ describe("resolveRunConfig", () => {
     const directConfig = deriveRunConfigForJob(
       resolveRunConfig({
         PERF_PULSE_CLIENT_MODE: "kubernetes",
-        PROFILE: "benchmark-small",
+        CAMPAIGN_TYPE: "benchmark",
+        CONFIRM_HIGH_USERS: "true",
         SURFACE: "k8s-direct",
+        LOGICAL_USERS: "100",
+        PROFILE: "campaign",
         TESTID: "Shared Benchmark 01",
+        TOTAL_JOBS: "100",
       }),
       75,
     );
     const kueueConfig = deriveRunConfigForJob(
       resolveRunConfig({
         PERF_PULSE_CLIENT_MODE: "kubernetes",
-        PROFILE: "benchmark-small",
+        CAMPAIGN_TYPE: "benchmark",
+        CONFIRM_HIGH_USERS: "true",
+        LOGICAL_USERS: "100",
+        PROFILE: "campaign",
         SURFACE: "k8s-kueue",
         TESTID: "Shared Benchmark 01",
+        TOTAL_JOBS: "100",
       }),
       75,
     );
@@ -324,8 +374,8 @@ describe("resolveRunConfig", () => {
       cohort: "baseline",
       job_profile: "tiny",
       namespace: "canfar-workloads",
-      profile: "spot-direct-tiny",
-      run_class: "spot",
+      profile: "cron",
+      run_class: "cron",
       scenario: "single-bulk-user",
       surface: "k8s-direct",
       testid: "metric-tags",

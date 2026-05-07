@@ -1,0 +1,53 @@
+{{- range $surface := .Values.surfaces }}
+{{- $short := include "perfpulse.nameForSurface" $surface }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: perfpulse-campaign-{{ $short }}-config
+  namespace: {{ $.Values.controlNamespace }}
+  labels:
+{{ include "perfpulse.labels" $ | indent 4 }}
+    perfpulse.opencadc.org/surface: {{ $surface }}
+data:
+  CLEANUP: "true"
+  CAMPAIGN_TYPE: {{ $.Values.campaign.type }}
+  COMPLETION_GATE_SECONDS: {{ $.Values.campaign.completionGateSeconds | quote }}
+  {{- if eq $.Values.campaign.type "stress" }}
+  CONFIRM_STRESS: "true"
+  {{- end }}
+  {{- if $.Values.campaign.confirmHighUsers }}
+  CONFIRM_HIGH_USERS: "true"
+  {{- end }}
+  K6_OTEL_EXPORTER_PROTOCOL: http/protobuf
+  K6_OTEL_HTTP_EXPORTER_ENDPOINT: {{ $.Values.otlp.endpoint | quote }}
+  K6_OTEL_HTTP_EXPORTER_INSECURE: "true"
+  K6_OTEL_HTTP_EXPORTER_URL_PATH: {{ $.Values.otlp.urlPath | quote }}
+  K6_OTEL_METRIC_PREFIX: k6_
+  K6_OTEL_SERVICE_NAME: perfpulse-campaign-{{ $short }}
+  K6_OTEL_EXPORT_INTERVAL: 5s
+  LOGICAL_USERS: {{ $.Values.campaign.logicalUsers | quote }}
+  PERF_PULSE_CLIENT_MODE: kubernetes
+  PROFILE: {{ $.Values.campaign.profile | quote }}
+  RUN_CLASS: campaign
+  SCENARIO: {{ $.Values.campaign.scenario | quote }}
+  SURFACE: {{ $surface }}
+  TOTAL_JOBS: {{ $.Values.campaign.totalJobs | quote }}
+  VISIBILITY_GATE_SECONDS: {{ $.Values.campaign.visibilityGateSeconds | quote }}
+  {{- if or (eq $surface "k8s-direct") (eq $surface "k8s-kueue") }}
+  WORKLOAD_NAMESPACE: {{ $.Values.workloadNamespace }}
+  {{- end }}
+  {{- if eq $surface "k8s-kueue" }}
+  KUEUE_ADMISSION_GATE_SECONDS: {{ $.Values.campaign.completionGateSeconds | quote }}
+  KUEUE_PRIORITY_CLASS: low
+  KUEUE_QUEUE_NAME: cadc-default
+  {{- end }}
+  {{- if eq $surface "skaha" }}
+  SKAHA_API_URL: {{ $.Values.skaha.apiUrl | quote }}
+  SKAHA_LOGIN_URL: {{ $.Values.skaha.loginUrl | quote }}
+  SKAHA_PASSWORD_PATH: /var/run/secrets/perfpulse/skaha-auth/password
+  SKAHA_REQUEST_TIMEOUT_SECONDS: "120"
+  SKAHA_USERNAME_PATH: /var/run/secrets/perfpulse/skaha-auth/username
+  SUBMISSION_STAGGER_SECONDS: "1"
+  {{- end }}
+{{- end }}

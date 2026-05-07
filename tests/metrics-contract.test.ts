@@ -19,8 +19,29 @@ describe("metrics contract", () => {
   test("emits only approved metric tags", () => {
     const tags = metricTags(resolveRunConfig({ TESTID: "spot-20260501" }));
 
-    expect(Object.keys(tags).sort()).toEqual([...ALLOWED_METRIC_TAGS].sort());
+    expect(
+      Object.keys(tags).every((tag) => (ALLOWED_METRIC_TAGS as readonly string[]).includes(tag)),
+    ).toBe(true);
     expect(tags.testid).toBe("spot-20260501");
     expect(tags.surface).toBe("k8s-direct");
+  });
+
+  test("emits low-cardinality campaign type for campaigns only", () => {
+    const cronTags = metricTags(resolveRunConfig({}));
+    const campaignTags = metricTags(
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        LOGICAL_USERS: "10",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "100",
+      }),
+    );
+
+    expect(cronTags).not.toHaveProperty("campaign_type");
+    expect(campaignTags).toMatchObject({
+      campaign_type: "benchmark",
+      profile: "campaign",
+      run_class: "campaign",
+    });
   });
 });

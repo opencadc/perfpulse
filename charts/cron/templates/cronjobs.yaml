@@ -1,0 +1,137 @@
+{{- range $surface := .Values.surfaces }}
+{{- $short := include "perfpulse.nameForSurface" $surface }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: perfpulse-cron-{{ $short }}
+  namespace: {{ $.Values.controlNamespace }}
+  labels:
+{{ include "perfpulse.labels" $ | indent 4 }}
+    perfpulse.opencadc.org/profile: cron
+    perfpulse.opencadc.org/surface: {{ $surface }}
+spec:
+  schedule: {{ $.Values.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 1260
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 900
+      template:
+        metadata:
+          labels:
+{{ include "perfpulse.labels" $ | indent 12 }}
+            perfpulse.opencadc.org/surface: {{ $surface }}
+        spec:
+          serviceAccountName: canfar-perfpulse
+          restartPolicy: Never
+          securityContext:
+{{ include "perfpulse.podSecurityContext" $ | indent 12 }}
+          containers:
+            - name: create-testrun
+              image: {{ $.Values.kubectl.image | quote }}
+              command: ["/bin/sh", "-c"]
+              args:
+                - |-
+                  set -eu
+                  TESTID="cron-{{ $short }}-$(date -u +%Y%m%d%H%M%S)"
+                  cat <<YAML | kubectl apply -f -
+                  apiVersion: k6.io/v1alpha1
+                  kind: TestRun
+                  metadata:
+                    name: perfpulse-cron-{{ $short }}-${TESTID}
+                    namespace: {{ $.Values.controlNamespace }}
+                    labels:
+                      app.kubernetes.io/name: perfpulse
+                      app.kubernetes.io/part-of: perfpulse
+                      perfpulse.opencadc.org/profile: cron
+                      perfpulse.opencadc.org/surface: {{ $surface }}
+                      perfpulse.opencadc.org/testid: ${TESTID}
+                  spec:
+                    cleanup: post
+                    parallelism: 1
+                    arguments: "-o opentelemetry"
+                    script:
+                      localFile: /test/perfpulse.js
+                    initializer:
+                      image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
+                      serviceAccountName: canfar-perfpulse
+                      securityContext:
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      containerSecurityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                    runner:
+                      image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
+                      serviceAccountName: canfar-perfpulse
+                      securityContext:
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      containerSecurityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      env:
+                        - name: TESTID
+                          value: ${TESTID}
+                      envFrom:
+                        - configMapRef:
+                            name: perfpulse-cron-{{ $short }}-config
+                        - secretRef:
+                            name: {{ $.Values.otlp.credentialsSecretName }}
+                            optional: true
+                      {{- if eq $surface "skaha" }}
+                      volumeMounts:
+                        - mountPath: /var/run/secrets/perfpulse/skaha-auth
+                          name: skaha-auth-credentials
+                          readOnly: true
+                      volumes:
+                        - name: skaha-auth-credentials
+                          secret:
+                            secretName: {{ $.Values.skaha.credentialsSecretName }}
+                      {{- end }}
+                    starter:
+                      serviceAccountName: canfar-perfpulse
+                      securityContext:
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      containerSecurityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsGroup: 1000
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                  YAML
+              securityContext:
+{{ include "perfpulse.containerSecurityContext" $ | indent 16 }}
+{{- end }}

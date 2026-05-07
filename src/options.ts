@@ -45,9 +45,11 @@ function createScenarios(config: RunConfig): NonNullable<Options["scenarios"]> {
 }
 
 function createThresholds(config: RunConfig): NonNullable<Options["thresholds"]> {
-  if (config.runClass === "stress") {
+  if (config.campaignType === "stress") {
     return {
       [METRIC_NAMES.cleanupFailed]: ["count==0"],
+      [METRIC_NAMES.jobsSubmissionFailed]: ["count==0"],
+      [METRIC_NAMES.jobsVisibilityFailed]: ["count==0"],
     };
   }
 
@@ -56,12 +58,8 @@ function createThresholds(config: RunConfig): NonNullable<Options["thresholds"]>
     http_req_failed: ["rate<0.01"],
     [METRIC_NAMES.cleanupFailed]: ["count==0"],
     [METRIC_NAMES.jobsSubmissionFailed]: ["count==0"],
+    [METRIC_NAMES.jobsVisibilityFailed]: ["count==0"],
   };
-
-  if (config.runClass === "spot") {
-    thresholds[METRIC_NAMES.jobsCompletionFailed] = ["count==0"];
-    thresholds[METRIC_NAMES.jobsVisibilityFailed] = ["count==0"];
-  }
 
   return thresholds;
 }

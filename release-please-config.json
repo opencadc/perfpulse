@@ -11,7 +11,39 @@
       "prerelease": false,
       "include-component-in-tag": false,
       "include-v-in-tag": true,
-      "initial-version": "0.1.0"
+      "initial-version": "0.1.0",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "charts/cron/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "charts/cron/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "yaml",
+          "path": "charts/cron/values.yaml",
+          "jsonpath": "$.image.tag"
+        },
+        {
+          "type": "yaml",
+          "path": "charts/campaign/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "charts/campaign/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "yaml",
+          "path": "charts/campaign/values.yaml",
+          "jsonpath": "$.image.tag"
+        }
+      ]
     }
   }
 }

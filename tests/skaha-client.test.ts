@@ -219,7 +219,7 @@ describe("Skaha user-facing surface client", () => {
     ]);
   });
 
-  test("treats pending or running status as visibility but not spot completion", () => {
+  test("accepts pending or running status as visibility without requiring completion", () => {
     const config = skahaSurfaceConfig();
     const client: SkahaSurfaceClient = {
       createSession() {
@@ -247,14 +247,12 @@ describe("Skaha user-facing surface client", () => {
 
     expect(result.visible).toBe(true);
     expect(result.completed).toBe(false);
-    expect(result.failure).toEqual({
-      message: "Skaha session did not reach Succeeded or Completed within 120s",
-      stage: "completion",
-    });
+    expect(result.failure).toBeUndefined();
   });
 
   test("succeeds when a visible session reaches Succeeded within the completion gate", () => {
     const config = skahaSurfaceConfig();
+    config.requireCompletion = true;
     const statuses: Array<"Pending" | "Succeeded"> = ["Pending", "Succeeded"];
     const client: SkahaSurfaceClient = {
       createSession() {
@@ -371,6 +369,7 @@ function skahaSurfaceConfig(): SkahaSurfaceConfig {
   return {
     completionGateSeconds: 120,
     pollIntervalSeconds: 2,
+    requireCompletion: false,
     session: {
       args: ["--cpu", "1", "--timeout", "10s", "--metrics-brief"],
       cmd: "stress-ng",

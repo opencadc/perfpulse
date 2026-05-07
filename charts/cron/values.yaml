@@ -1,0 +1,28 @@
+controlNamespace: canfar-perfpulse
+workloadNamespace: canfar-workloads
+
+image:
+  repository: images.opencadc.org/platform/perfpulse
+  tag: TAG
+
+kubectl:
+  image: docker.io/bitnami/kubectl:1.31
+
+schedule: "*/30 * * * *"
+testDurationSeconds: 60
+observeSeconds: 600
+
+otlp:
+  credentialsSecretName: perfpulse-otlp-credentials
+  endpoint: kube-prometheus-stack-prometheus.monitoring:9090
+  urlPath: /api/v1/otlp/v1/metrics
+
+skaha:
+  credentialsSecretName: perfpulse-skaha-auth
+  apiUrl: http://canfar-skaha-staging-skaha-tomcat-svc.canfar-system-staging.svc.keel-prod.local:8080/skaha/v1
+  loginUrl: https://ws-cadc.canfar.net/ac/login
+
+surfaces:
+  - k8s-direct
+  - k8s-kueue
+  - skaha

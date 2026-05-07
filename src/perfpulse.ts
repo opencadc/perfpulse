@@ -54,7 +54,7 @@ export function setup(): RuntimeData {
     `PerfPulse ${config.profile}: mode=${config.clientMode} surface=${config.surface} testid=${config.testid}`,
   );
   console.log(
-    "Executor rationale: shared-iterations closed model because spot-direct-tiny creates one bounded workload and exits.",
+    "Executor rationale: closed model for cron acceptance checks; campaigns select explicit workload shape.",
   );
   if (config.clientMode === "kubernetes" && config.surface === "skaha") {
     return {
@@ -262,7 +262,7 @@ function runSkaha(runtimeData: RuntimeData, data: RunConfig, tags: MetricTags): 
     {
       completionGateSeconds: data.completionGateSeconds,
       pollIntervalSeconds: data.kubernetes.pollIntervalSeconds,
-      requireCompletion: data.runClass !== "stress",
+      requireCompletion: false,
       session: {
         args: data.workload.args,
         cmd: data.workload.command?.join(" ") ?? "stress-ng",

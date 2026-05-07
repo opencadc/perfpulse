@@ -10,7 +10,7 @@ describe("k6 options contract", () => {
         VISIBILITY_GATE_SECONDS: "60",
       }),
     );
-    const scenario = options.scenarios?.spot_direct_tiny;
+    const scenario = options.scenarios?.cron;
 
     expect(scenario).toMatchObject({
       executor: "shared-iterations",
@@ -21,35 +21,50 @@ describe("k6 options contract", () => {
     });
   });
 
-  test("keeps failure thresholds focused on the M0.5 gates", () => {
+  test("keeps failure thresholds focused on acceptance gates", () => {
     const options = createOptions(resolveRunConfig({}));
 
     expect(Object.keys(options.thresholds ?? {}).sort()).toEqual([
       "checks",
       "http_req_failed",
       "perfpulse_cleanup_failed",
-      "perfpulse_jobs_completion_failed",
       "perfpulse_jobs_submission_failed",
       "perfpulse_jobs_visibility_failed",
     ]);
   });
 
-  test("does not add benchmark latency or completion gates before baselines exist", () => {
-    const options = createOptions(resolveRunConfig({ PROFILE: "benchmark-small" }));
+  test("does not add campaign completion gates", () => {
+    const options = createOptions(
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        CONFIRM_HIGH_USERS: "true",
+        LOGICAL_USERS: "100",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "100",
+      }),
+    );
 
     expect(Object.keys(options.thresholds ?? {}).sort()).toEqual([
       "checks",
       "http_req_failed",
       "perfpulse_cleanup_failed",
       "perfpulse_jobs_submission_failed",
+      "perfpulse_jobs_visibility_failed",
     ]);
   });
 
-  test("uses an arrival-rate executor for throughput stress profiles", () => {
+  test("uses an arrival-rate executor for stress campaigns", () => {
     const options = createOptions(
-      resolveRunConfig({ CONFIRM_STRESS: "true", PROFILE: "stress-medium" }),
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "stress",
+        CONFIRM_HIGH_USERS: "true",
+        CONFIRM_STRESS: "true",
+        LOGICAL_USERS: "100",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "10000",
+      }),
     );
-    const scenario = options.scenarios?.stress_medium;
+    const scenario = options.scenarios?.campaign;
 
     expect(scenario).toMatchObject({
       executor: "constant-arrival-rate",
@@ -58,12 +73,23 @@ describe("k6 options contract", () => {
     });
   });
 
-  test("keeps stress thresholds limited to safety failures", () => {
+  test("keeps stress campaign thresholds limited to safety and acceptance failures", () => {
     const options = createOptions(
-      resolveRunConfig({ CONFIRM_STRESS: "true", PROFILE: "stress-medium" }),
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "stress",
+        CONFIRM_HIGH_USERS: "true",
+        CONFIRM_STRESS: "true",
+        LOGICAL_USERS: "100",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "10000",
+      }),
     );
 
-    expect(Object.keys(options.thresholds ?? {}).sort()).toEqual(["perfpulse_cleanup_failed"]);
+    expect(Object.keys(options.thresholds ?? {}).sort()).toEqual([
+      "perfpulse_cleanup_failed",
+      "perfpulse_jobs_submission_failed",
+      "perfpulse_jobs_visibility_failed",
+    ]);
   });
 
   test("keeps k6 system tags low-cardinality", () => {
@@ -75,8 +101,10 @@ describe("k6 options contract", () => {
   test("adds low-cardinality run tags to built-in k6 metrics", () => {
     const options = createOptions(
       resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        CONFIRM_HIGH_USERS: "true",
         LOGICAL_USERS: "100",
-        PROFILE: "benchmark-small",
+        PROFILE: "campaign",
         SCENARIO: "many-small-users",
         SURFACE: "k8s-kueue",
         TESTID: "Benchmark Small Manual",
@@ -85,11 +113,12 @@ describe("k6 options contract", () => {
     );
 
     expect(options.tags).toEqual({
+      campaign_type: "benchmark",
       cohort: "baseline",
       job_profile: "small",
       namespace: "canfar-workloads",
-      profile: "benchmark-small",
-      run_class: "benchmark",
+      profile: "campaign",
+      run_class: "campaign",
       scenario: "many-small-users",
       surface: "k8s-kueue",
       testid: "benchmark-small-manual",
