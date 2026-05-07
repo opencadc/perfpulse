@@ -46,9 +46,15 @@ jobs:
         with:
           bun-version: 1.2.12
       - name: Install dependencies
-        run: bun install --frozen-lockfile
-      - name: Build and check
-        run: bun run check
+        run: bun ci
+      - name: Lint
+        run: bun run lint
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Unit tests
+        run: bun test
+      - name: Build k6 bundle
+        run: bun run build
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4.0.0
       - name: Setup Docker Buildx

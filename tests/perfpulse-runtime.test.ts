@@ -38,7 +38,7 @@ let sessionStatus = "Completed";
 
 Reflect.set(globalThis, "__ENV", {
   PERF_PULSE_CLIENT_MODE: "kubernetes",
-  PROFILE: "spot-tiny",
+  PROFILE: "cron",
   SKAHA_API_URL: "https://ws.example/skaha/v1",
   SKAHA_PASSWORD_PATH: "/var/run/secrets/perfpulse/skaha-auth/password",
   SKAHA_USERNAME_PATH: "/var/run/secrets/perfpulse/skaha-auth/username",
@@ -199,7 +199,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
   test("runs the Kueue Kubernetes surface when runtime config selects k8s-kueue", async () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "spot-tiny",
+      PROFILE: "cron",
       SURFACE: "k8s-kueue",
       TESTID: "kueue-spot",
     });
@@ -275,7 +275,11 @@ describe("PerfPulse k6 runtime dispatch", () => {
       KUEUE_ADMISSION_GATE_SECONDS: "1",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       POLL_INTERVAL_SECONDS: "1",
-      PROFILE: "stress-high",
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "100",
+      PROFILE: "campaign",
+      TOTAL_JOBS: "10000",
       SURFACE: "k8s-kueue",
       TESTID: "stress-kueue",
     });
@@ -306,7 +310,8 @@ describe("PerfPulse k6 runtime dispatch", () => {
     const config = resolveRunConfig({
       LOGICAL_USERS: "2",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "benchmark-small",
+      CAMPAIGN_TYPE: "benchmark",
+      PROFILE: "campaign",
       SURFACE: "k8s-direct",
       TESTID: "direct-benchmark",
       TOTAL_JOBS: "100",
@@ -335,7 +340,11 @@ describe("PerfPulse k6 runtime dispatch", () => {
       CONFIRM_STRESS: "true",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       POLL_INTERVAL_SECONDS: "1",
-      PROFILE: "stress-medium",
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "100",
+      PROFILE: "campaign",
+      TOTAL_JOBS: "10000",
       SURFACE: "k8s-direct",
       TESTID: "stress-direct",
     });
@@ -366,7 +375,8 @@ describe("PerfPulse k6 runtime dispatch", () => {
     const config = resolveRunConfig({
       LOGICAL_USERS: "2",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "benchmark-small",
+      CAMPAIGN_TYPE: "benchmark",
+      PROFILE: "campaign",
       SURFACE: "k8s-kueue",
       TESTID: "kueue-benchmark",
       TOTAL_JOBS: "100",
@@ -392,7 +402,8 @@ describe("PerfPulse k6 runtime dispatch", () => {
     const directConfig = resolveRunConfig({
       LOGICAL_USERS: "2",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "benchmark-small",
+      CAMPAIGN_TYPE: "benchmark",
+      PROFILE: "campaign",
       SURFACE: "k8s-direct",
       TESTID: "shared-benchmark",
       TOTAL_JOBS: "100",
@@ -400,7 +411,8 @@ describe("PerfPulse k6 runtime dispatch", () => {
     const kueueConfig = resolveRunConfig({
       LOGICAL_USERS: "2",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "benchmark-small",
+      CAMPAIGN_TYPE: "benchmark",
+      PROFILE: "campaign",
       SURFACE: "k8s-kueue",
       TESTID: "shared-benchmark",
       TOTAL_JOBS: "100",
@@ -424,7 +436,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
   test("runs the Skaha surface with runtime API URL and bearer-token auth", async () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "spot-tiny",
+      PROFILE: "cron",
       SKAHA_API_URL: "https://ws.example/skaha/v1",
       SURFACE: "skaha",
       TESTID: "skaha-spot",
@@ -468,14 +480,12 @@ describe("PerfPulse k6 runtime dispatch", () => {
       }),
       value: 1,
     });
-    expect(metricRecords).toContainEqual({
-      metric: METRIC_NAMES.jobsCompleted,
-      tags: expect.objectContaining({
-        surface: "skaha",
-        testid: "skaha-spot",
+    expect(metricRecords).not.toContainEqual(
+      expect.objectContaining({
+        metric: METRIC_NAMES.jobsCompletionFailed,
+        value: 1,
       }),
-      value: 1,
-    });
+    );
   });
 
   test("derives Skaha registry auth from mounted credentials without surfacing the secret", async () => {
@@ -504,7 +514,8 @@ describe("PerfPulse k6 runtime dispatch", () => {
     const config = resolveRunConfig({
       LOGICAL_USERS: "2",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "benchmark-small",
+      CAMPAIGN_TYPE: "benchmark",
+      PROFILE: "campaign",
       SKAHA_API_URL: "https://ws.example/skaha/v1",
       SURFACE: "skaha",
       TESTID: "skaha-benchmark",
@@ -530,7 +541,11 @@ describe("PerfPulse k6 runtime dispatch", () => {
       CONFIRM_STRESS: "true",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       POLL_INTERVAL_SECONDS: "1",
-      PROFILE: "stress-medium",
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "100",
+      PROFILE: "campaign",
+      TOTAL_JOBS: "10000",
       SKAHA_API_URL: "https://ws.example/skaha/v1",
       SURFACE: "skaha",
       TESTID: "stress-skaha",
@@ -561,7 +576,10 @@ describe("PerfPulse k6 runtime dispatch", () => {
     iterationInTest = 3;
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "benchmark-small",
+      CAMPAIGN_TYPE: "benchmark",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "100",
+      PROFILE: "campaign",
       SKAHA_API_URL: "https://ws.example/skaha/v1",
       SUBMISSION_STAGGER_SECONDS: "60",
       SURFACE: "skaha",
@@ -584,7 +602,10 @@ describe("PerfPulse k6 runtime dispatch", () => {
     iterationInTest = 3;
     const directConfig = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "benchmark-small",
+      CAMPAIGN_TYPE: "benchmark",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "100",
+      PROFILE: "campaign",
       SUBMISSION_STAGGER_SECONDS: "60",
       SURFACE: "k8s-direct",
       TESTID: "direct-benchmark",
@@ -592,7 +613,10 @@ describe("PerfPulse k6 runtime dispatch", () => {
     });
     const kueueConfig = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "benchmark-small",
+      CAMPAIGN_TYPE: "benchmark",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "100",
+      PROFILE: "campaign",
       SUBMISSION_STAGGER_SECONDS: "60",
       SURFACE: "k8s-kueue",
       TESTID: "kueue-benchmark",
@@ -609,7 +633,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
   test("cleans up a Skaha session in the same k6 iteration that created it", async () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "spot-tiny",
+      PROFILE: "cron",
       SKAHA_API_URL: "https://ws.example/skaha/v1",
       SURFACE: "skaha",
       TESTID: "skaha-spot",
@@ -644,13 +668,13 @@ describe("PerfPulse k6 runtime dispatch", () => {
   test("treats a failed Skaha delete as cleaned up when follow-up get returns not found", async () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "spot-tiny",
+      PROFILE: "cron",
       SKAHA_API_URL: "https://ws.example/skaha/v1",
       SURFACE: "skaha",
       TESTID: "skaha-spot",
     });
     deleteStatuses.push(0);
-    sessionGetStatuses.push(200, 200, 404);
+    sessionGetStatuses.push(200, 404);
     const runtime = await import("../src/perfpulse");
 
     runtime.default({ config, skahaBearerToken: "runtime-token" });
@@ -661,7 +685,6 @@ describe("PerfPulse k6 runtime dispatch", () => {
         .map((request) => request.options?.tags?.name),
     ).toEqual([
       "skaha_create_session",
-      "skaha_get_session",
       "skaha_get_session",
       "skaha_delete_session",
       "skaha_get_session",
@@ -682,13 +705,13 @@ describe("PerfPulse k6 runtime dispatch", () => {
   test("fails Skaha cleanup when failed delete verification still finds the session", async () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "spot-tiny",
+      PROFILE: "cron",
       SKAHA_API_URL: "https://ws.example/skaha/v1",
       SURFACE: "skaha",
       TESTID: "skaha-spot",
     });
     deleteStatuses.push(0);
-    sessionGetStatuses.push(200, 200, 200);
+    sessionGetStatuses.push(200, 200);
     const runtime = await import("../src/perfpulse");
 
     expect(() => runtime.default({ config, skahaBearerToken: "runtime-token" })).toThrow(
@@ -700,7 +723,6 @@ describe("PerfPulse k6 runtime dispatch", () => {
         .map((request) => request.options?.tags?.name),
     ).toEqual([
       "skaha_create_session",
-      "skaha_get_session",
       "skaha_get_session",
       "skaha_delete_session",
       "skaha_get_session",
@@ -715,7 +737,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
   test("does not rely on teardown module state for Skaha cleanup", async () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "spot-tiny",
+      PROFILE: "cron",
       SKAHA_API_URL: "https://ws.example/skaha/v1",
       SURFACE: "skaha",
       TESTID: "skaha-spot",
@@ -736,9 +758,13 @@ describe("PerfPulse k6 runtime dispatch", () => {
   test("cleans up only current-surface Kubernetes Jobs with the same testid label", async () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "benchmark-small",
+      CAMPAIGN_TYPE: "benchmark",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "100",
+      PROFILE: "campaign",
       SURFACE: "k8s-direct",
       TESTID: "cleanup-many",
+      TOTAL_JOBS: "100",
     });
     createdJobs.push(
       {
@@ -785,9 +811,13 @@ describe("PerfPulse k6 runtime dispatch", () => {
   test("fails Kubernetes cleanup when any listed Job delete returns an unexpected status", async () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "benchmark-small",
+      CAMPAIGN_TYPE: "benchmark",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "100",
+      PROFILE: "campaign",
       SURFACE: "k8s-kueue",
       TESTID: "cleanup-failure",
+      TOTAL_JOBS: "100",
     });
     createdJobs.push(
       {
@@ -815,9 +845,13 @@ describe("PerfPulse k6 runtime dispatch", () => {
   test("records cleanup failure when Kubernetes Job listing fails", async () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "benchmark-small",
+      CAMPAIGN_TYPE: "benchmark",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "100",
+      PROFILE: "campaign",
       SURFACE: "k8s-direct",
       TESTID: "cleanup-list-failure",
+      TOTAL_JOBS: "100",
     });
     listJobsStatus = 503;
     const runtime = await import("../src/perfpulse");

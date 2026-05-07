@@ -152,49 +152,49 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "submitted",
           "refId": "A"
         },
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "visible",
           "refId": "B"
         },
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_completed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=~\"k8s-direct|skaha\"}[$__range])) or sum by (surface) (last_over_time(k6_perfpulse_kueue_workloads_admitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=\"k8s-kueue\"}[$__range]))",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "format": "table",
           "instant": true,
-          "legendFormat": "target-state",
+          "legendFormat": "accepted-visible",
           "refId": "C"
         },
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_submission_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_submission_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "submit-failed",
           "refId": "D"
         },
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visibility_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visibility_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "visible-failed",
           "refId": "E"
         },
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_completion_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=~\"k8s-direct|skaha\"}[$__range])) or sum by (surface) (last_over_time(k6_perfpulse_kueue_workloads_admission_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=\"k8s-kueue\"}[$__range]))",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visibility_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "format": "table",
           "instant": true,
-          "legendFormat": "target-failed",
+          "legendFormat": "acceptance-failed",
           "refId": "F"
         },
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "cleanup-failed",
@@ -209,7 +209,7 @@
       ],
       "title": "Diagnosis Matrix",
       "type": "table",
-      "description": "Surface-level funnel counts shown as one table. Submitted is the accepted create response count; Visible is work observed after that response; Target state is direct/Skaha completion or Kueue Workload admission."
+      "description": "Surface-level funnel counts shown as one table. Submitted is the accepted create response count; Visible and Target state are work observed after that response. Completion and Kueue admission are evidence-only signals."
     },
     {
       "datasource": {
@@ -279,7 +279,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "(absent(sum(last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))) or vector(0))",
+          "expr": "(absent(sum(last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))) or vector(0))",
           "legendFormat": "no data warning",
           "refId": "A"
         }
@@ -338,14 +338,14 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "(sum(last_over_time(k6_perfpulse_jobs_completed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])) or vector(0)) + (sum(last_over_time(k6_perfpulse_kueue_workloads_admitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])) or vector(0))",
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "legendFormat": "run outcome",
           "refId": "A"
         }
       ],
       "title": "Run Outcome",
       "type": "stat",
-      "description": "Direct/Skaha work that reached terminal completion plus Kueue Workloads that reached admission for selected filters."
+      "description": "Accepted and visible work for selected filters. Completion and Kueue admission are evidence-only signals."
     },
     {
       "datasource": {
@@ -397,7 +397,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum(last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "legendFormat": "jobs submitted",
           "refId": "A"
         }
@@ -456,7 +456,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum(last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "legendFormat": "jobs visible",
           "refId": "A"
         }
@@ -515,7 +515,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum(last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "expr": "sum(last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "legendFormat": "cleanup failures",
           "refId": "A"
         }
@@ -580,19 +580,14 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (testid, surface) (k6_perfpulse_jobs_completed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"})",
-          "legendFormat": "{{testid}} {{surface}} completed",
+          "expr": "sum by (testid, surface) (k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"})",
+          "legendFormat": "{{testid}} {{surface}} visible",
           "refId": "A"
-        },
-        {
-          "expr": "sum by (testid, surface) (k6_perfpulse_kueue_workloads_admitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"})",
-          "legendFormat": "{{testid}} {{surface}} admitted",
-          "refId": "B"
         }
       ],
       "title": "Run Outcome Trend",
       "type": "timeseries",
-      "description": "Target-state counts by test and surface over time: direct/Skaha completion and Kueue Workload admission."
+      "description": "Accepted and visible work by test and surface over time. Completion and Kueue admission are evidence-only signals."
     },
     {
       "datasource": {
@@ -650,19 +645,14 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_completed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=~\"k8s-direct|skaha\"}[$__range]))",
-          "legendFormat": "{{surface}} completed",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
+          "legendFormat": "{{surface}} visible",
           "refId": "A"
-        },
-        {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_kueue_workloads_admitted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=\"k8s-kueue\"}[$__range]))",
-          "legendFormat": "{{surface}} admitted",
-          "refId": "B"
         }
       ],
       "title": "Target State Reached",
       "type": "timeseries",
-      "description": "Target-state success counts by surface. Direct and Skaha target state is completion; Kueue target state is Workload admission."
+      "description": "Acceptance target counts by surface. Target state is accepted work that became visible."
     },
     {
       "datasource": {
@@ -720,19 +710,14 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_completion_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=~\"k8s-direct|skaha\"}[$__range]))",
-          "legendFormat": "{{surface}} completion failed",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visibility_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
+          "legendFormat": "{{surface}} visibility failed",
           "refId": "A"
-        },
-        {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_kueue_workloads_admission_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",surface=\"k8s-kueue\"}[$__range]))",
-          "legendFormat": "{{surface}} admission failed",
-          "refId": "B"
         }
       ],
       "title": "Target State Failures",
       "type": "timeseries",
-      "description": "Target-state failure counts by surface. Direct and Skaha failures are completion-gate failures; Kueue failures are admission-gate failures."
+      "description": "Acceptance target failure counts by surface. Target failure means work did not become visible within the visibility gate."
     },
     {
       "datasource": {
@@ -790,17 +775,17 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_submission_duration_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_submission_duration_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
           "legendFormat": "p50 {{surface}}",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_submission_duration_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_submission_duration_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
           "legendFormat": "p95 {{surface}}",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_submission_duration_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_submission_duration_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
           "legendFormat": "p99 {{surface}}",
           "refId": "C"
         }
@@ -865,17 +850,17 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_visibility_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_visibility_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
           "legendFormat": "p50 {{surface}}",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_visibility_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_visibility_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
           "legendFormat": "p95 {{surface}}",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_visibility_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_visibility_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
           "legendFormat": "p99 {{surface}}",
           "refId": "C"
         }
@@ -940,24 +925,24 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
           "legendFormat": "p50 {{surface}}",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
           "legendFormat": "p95 {{surface}}",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
           "legendFormat": "p99 {{surface}}",
           "refId": "C"
         }
       ],
       "title": "Completion Latency",
       "type": "timeseries",
-      "description": "Post-submit completion latency for direct and Skaha spot work, measured from accepted create response until terminal completion. This excludes submission duration."
+      "description": "Post-submit completion latency for direct and Skaha cron work, measured from accepted create response until terminal completion. This excludes submission duration."
     },
     {
       "datasource": {
@@ -1015,17 +1000,17 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_kueue_admission_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_kueue_admission_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
           "legendFormat": "p50 {{surface}}",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_kueue_admission_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_kueue_admission_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
           "legendFormat": "p95 {{surface}}",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_kueue_admission_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range])))",
+          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_kueue_admission_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
           "legendFormat": "p99 {{surface}}",
           "refId": "C"
         }
@@ -1090,12 +1075,12 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_deleted_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_deleted_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "legendFormat": "{{surface}} deleted",
           "refId": "A"
         },
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "legendFormat": "{{surface}} failed",
           "refId": "B"
         }
@@ -1178,7 +1163,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (testid, scenario) (last_over_time(k6_dropped_iterations_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "expr": "sum by (testid, scenario) (last_over_time(k6_dropped_iterations_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "legendFormat": "{{testid}} {{scenario}}",
           "refId": "A"
         }
@@ -1243,7 +1228,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (testid, scenario) (last_over_time(k6_iterations_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "expr": "sum by (testid, scenario) (last_over_time(k6_iterations_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "legendFormat": "{{testid}} {{scenario}}",
           "refId": "A"
         }
@@ -1308,7 +1293,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "max by (testid, scenario) (last_over_time(k6_vus{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__range]))",
+          "expr": "max by (testid, scenario) (last_over_time(k6_vus{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "legendFormat": "{{testid}} {{scenario}}",
           "refId": "A"
         }
@@ -1373,12 +1358,12 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",condition=\"nonzero\"}[$__rate_interval])) / (sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",condition=~\"zero|nonzero\"}[$__rate_interval])) + 1e-12)",
+          "expr": "sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\",condition=\"nonzero\"}[$__rate_interval])) / (sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\",condition=~\"zero|nonzero\"}[$__rate_interval])) + 1e-12)",
           "legendFormat": "checks passed",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",condition=\"zero\"}[$__rate_interval])) / (sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",condition=~\"zero|nonzero\"}[$__rate_interval])) + 1e-12)",
+          "expr": "sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\",condition=\"zero\"}[$__rate_interval])) / (sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\",condition=~\"zero|nonzero\"}[$__rate_interval])) + 1e-12)",
           "legendFormat": "checks failed",
           "refId": "B"
         }
@@ -1443,12 +1428,12 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum(rate(k6_data_sent_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__rate_interval]))",
+          "expr": "sum(rate(k6_data_sent_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__rate_interval]))",
           "legendFormat": "sent",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(k6_data_received_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}[$__rate_interval]))",
+          "expr": "sum(rate(k6_data_received_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__rate_interval]))",
           "legendFormat": "received",
           "refId": "B"
         }
@@ -1531,7 +1516,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (name) (rate(k6_http_reqs_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",name=~\"$request_name\"}[$__rate_interval]))",
+          "expr": "sum by (name) (rate(k6_http_reqs_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\",name=~\"$request_name\"}[$__rate_interval]))",
           "legendFormat": "{{name}}",
           "refId": "A"
         }
@@ -1596,7 +1581,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (name) (rate(k6_http_req_failed_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",name=~\"$request_name\"}[$__rate_interval]))",
+          "expr": "sum by (name) (rate(k6_http_req_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\",name=~\"$request_name\"}[$__rate_interval]))",
           "legendFormat": "{{name}}",
           "refId": "A"
         }
@@ -1661,7 +1646,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, name) (rate(k6_http_req_duration_milliseconds_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",name=~\"$request_name\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le, name) (rate(k6_http_req_duration_milliseconds_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\",name=~\"$request_name\"}[$__rate_interval])))",
           "legendFormat": "{{name}} p95",
           "refId": "A"
         }
@@ -1731,7 +1716,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (le) (rate(k6_http_req_duration_milliseconds_bucket{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",name=~\"$request_name\"}[$__rate_interval]))",
+          "expr": "sum by (le) (rate(k6_http_req_duration_milliseconds_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\",name=~\"$request_name\"}[$__rate_interval]))",
           "format": "heatmap",
           "legendFormat": "{{le}}",
           "refId": "A"
@@ -2028,7 +2013,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (verb, resource) (rate(apiserver_request_total{resource=~\"jobs|workloads\",verb=~\"create|list|delete|get\"}[$__rate_interval]))",
+          "expr": "sum by (verb, resource) (rate(apiserver_request_total{group=~\"batch|kueue.x-k8s.io\",resource=~\"jobs|workloads\",verb=~\"create|list|delete|get\"}[$__rate_interval]))",
           "legendFormat": "{{verb}} {{resource}}",
           "refId": "A"
         }
@@ -2093,7 +2078,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, verb, resource) (rate(apiserver_request_duration_seconds_bucket{resource=~\"jobs|workloads\",verb=~\"create|list|delete|get\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le, verb, resource) (rate(apiserver_request_duration_seconds_bucket{group=~\"batch|kueue.x-k8s.io\",resource=~\"jobs|workloads\",verb=~\"create|list|delete|get\"}[$__rate_interval])))",
           "legendFormat": "{{verb}} {{resource}}",
           "refId": "A"
         }
@@ -2216,15 +2201,15 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(k6_perfpulse_jobs_submitted_total, run_class)",
+        "definition": "label_values(k6_perfpulse_jobs_submitted_total{profile=~\"cron|campaign\"}, run_class)",
         "hide": 0,
         "includeAll": true,
-        "label": "run_class",
+        "label": "runClass",
         "multi": true,
-        "name": "run_class",
+        "name": "runClass",
         "options": [],
         "query": {
-          "query": "label_values(k6_perfpulse_jobs_submitted_total, run_class)",
+          "query": "label_values(k6_perfpulse_jobs_submitted_total{profile=~\"cron|campaign\"}, run_class)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -2232,7 +2217,7 @@
         "skipUrlSync": false,
         "sort": 1,
         "type": "query",
-        "description": "PerfPulse run class filter."
+        "description": "PerfPulse run class filter: cron or campaign."
       },
       {
         "allValue": ".*",
@@ -2245,7 +2230,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(k6_perfpulse_jobs_submitted_total, profile)",
+        "definition": "label_values(k6_perfpulse_jobs_submitted_total{profile=~\"cron|campaign\"}, profile)",
         "hide": 0,
         "includeAll": true,
         "label": "profile",
@@ -2253,7 +2238,7 @@
         "name": "profile",
         "options": [],
         "query": {
-          "query": "label_values(k6_perfpulse_jobs_submitted_total, profile)",
+          "query": "label_values(k6_perfpulse_jobs_submitted_total{profile=~\"cron|campaign\"}, profile)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -2261,7 +2246,36 @@
         "skipUrlSync": false,
         "sort": 1,
         "type": "query",
-        "description": "PerfPulse profile filter."
+        "description": "PerfPulse profile filter. Expected values are cron and campaign."
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_perfpulse_jobs_submitted_total{profile=~\"campaign\"}, campaign_type)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "campaignType",
+        "multi": true,
+        "name": "campaignType",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_perfpulse_jobs_submitted_total{profile=~\"campaign\"}, campaign_type)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query",
+        "description": "PerfPulse campaign type filter for campaign runs, usually benchmark or stress."
       },
       {
         "allValue": ".*",
@@ -2419,7 +2433,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(k6_http_reqs_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}, name)",
+        "definition": "label_values(k6_http_reqs_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}, name)",
         "hide": 0,
         "includeAll": true,
         "label": "request_name",
@@ -2427,7 +2441,7 @@
         "name": "request_name",
         "options": [],
         "query": {
-          "query": "label_values(k6_http_reqs_total{testid=~\"$testid\",run_class=~\"$run_class\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\"}, name)",
+          "query": "label_values(k6_http_reqs_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}, name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,

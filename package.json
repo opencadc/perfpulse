@@ -6,6 +6,7 @@
   "scripts": {
     "build": "bun run scripts/build.ts",
     "check": "bun run lint && bun run typecheck && bun test && bun run build",
+    "ci": "bun install --frozen-lockfile",
     "kind:smoke": "bash scripts/kind-smoke.sh",
     "k6:dry-run": "bun run build && PERF_PULSE_CLIENT_MODE=noop TESTID=local-noop k6 run dist/perfpulse.js",
     "k6:dry-run:html": "bun run build && mkdir -p artifacts/local && PERF_PULSE_CLIENT_MODE=noop TESTID=local-noop NOOP_SLEEP_SECONDS=10 K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_PERIOD=1s K6_WEB_DASHBOARD_EXPORT=artifacts/local/perfpulse-noop.html k6 run dist/perfpulse.js",

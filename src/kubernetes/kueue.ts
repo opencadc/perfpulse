@@ -144,21 +144,6 @@ export function runKueueKubernetesSurface(
   }
 
   const workloadVisibilityLatencyMs = now() - submittedAt;
-  if (config.runClass === "stress") {
-    const workload = findWorkloadForJob(workloadVisibleList, config.jobName);
-    const admitted = isWorkloadAdmitted(workload);
-    return {
-      admitted,
-      ...(admitted ? { admissionLatencyMs: now() - submittedAt } : {}),
-      createResponse,
-      jobVisible: true,
-      submissionDurationMs,
-      visibilityLatencyMs,
-      workloadVisible: true,
-      workloadVisibilityLatencyMs,
-    };
-  }
-
   const admittedList = pollUntil(
     options.admissionGateSeconds,
     config.kubernetes.pollIntervalSeconds,
@@ -167,27 +152,11 @@ export function runKueueKubernetesSurface(
   );
   const admittedWorkload =
     admittedList === undefined ? undefined : findWorkloadForJob(admittedList, config.jobName);
-
-  if (!isWorkloadAdmitted(admittedWorkload)) {
-    return {
-      admitted: false,
-      createResponse,
-      failure: {
-        category: "kueue-admission",
-        message: `Kueue Workload was visible but not admitted within ${options.admissionGateSeconds}s`,
-        stage: "admission",
-      },
-      jobVisible: true,
-      submissionDurationMs,
-      visibilityLatencyMs,
-      workloadVisible: true,
-      workloadVisibilityLatencyMs,
-    };
-  }
+  const admitted = isWorkloadAdmitted(admittedWorkload);
 
   return {
-    admitted: true,
-    admissionLatencyMs: now() - submittedAt,
+    admitted,
+    ...(admitted ? { admissionLatencyMs: now() - submittedAt } : {}),
     createResponse,
     jobVisible: true,
     submissionDurationMs,

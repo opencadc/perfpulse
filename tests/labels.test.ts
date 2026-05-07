@@ -13,13 +13,28 @@ describe("PerfPulse Kubernetes labels", () => {
       [KUBERNETES_LABEL_KEYS.appName]: "perfpulse",
       [KUBERNETES_LABEL_KEYS.managedBy]: "k6",
       [KUBERNETES_LABEL_KEYS.testid]: "kind-smoke-01",
-      [KUBERNETES_LABEL_KEYS.profile]: "spot-direct-tiny",
-      [KUBERNETES_LABEL_KEYS.runClass]: "spot",
+      [KUBERNETES_LABEL_KEYS.profile]: "cron",
+      [KUBERNETES_LABEL_KEYS.runClass]: "cron",
       [KUBERNETES_LABEL_KEYS.surface]: "k8s-direct",
       [KUBERNETES_LABEL_KEYS.scenario]: "single-bulk-user",
       [KUBERNETES_LABEL_KEYS.cohort]: "baseline",
       [KUBERNETES_LABEL_KEYS.jobProfile]: "tiny",
       [KUBERNETES_LABEL_KEYS.userBucket]: "bucket-0",
+    });
+  });
+
+  test("adds campaign type label only for campaign workloads", () => {
+    const config = resolveRunConfig({
+      CAMPAIGN_TYPE: "benchmark",
+      LOGICAL_USERS: "10",
+      PROFILE: "campaign",
+      TOTAL_JOBS: "100",
+    });
+
+    expect(workloadLabels(config)).toMatchObject({
+      [KUBERNETES_LABEL_KEYS.campaignType]: "benchmark",
+      [KUBERNETES_LABEL_KEYS.profile]: "campaign",
+      [KUBERNETES_LABEL_KEYS.runClass]: "campaign",
     });
   });
 

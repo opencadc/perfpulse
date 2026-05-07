@@ -24,8 +24,9 @@ describe("Grafana dashboard contracts", () => {
 
     expect(dashboard.templating.list.map((variable) => variable.name)).toEqual([
       "testid",
-      "run_class",
+      "runClass",
       "profile",
+      "campaignType",
       "surface",
       "scenario",
       "cohort",
@@ -74,15 +75,15 @@ describe("Grafana dashboard contracts", () => {
     );
 
     const dashboardFilters =
-      'testid=~"$testid",run_class=~"$run_class",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace"';
+      'testid=~"$testid",run_class=~"$runClass",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace",campaign_type=~"$campaignType"';
 
     expect(statExpressions).toMatchObject({
       "Cleanup Failures": `sum(last_over_time(k6_perfpulse_cleanup_failed_total{${dashboardFilters}}[$__range]))`,
       "Jobs Submitted": `sum(last_over_time(k6_perfpulse_jobs_submitted_total{${dashboardFilters}}[$__range]))`,
       "Jobs Visible": `sum(last_over_time(k6_perfpulse_jobs_visible_total{${dashboardFilters}}[$__range]))`,
-      "Run Outcome": `(sum(last_over_time(k6_perfpulse_jobs_completed_total{${dashboardFilters}}[$__range])) or vector(0)) + (sum(last_over_time(k6_perfpulse_kueue_workloads_admitted_total{${dashboardFilters}}[$__range])) or vector(0))`,
+      "Run Outcome": `sum(last_over_time(k6_perfpulse_jobs_visible_total{${dashboardFilters}}[$__range]))`,
     });
-    expect(statExpressions["Run Outcome"]).toContain("or vector(0)");
+    expect(statExpressions["Run Outcome"]).not.toContain("or vector(0)");
     expect(Object.values(statExpressions).join("\n")).toContain('testid=~"$testid"');
     expect(Object.values(statExpressions).join("\n")).toContain("last_over_time(");
     expect(Object.values(statExpressions).join("\n")).not.toContain("increase(");
@@ -136,8 +137,9 @@ describe("Grafana dashboard contracts", () => {
 
     expect(multiIncludeAllVariables.map((variable) => variable.name)).toEqual([
       "testid",
-      "run_class",
+      "runClass",
       "profile",
+      "campaignType",
       "surface",
       "scenario",
       "cohort",
@@ -148,6 +150,25 @@ describe("Grafana dashboard contracts", () => {
     expect(promQl).toContain('testid=~"$testid"');
     expect(promQl).toContain('name=~"$request_name"');
     expect(promQl).not.toContain('testid="$testid"');
+  });
+
+  test("uses cron and campaign dashboard taxonomy without old run-class assumptions", async () => {
+    const dashboard = await loadDashboard();
+    const dashboardJson = JSON.stringify(dashboard);
+    const variableNames = dashboard.templating.list.map((variable) => variable.name);
+    const promQl = allPromQlExpressions(dashboard).join("\n");
+
+    expect(variableNames).toContain("runClass");
+    expect(variableNames).toContain("campaignType");
+    expect(variableNames).not.toContain("run_class");
+    expect(promQl).toContain('run_class=~"$runClass"');
+    expect(promQl).toContain('campaign_type=~"$campaignType"');
+    expect(promQl).toContain('profile=~"$profile"');
+    expect(promQl).toContain('profile=~"cron|campaign"');
+    expect(dashboardJson).not.toMatch(
+      /spot|benchmark-small|benchmark-medium|stress-medium|stress-high/u,
+    );
+    expect(dashboardJson).not.toContain('run_class=~"$run_class"');
   });
 
   test("documents dashboard panels and template variables for operators", async () => {
@@ -279,10 +300,14 @@ describe("Grafana dashboard contracts", () => {
     expect(diagnosisExpressions).toContain("sum by (surface)");
     expect(diagnosisExpressions).not.toContain("perfpulse_surface_expected");
 
-    expect(targetStateExpressions).toContain("k6_perfpulse_jobs_completed_total");
-    expect(targetStateExpressions).toContain('surface=~"k8s-direct|skaha"');
-    expect(targetStateExpressions).toContain("k6_perfpulse_kueue_workloads_admitted_total");
-    expect(targetStateExpressions).toContain('surface="k8s-kueue"');
+    expect(diagnosisExpressions).toContain("k6_perfpulse_jobs_visible_total");
+    expect(diagnosisExpressions).toContain("k6_perfpulse_jobs_visibility_failed_total");
+    expect(diagnosisExpressions).not.toContain("k6_perfpulse_jobs_completed_total");
+    expect(diagnosisExpressions).not.toContain("k6_perfpulse_kueue_workloads_admitted_total");
+    expect(targetStateExpressions).toContain("k6_perfpulse_jobs_visible_total");
+    expect(targetStateExpressions).toContain('surface=~"$surface"');
+    expect(targetStateExpressions).not.toContain("k6_perfpulse_jobs_completed_total");
+    expect(targetStateExpressions).not.toContain("k6_perfpulse_kueue_workloads_admitted_total");
 
     const targetStateFailuresPanel = dashboard.panels.find(
       (panel) => panel.title === "Target State Failures",
@@ -292,10 +317,13 @@ describe("Grafana dashboard contracts", () => {
       : "";
 
     expect(targetStateFailureExpressions).toContain(
-      'k6_perfpulse_jobs_completion_failed_total{testid=~"$testid",run_class=~"$run_class",profile=~"$profile",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace",surface=~"k8s-direct|skaha"}',
+      'k6_perfpulse_jobs_visibility_failed_total{testid=~"$testid",run_class=~"$runClass",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace",campaign_type=~"$campaignType"}',
     );
-    expect(targetStateFailureExpressions).toContain(
-      'k6_perfpulse_kueue_workloads_admission_failed_total{testid=~"$testid",run_class=~"$run_class",profile=~"$profile",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace",surface="k8s-kueue"}',
+    expect(targetStateFailureExpressions).not.toContain(
+      "k6_perfpulse_jobs_completion_failed_total",
+    );
+    expect(targetStateFailureExpressions).not.toContain(
+      "k6_perfpulse_kueue_workloads_admission_failed_total",
     );
   });
 
@@ -309,7 +337,7 @@ describe("Grafana dashboard contracts", () => {
     expect(noDataExpression).toContain("absent(");
     expect(noDataExpression).toContain("last_over_time(");
     expect(noDataExpression).toContain(
-      'k6_perfpulse_jobs_submitted_total{testid=~"$testid",run_class=~"$run_class",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace"}',
+      'k6_perfpulse_jobs_submitted_total{testid=~"$testid",run_class=~"$runClass",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace",campaign_type=~"$campaignType"}',
     );
     expect(noDataExpression).not.toContain('testid="$testid"');
     expect(JSON.stringify(noDataPanel?.options ?? {})).not.toContain("No PerfPulse series found");
@@ -345,7 +373,7 @@ describe("Grafana dashboard contracts", () => {
       "heatmap",
     );
     expect(expressionsByTitle["HTTP Requests"]).toContain(
-      'testid=~"$testid",run_class=~"$run_class",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace",name=~"$request_name"',
+      'testid=~"$testid",run_class=~"$runClass",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace",campaign_type=~"$campaignType",name=~"$request_name"',
     );
     expect(expressionsByTitle["HTTP Duration Heatmap"]).toContain('name=~"$request_name"');
     expect(expressionsByTitle["Kueue Workloads Admitted"]).toContain(

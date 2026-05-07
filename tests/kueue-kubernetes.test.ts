@@ -53,7 +53,7 @@ describe("direct Kubernetes Kueue surface", () => {
     expect(createdManifests[0]?.metadata.labels["kueue.x-k8s.io/queue-name"]).toBe("cadc-default");
   });
 
-  test("reports visible-but-not-admitted Workloads as hard Kueue admission failures", () => {
+  test("accepts visible Workloads without requiring admission", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-kueue",
@@ -90,11 +90,7 @@ describe("direct Kubernetes Kueue surface", () => {
       () => 10,
     );
 
-    expect(result.failure).toEqual({
-      category: "kueue-admission",
-      message: "Kueue Workload was visible but not admitted within 120s",
-      stage: "admission",
-    });
+    expect(result.failure).toBeUndefined();
     expect(result.jobVisible).toBe(true);
     expect(result.workloadVisible).toBe(true);
     expect(result.admitted).toBe(false);

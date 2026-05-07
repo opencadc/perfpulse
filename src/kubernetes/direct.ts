@@ -1,6 +1,6 @@
 import type { RunConfig } from "../config";
 import { buildDirectJobManifest, type KubernetesJobManifest } from "./job";
-import { findJobByName, isJobComplete, isJobFailed, type JobListLike } from "./status";
+import { findJobByName, isJobComplete, type JobListLike } from "./status";
 
 export interface KubernetesResponseLike {
   body?: unknown;
@@ -83,50 +83,15 @@ export function runDirectKubernetesSurface(
   }
 
   const visibilityLatencyMs = now() - submittedAt;
-  if (config.runClass === "stress") {
-    return {
-      completed: false,
-      createResponse,
-      submissionDurationMs,
-      visible: true,
-      visibilityLatencyMs,
-    };
-  }
-
-  const completeList = pollUntil(
-    config.completionGateSeconds,
-    config.kubernetes.pollIntervalSeconds,
-    () => client.listJobsByTestId(),
-    (list) => isCompleteOrFailed(list, config.jobName),
-  );
-  const completedJob =
-    completeList === undefined ? undefined : findJobByName(completeList, config.jobName);
-
-  if (completedJob === undefined || !isJobComplete(completedJob)) {
-    return {
-      completed: false,
-      createResponse,
-      failure: {
-        message: `Kubernetes Job ${config.jobName} did not complete within ${config.completionGateSeconds}s`,
-        stage: "completion",
-      },
-      submissionDurationMs,
-      visible: true,
-      visibilityLatencyMs,
-    };
-  }
+  const visibleJob = findJobByName(visibleList, config.jobName);
+  const completed = visibleJob !== undefined && isJobComplete(visibleJob);
 
   return {
-    completed: true,
-    completionLatencyMs: now() - submittedAt,
+    completed,
+    ...(completed ? { completionLatencyMs: visibilityLatencyMs } : {}),
     createResponse,
     submissionDurationMs,
     visible: true,
     visibilityLatencyMs,
   };
-}
-
-function isCompleteOrFailed(list: JobListLike, jobName: string): boolean {
-  const job = findJobByName(list, jobName);
-  return job !== undefined && (isJobComplete(job) || isJobFailed(job));
 }
