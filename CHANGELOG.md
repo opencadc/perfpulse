@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/opencadc/perfpulse/compare/v0.1.7...v0.1.8) (2026-05-07)
+
+
+### Features
+
+* add Helm CI/CD for PerfPulse ([1fbfe2a](https://github.com/opencadc/perfpulse/commit/1fbfe2a5ecab777d9a8aea512462c40dccc984b6))
+
 ## [0.1.7](https://github.com/opencadc/perfpulse/compare/v0.1.6...v0.1.7) (2026-05-06)
 
 

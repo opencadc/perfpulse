@@ -1,32 +1,28 @@
 controlNamespace: canfar-perfpulse
 workloadNamespace: canfar-workloads
-
 image:
   repository: images.opencadc.org/platform/perfpulse
-  tag: TAG
-
+  tag: 0.1.8
 campaign:
   type: benchmark
   confirmStress: false
   confirmHighUsers: false
   testid: campaign-manual
-  totalJobs:
-  logicalUsers:
+  totalJobs: null
+  logicalUsers: null
   visibilityGateSeconds: 120
   completionGateSeconds: 300
   profile: campaign
   scenario: many-small-users
-
 otlp:
   credentialsSecretName: perfpulse-otlp-credentials
   endpoint: kube-prometheus-stack-prometheus.monitoring:9090
   urlPath: /api/v1/otlp/v1/metrics
-
 skaha:
   credentialsSecretName: perfpulse-skaha-auth
-  apiUrl: http://canfar-skaha-staging-skaha-tomcat-svc.canfar-system-staging.svc.keel-prod.local:8080/skaha/v1
+  apiUrl: >-
+    http://canfar-skaha-staging-skaha-tomcat-svc.canfar-system-staging.svc.keel-prod.local:8080/skaha/v1
   loginUrl: https://ws-cadc.canfar.net/ac/login
-
 surfaces:
   - k8s-direct
   - k8s-kueue
