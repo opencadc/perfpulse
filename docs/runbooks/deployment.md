@@ -1,7 +1,7 @@
 # PerfPulse Helm Runbook
 
-Use Helm for operator-facing PerfPulse deployment. Static manifests remain historical examples, not
-the normal install path.
+Use Helm for operator-facing PerfPulse deployment. The `cron` and `campaign` charts are the
+supported deployment interface.
 
 ## Prerequisites
 
@@ -9,7 +9,7 @@ the normal install path.
 - `kubectl` context pointed at the target cluster.
 - k6 Operator installed and serving `k6.io/v1alpha1` `TestRun`.
 - Prometheus or an OTLP path that accepts PerfPulse k6 metrics.
-- Published PerfPulse runner image tag.
+- Released PerfPulse runner image. Release Please maintains the default chart image tags.
 - `canfar-perfpulse` and workload namespaces allowed by cluster policy.
 - Existing Skaha credential Secret when Skaha surface is enabled.
 
@@ -29,9 +29,7 @@ Install or upgrade:
 ```bash
 helm upgrade --install perfpulse-cron ./charts/cron \
   --namespace canfar-perfpulse \
-  --create-namespace \
-  --set image.repository=images.opencadc.org/platform/perfpulse \
-  --set image.tag=TAG
+  --create-namespace
 ```
 
 Cron checks are acceptance evidence. Direct success means Job accepted and visible. Kueue success
@@ -46,8 +44,6 @@ removed after evidence capture.
 ```bash
 helm upgrade --install perfpulse-benchmark ./charts/campaign \
   --namespace canfar-perfpulse \
-  --set image.repository=images.opencadc.org/platform/perfpulse \
-  --set image.tag=TAG \
   --set campaign.type=benchmark \
   --set campaign.totalJobs=1000 \
   --set campaign.logicalUsers=100 \
@@ -68,8 +64,6 @@ confirmation in values.
 ```bash
 helm upgrade --install perfpulse-stress ./charts/campaign \
   --namespace canfar-perfpulse \
-  --set image.repository=images.opencadc.org/platform/perfpulse \
-  --set image.tag=TAG \
   --set campaign.type=stress \
   --set campaign.totalJobs=10000 \
   --set campaign.logicalUsers=100 \

@@ -2,9 +2,10 @@ controlNamespace: canfar-perfpulse
 workloadNamespace: canfar-workloads
 image:
   repository: images.opencadc.org/platform/perfpulse
-  tag: 0.1.8
+  tag: v0.1.8 # x-release-please-version
+# Helper image used by each CronJob to create a fresh k6 TestRun on schedule.
 kubectl:
-  image: docker.io/bitnami/kubectl:1.31
+  image: docker.io/bitnami/kubectl:latest
 schedule: '*/30 * * * *'
 testDurationSeconds: 60
 observeSeconds: 600

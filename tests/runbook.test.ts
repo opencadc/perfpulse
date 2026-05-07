@@ -9,6 +9,7 @@ describe("PerfPulse runbooks", () => {
     expect(runbook).toContain("helm upgrade --install perfpulse-cron");
     expect(runbook).toContain("helm upgrade --install perfpulse-benchmark");
     expect(runbook).toContain("helm upgrade --install perfpulse-stress");
+    expect(runbook).toContain("Release Please maintains the default chart image tags.");
     expect(runbook).toContain("--set campaign.type=benchmark");
     expect(runbook).toContain("--set campaign.totalJobs=1000");
     expect(runbook).toContain("--set campaign.logicalUsers=100");
@@ -22,6 +23,8 @@ describe("PerfPulse runbooks", () => {
     expect(runbook).toContain("Completion is evidence, not the success gate.");
     expect(runbook).toContain("Dashboard evidence");
     expect(runbook).not.toContain("kubectl apply -f docs/manifests");
+    expect(runbook).not.toContain("--set image.repository=");
+    expect(runbook).not.toContain("--set image.tag=");
   });
 
   test("documented campaign values render with Helm", () => {
@@ -30,10 +33,6 @@ describe("PerfPulse runbooks", () => {
       "./charts/campaign",
       "--namespace",
       "canfar-perfpulse",
-      "--set",
-      "image.repository=images.opencadc.org/platform/perfpulse",
-      "--set",
-      "image.tag=TAG",
       "--set",
       "campaign.type=benchmark",
       "--set",
@@ -48,10 +47,6 @@ describe("PerfPulse runbooks", () => {
       "./charts/campaign",
       "--namespace",
       "canfar-perfpulse",
-      "--set",
-      "image.repository=images.opencadc.org/platform/perfpulse",
-      "--set",
-      "image.tag=TAG",
       "--set",
       "campaign.type=stress",
       "--set",

@@ -8,10 +8,12 @@ describe("PerfPulse Helm charts", () => {
       "--set",
       "image.tag=2026.05.04",
       "--set",
-      "kubectl.image=docker.io/bitnami/kubectl:1.31",
+      "kubectl.image=docker.io/bitnami/kubectl:latest",
     ]);
 
     expect(manifest).toContain("kind: CronJob");
+    expect(manifest).toContain('image: "docker.io/bitnami/kubectl:latest"');
+    expect(manifest).not.toContain("bitnami/kubectl:1.31");
     expect(manifest).toContain("name: perfpulse-cron-direct");
     expect(manifest).toContain("name: perfpulse-cron-kueue");
     expect(manifest).toContain("name: perfpulse-cron-skaha");

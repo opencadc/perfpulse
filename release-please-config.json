@@ -24,9 +24,8 @@
           "jsonpath": "$.appVersion"
         },
         {
-          "type": "yaml",
-          "path": "charts/cron/values.yaml",
-          "jsonpath": "$.image.tag"
+          "type": "generic",
+          "path": "charts/cron/values.yaml"
         },
         {
           "type": "yaml",
@@ -39,9 +38,8 @@
           "jsonpath": "$.appVersion"
         },
         {
-          "type": "yaml",
-          "path": "charts/campaign/values.yaml",
-          "jsonpath": "$.image.tag"
+          "type": "generic",
+          "path": "charts/campaign/values.yaml"
         }
       ]
     }

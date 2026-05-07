@@ -2,7 +2,7 @@ controlNamespace: canfar-perfpulse
 workloadNamespace: canfar-workloads
 image:
   repository: images.opencadc.org/platform/perfpulse
-  tag: 0.1.8
+  tag: v0.1.8 # x-release-please-version
 campaign:
   type: benchmark
   confirmStress: false
