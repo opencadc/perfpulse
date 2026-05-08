@@ -7,7 +7,18 @@ describe("PerfPulse runbooks", () => {
     expect(runbook).toContain("# PerfPulse Helm Runbook");
     expect(runbook).toContain("## Prerequisites");
     expect(runbook).toContain("helm upgrade --install perfpulse-cron");
+    expect(runbook).toContain("## Run Cron Check Manually");
+    expect(runbook).toContain(
+      'kubectl create job "perfpulse-cron-$' + "{SURFACE}-manual-$" + '{RUN_ID}"',
+    );
+    expect(runbook).toContain('--from="cronjob/perfpulse-cron-$' + '{SURFACE}"');
     expect(runbook).toContain("helm upgrade --install perfpulse-benchmark");
+    expect(runbook).toContain("## Select Campaign Surfaces");
+    expect(runbook).toContain("run concurrently");
+    expect(runbook).toContain("`campaign.totalJobs` is per selected surface");
+    expect(runbook).toContain("--set-json 'surfaces=[\"skaha\"]'");
+    expect(runbook).toContain("--set-json 'surfaces=[\"k8s-direct\"]'");
+    expect(runbook).toContain("--set-json 'surfaces=[\"k8s-kueue\"]'");
     expect(runbook).toContain("helm upgrade --install perfpulse-stress");
     expect(runbook).toContain("Release Please maintains the default chart image tags.");
     expect(runbook).toContain("--set campaign.type=benchmark");

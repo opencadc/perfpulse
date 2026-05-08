@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 const repoRoot = new URL("..", import.meta.url).pathname;
 
 describe("PerfPulse Helm charts", () => {
-  test("cron chart renders one non-overlapping 30-minute CronJob per default surface", () => {
+  test("cron chart renders one non-overlapping 5-minute CronJob per default surface", () => {
     const manifest = helmTemplate("cron", [
       "--set",
       "image.tag=2026.05.04",
@@ -12,13 +12,14 @@ describe("PerfPulse Helm charts", () => {
     ]);
 
     expect(manifest).toContain("kind: CronJob");
+    expect(manifest).not.toContain("kind: Namespace");
     expect(manifest).toContain('image: "docker.io/bitnami/kubectl:latest"');
     expect(manifest).not.toContain("bitnami/kubectl:1.31");
     expect(manifest).toContain("name: perfpulse-cron-direct");
     expect(manifest).toContain("name: perfpulse-cron-kueue");
     expect(manifest).toContain("name: perfpulse-cron-skaha");
     expect(count(manifest, "kind: CronJob")).toBe(3);
-    expect(manifest).toContain('schedule: "*/30 * * * *"');
+    expect(manifest).toContain('schedule: "*/5 * * * *"');
     expect(manifest).toContain("concurrencyPolicy: Forbid");
     expect(manifest).toContain("activeDeadlineSeconds: 1260");
     expect(manifest).toContain("PROFILE: cron");
@@ -30,9 +31,12 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).toContain("secretName: perfpulse-skaha-auth");
     expect(manifest).toContain("secretRef:");
     expect(manifest).toContain("name: perfpulse-otlp-credentials");
+    expect(manifest).toMatch(/apiVersion: v1\nkind: ServiceAccount/u);
+    expect(manifest).toContain("name: canfar-perfpulse");
     expect(manifest).toContain("kind: Role");
-    expect(manifest).toContain("perfpulse-workload-writer");
-    expect(manifest).toContain("perfpulse-testrun-writer");
+    expect(manifest).toContain("cron-workload-writer");
+    expect(manifest).toContain("cron-testrun-writer");
+    expect(manifest).not.toContain("name: perfpulse-workload-writer");
     expect(manifest).toContain("runAsNonRoot: true");
     expect(manifest).toContain("allowPrivilegeEscalation: false");
     expect(manifest).not.toContain("name: canfar-workloads\n");
@@ -58,6 +62,7 @@ describe("PerfPulse Helm charts", () => {
     ]);
 
     expect(count(manifest, "kind: TestRun")).toBe(3);
+    expect(manifest).not.toContain("kind: Namespace");
     expect(manifest).toContain("name: perfpulse-campaign-direct");
     expect(manifest).toContain("name: perfpulse-campaign-kueue");
     expect(manifest).toContain("name: perfpulse-campaign-skaha");
@@ -72,7 +77,10 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).toContain('value: "manual-20260507"');
     expect(manifest).toContain("secretName: perfpulse-skaha-auth");
     expect(manifest).toContain("name: perfpulse-otlp-credentials");
-    expect(manifest).toContain("perfpulse-workload-writer");
+    expect(manifest).not.toMatch(/apiVersion: v1\nkind: ServiceAccount/u);
+    expect(manifest).toContain("serviceAccountName: canfar-perfpulse");
+    expect(manifest).toContain("campaign-workload-writer");
+    expect(manifest).not.toContain("name: perfpulse-workload-writer");
     expect(manifest).toContain("runAsNonRoot: true");
     expect(manifest).toContain("allowPrivilegeEscalation: false");
     expect(manifest).not.toContain("kind: CronJob");
@@ -107,6 +115,23 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).toContain("secretName: skaha-custom");
     expect(manifest).toContain("CAMPAIGN_TYPE: stress");
     expect(manifest).toContain('CONFIRM_STRESS: "true"');
+  });
+
+  test("campaign chart can create a dedicated ServiceAccount when requested", () => {
+    const manifest = helmTemplate("campaign", [
+      "--set",
+      "campaign.totalJobs=4",
+      "--set",
+      "campaign.logicalUsers=2",
+      "--set",
+      "serviceAccount.create=true",
+      "--set",
+      "serviceAccount.name=perfpulse-campaign",
+    ]);
+
+    expect(manifest).toMatch(/apiVersion: v1\nkind: ServiceAccount/u);
+    expect(manifest).toContain("name: perfpulse-campaign");
+    expect(manifest).toContain("serviceAccountName: perfpulse-campaign");
   });
 
   test("campaign chart requires sizing and rejects unsafe gates", () => {

@@ -48,7 +48,7 @@ The Helm charts are the canonical operator interface. Bun remains the TypeScript
 installing dependencies, linting, type checking, unit testing, building the k6 bundle, and running
 local dry runs. There should not be a new Bun operator CLI or `bunx` deployment interface.
 
-The `cron` chart installs a permanent 30-minute check. It creates one Kubernetes CronJob per
+The `cron` chart installs a permanent 5-minute check. It creates one Kubernetes CronJob per
 enabled surface. The default enabled surfaces are Direct Kubernetes, Kueue, and Skaha. Each CronJob
 creates the appropriate k6 Operator `TestRun` for its surface. Surface isolation is intentional:
 operators should be able to see whether Direct, Kueue, or Skaha is failing without unpacking one
@@ -116,7 +116,7 @@ The deployment runbook should become a short Helm-based operator guide:
    from manual campaigns.
 3. As a platform operator, I want a `campaign` chart, so that benchmark and stress runs share one
    manual run interface.
-4. As a platform operator, I want the `cron` chart to run every 30 minutes, so that Grafana has
+4. As a platform operator, I want the `cron` chart to run every 5 minutes, so that Grafana has
    fresh operational evidence.
 5. As a platform operator, I want one CronJob per surface, so that Direct, Kueue, and Skaha
    failures are isolated in Kubernetes history.
@@ -237,7 +237,7 @@ The deployment runbook should become a short Helm-based operator guide:
 
 ### Cron Chart Behavior
 
-- The `cron` chart runs on a 30-minute cadence.
+- The `cron` chart runs on a 5-minute cadence.
 - Direct, Kueue, and Skaha are enabled by default.
 - Each enabled surface renders a separate Kubernetes CronJob.
 - Each CronJob creates one k6 Operator `TestRun` for its surface.
@@ -406,7 +406,7 @@ Surface tests should cover:
 Helm chart tests should cover:
 
 - The `cron` chart renders one CronJob per default surface.
-- The `cron` chart renders a 30-minute schedule.
+- The `cron` chart renders a 5-minute schedule.
 - The `cron` chart renders the expected workload duration and observation values.
 - The `cron` chart renders separate surface configuration.
 - The `campaign` chart renders per-surface `TestRun` resources.

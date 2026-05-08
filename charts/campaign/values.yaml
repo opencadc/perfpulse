@@ -1,5 +1,8 @@
 controlNamespace: canfar-perfpulse
 workloadNamespace: canfar-workloads
+serviceAccount:
+  create: false
+  name: canfar-perfpulse
 image:
   repository: images.opencadc.org/platform/perfpulse
   tag: v0.1.8 # x-release-please-version

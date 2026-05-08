@@ -18,14 +18,14 @@ spec:
     localFile: /test/perfpulse.js
   initializer:
     image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
-    serviceAccountName: canfar-perfpulse
+    serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
     securityContext:
 {{ include "perfpulse.podSecurityContext" $ | indent 6 }}
     containerSecurityContext:
 {{ include "perfpulse.containerSecurityContext" $ | indent 6 }}
   runner:
     image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
-    serviceAccountName: canfar-perfpulse
+    serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
     securityContext:
 {{ include "perfpulse.podSecurityContext" $ | indent 6 }}
     containerSecurityContext:
@@ -50,7 +50,7 @@ spec:
           secretName: {{ $.Values.skaha.credentialsSecretName }}
     {{- end }}
   starter:
-    serviceAccountName: canfar-perfpulse
+    serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
     securityContext:
 {{ include "perfpulse.podSecurityContext" $ | indent 6 }}
     containerSecurityContext:

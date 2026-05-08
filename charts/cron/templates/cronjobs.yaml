@@ -26,7 +26,7 @@ spec:
 {{ include "perfpulse.labels" $ | indent 12 }}
             perfpulse.opencadc.org/surface: {{ $surface }}
         spec:
-          serviceAccountName: canfar-perfpulse
+          serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
           restartPolicy: Never
           securityContext:
 {{ include "perfpulse.podSecurityContext" $ | indent 12 }}
@@ -58,7 +58,7 @@ spec:
                       localFile: /test/perfpulse.js
                     initializer:
                       image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
-                      serviceAccountName: canfar-perfpulse
+                      serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
                       securityContext:
                         runAsGroup: 1000
                         runAsNonRoot: true
@@ -77,7 +77,7 @@ spec:
                           type: RuntimeDefault
                     runner:
                       image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
-                      serviceAccountName: canfar-perfpulse
+                      serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
                       securityContext:
                         runAsGroup: 1000
                         runAsNonRoot: true
@@ -114,7 +114,7 @@ spec:
                             secretName: {{ $.Values.skaha.credentialsSecretName }}
                       {{- end }}
                     starter:
-                      serviceAccountName: canfar-perfpulse
+                      serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
                       securityContext:
                         runAsGroup: 1000
                         runAsNonRoot: true

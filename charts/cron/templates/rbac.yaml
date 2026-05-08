@@ -1,22 +1,17 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ .Values.controlNamespace }}
-  labels:
-{{ include "perfpulse.labels" . | indent 4 }}
----
+{{- if .Values.serviceAccount.create }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: canfar-perfpulse
+  name: {{ include "perfpulse.serviceAccountName" . }}
   namespace: {{ .Values.controlNamespace }}
   labels:
 {{ include "perfpulse.labels" . | indent 4 }}
 ---
+{{- end }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: perfpulse-workload-writer
+  name: {{ include "perfpulse.workloadWriterName" . }}
   namespace: {{ .Values.workloadNamespace }}
   labels:
 {{ include "perfpulse.labels" . | indent 4 }}
@@ -31,23 +26,23 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: perfpulse-workload-writer
+  name: {{ include "perfpulse.workloadWriterName" . }}
   namespace: {{ .Values.workloadNamespace }}
   labels:
 {{ include "perfpulse.labels" . | indent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: perfpulse-workload-writer
+  name: {{ include "perfpulse.workloadWriterName" . }}
 subjects:
   - kind: ServiceAccount
-    name: canfar-perfpulse
+    name: {{ include "perfpulse.serviceAccountName" . }}
     namespace: {{ .Values.controlNamespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: perfpulse-testrun-writer
+  name: {{ include "perfpulse.testRunWriterName" . }}
   namespace: {{ .Values.controlNamespace }}
   labels:
 {{ include "perfpulse.labels" . | indent 4 }}
@@ -59,15 +54,15 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: perfpulse-testrun-writer
+  name: {{ include "perfpulse.testRunWriterName" . }}
   namespace: {{ .Values.controlNamespace }}
   labels:
 {{ include "perfpulse.labels" . | indent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: perfpulse-testrun-writer
+  name: {{ include "perfpulse.testRunWriterName" . }}
 subjects:
   - kind: ServiceAccount
-    name: canfar-perfpulse
+    name: {{ include "perfpulse.serviceAccountName" . }}
     namespace: {{ .Values.controlNamespace }}

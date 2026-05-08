@@ -7,6 +7,14 @@ app.kubernetes.io/name: perfpulse
 app.kubernetes.io/part-of: perfpulse
 {{- end -}}
 
+{{- define "perfpulse.workloadWriterName" -}}
+{{- printf "%s-workload-writer" .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "perfpulse.serviceAccountName" -}}
+{{- .Values.serviceAccount.name -}}
+{{- end -}}
+
 {{- define "perfpulse.podSecurityContext" -}}
 runAsGroup: 1000
 runAsNonRoot: true
