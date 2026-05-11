@@ -14,11 +14,15 @@ describe("PerfPulse runbooks", () => {
     expect(runbook).toContain("## Preflight Checks");
     expect(runbook).toContain("helm list --namespace canfar-perfpulse");
     expect(runbook).toContain("kubectl auth can-i list secrets --namespace canfar-perfpulse");
-    expect(runbook).toContain("kubectl auth can-i create testruns.k6.io --namespace canfar-perfpulse");
+    expect(runbook).toContain(
+      "kubectl auth can-i create testruns.k6.io --namespace canfar-perfpulse",
+    );
     expect(runbook).toContain("Each `kubectl auth can-i` check should return `yes`.");
     expect(runbook).toContain("## Set Up Skaha Auth");
     expect(runbook).toContain("bun run skaha-auth-setup");
-    expect(runbook).toContain("kubectl get secret perfpulse-skaha-auth --namespace canfar-perfpulse");
+    expect(runbook).toContain(
+      "kubectl get secret perfpulse-skaha-auth --namespace canfar-perfpulse",
+    );
     expect(runbook).toContain("bun run skaha-auth-cleanup");
     expect(runbook).toContain('--set-json \'surfaces=["k8s-direct","k8s-kueue"]\'');
     expect(runbook).toContain("helm upgrade --install perfpulse-cron");
