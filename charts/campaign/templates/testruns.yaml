@@ -17,14 +17,14 @@ spec:
   script:
     localFile: /test/perfpulse.js
   initializer:
-    image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
+    image: {{ include "perfpulse.image" $ | quote }}
     serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
     securityContext:
 {{ include "perfpulse.podSecurityContext" $ | indent 6 }}
     containerSecurityContext:
 {{ include "perfpulse.containerSecurityContext" $ | indent 6 }}
   runner:
-    image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
+    image: {{ include "perfpulse.image" $ | quote }}
     serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
     securityContext:
 {{ include "perfpulse.podSecurityContext" $ | indent 6 }}
@@ -50,6 +50,7 @@ spec:
           secretName: {{ $.Values.skaha.credentialsSecretName }}
     {{- end }}
   starter:
+    image: {{ include "perfpulse.image" $ | quote }}
     serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
     securityContext:
 {{ include "perfpulse.podSecurityContext" $ | indent 6 }}

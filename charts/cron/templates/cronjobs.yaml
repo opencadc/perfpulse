@@ -32,7 +32,7 @@ spec:
 {{ include "perfpulse.podSecurityContext" $ | indent 12 }}
           containers:
             - name: create-testrun
-              image: {{ $.Values.kubectl.image | quote }}
+              image: {{ include "perfpulse.image" $ | quote }}
               command: ["/bin/sh", "-c"]
               args:
                 - |-
@@ -57,7 +57,7 @@ spec:
                     script:
                       localFile: /test/perfpulse.js
                     initializer:
-                      image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
+                      image: {{ include "perfpulse.image" $ | quote }}
                       serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
                       securityContext:
                         runAsGroup: 1000
@@ -76,7 +76,7 @@ spec:
                         seccompProfile:
                           type: RuntimeDefault
                     runner:
-                      image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
+                      image: {{ include "perfpulse.image" $ | quote }}
                       serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
                       securityContext:
                         runAsGroup: 1000
@@ -114,6 +114,7 @@ spec:
                             secretName: {{ $.Values.skaha.credentialsSecretName }}
                       {{- end }}
                     starter:
+                      image: {{ include "perfpulse.image" $ | quote }}
                       serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
                       securityContext:
                         runAsGroup: 1000

@@ -9,7 +9,9 @@ supported deployment interface.
 - `kubectl` context pointed at the target cluster.
 - k6 Operator installed and serving `k6.io/v1alpha1` `TestRun`.
 - Prometheus or an OTLP path that accepts PerfPulse k6 metrics.
-- Released PerfPulse runner image. Release Please maintains the default chart image tags.
+- Released PerfPulse image. Release Please maintains the default chart image tags. The same image is
+  used for cron helpers, k6 Operator initializer/starter/runner pods, and the bounded `stress-ng`
+  workload pods or Skaha sessions.
 - `canfar-perfpulse` and workload namespaces allowed by cluster policy. The Helm command can create
   `canfar-perfpulse` when it is missing; the chart does not adopt or manage a pre-existing namespace.
   The workload namespace is always platform-owned and must exist before install, including when

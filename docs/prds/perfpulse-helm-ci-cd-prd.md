@@ -96,9 +96,14 @@ Acceptance means:
 - Kueue: the Job create request succeeds and the corresponding Kueue Workload becomes visible.
 - Skaha: the session POST succeeds and returns a recognizable visible or Pending platform state.
 
-The `cron` workload uses a 60-second `stress-ng` runtime. PerfPulse may observe for up to 10
-minutes because queueing or platform delay can dominate. The 10-minute observation window should
-not imply that workload completion is a hard gate.
+The `cron` workload uses a 60-second `stress-ng` runtime from the released PerfPulse image.
+PerfPulse may observe for up to 10 minutes because queueing or platform delay can dominate. The
+10-minute observation window should not imply that workload completion is a hard gate.
+
+All pods created by the Helm path should use the same released PerfPulse image: the cron helper,
+k6 Operator initializer/starter/runner pods, and the bounded workload pods or Skaha sessions. The
+image includes `k6`, `kubectl`, and `stress-ng` so chart users do not need separate helper or
+workload images.
 
 Release Please updates the package version, chart version, chart app version, and chart image tag.
 The chart default image tag should match the release tag, for example `v0.1.8`. Digest pinning is

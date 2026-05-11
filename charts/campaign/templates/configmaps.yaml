@@ -34,6 +34,8 @@ data:
   SURFACE: {{ $surface }}
   TOTAL_JOBS: {{ $.Values.campaign.totalJobs | quote }}
   VISIBILITY_GATE_SECONDS: {{ $.Values.campaign.visibilityGateSeconds | quote }}
+  WORKLOAD_COMMAND: '["stress-ng"]'
+  WORKLOAD_IMAGE: {{ include "perfpulse.image" $ | quote }}
   {{- if or (eq $surface "k8s-direct") (eq $surface "k8s-kueue") }}
   WORKLOAD_NAMESPACE: {{ $.Values.workloadNamespace }}
   {{- end }}

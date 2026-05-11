@@ -1,30 +1,35 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
+const cronValues = readFileSync("charts/cron/values.yaml", "utf8");
 
 describe("PerfPulse Helm charts", () => {
   test("cron chart renders one non-overlapping 5-minute CronJob per default surface", () => {
-    const manifest = helmTemplate("cron", [
-      "--set",
-      "image.tag=2026.05.04",
-      "--set",
-      "kubectl.image=docker.io/bitnami/kubectl:latest",
-    ]);
+    const manifest = helmTemplate("cron", ["--set", "image.tag=2026.05.04"]);
 
     expect(manifest).toContain("kind: CronJob");
     expect(manifest).not.toContain("kind: Namespace");
-    expect(manifest).toContain('image: "docker.io/bitnami/kubectl:latest"');
-    expect(manifest).not.toContain("bitnami/kubectl:1.31");
+    expect(manifest).toContain('image: "images.opencadc.org/platform/perfpulse:2026.05.04"');
+    expect(manifest).not.toContain("docker.io/bitnami/kubectl");
+    expect(manifest).not.toContain("bitnami/kubectl");
+    expect(manifest).not.toContain("docker.io/alexeiled/stress-ng");
+    expect(manifest).not.toContain("images.canfar.net/skaha/stress-ng");
     expect(manifest).toContain("name: perfpulse-cron-direct");
     expect(manifest).toContain("name: perfpulse-cron-kueue");
     expect(manifest).toContain("name: perfpulse-cron-skaha");
+    expect(count(manifest, 'image: "images.opencadc.org/platform/perfpulse:2026.05.04"')).toBe(12);
     expect(count(manifest, "kind: CronJob")).toBe(3);
     expect(manifest).toContain('schedule: "*/5 * * * *"');
     expect(manifest).toContain("concurrencyPolicy: Forbid");
     expect(manifest).toContain("activeDeadlineSeconds: 1260");
     expect(manifest).toContain("PROFILE: cron");
     expect(manifest).toContain("RUN_CLASS: cron");
+    expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
     expect(manifest).toContain('WORKLOAD_DURATION_SECONDS: "60"');
+    expect(manifest).toContain(
+      'WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04"',
+    );
     expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "600"');
     expect(manifest).not.toContain("OBSERVE_SECONDS");
     expect(manifest).toContain("kind: TestRun");
@@ -39,6 +44,8 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).not.toContain("name: perfpulse-workload-writer");
     expect(manifest).toContain("runAsNonRoot: true");
     expect(manifest).toContain("allowPrivilegeEscalation: false");
+    expect(cronValues).not.toContain("kubectl:");
+    expect(cronValues).not.toContain("bitnami/kubectl");
     expect(manifest).not.toContain("name: canfar-workloads\n");
     expect(manifest).not.toContain("kind: Secret");
   });
@@ -63,6 +70,10 @@ describe("PerfPulse Helm charts", () => {
 
     expect(count(manifest, "kind: TestRun")).toBe(3);
     expect(manifest).not.toContain("kind: Namespace");
+    expect(count(manifest, 'image: "images.opencadc.org/platform/perfpulse:2026.05.04"')).toBe(9);
+    expect(manifest).not.toContain("docker.io/bitnami/kubectl");
+    expect(manifest).not.toContain("docker.io/alexeiled/stress-ng");
+    expect(manifest).not.toContain("images.canfar.net/skaha/stress-ng");
     expect(manifest).toContain("name: perfpulse-campaign-direct");
     expect(manifest).toContain("name: perfpulse-campaign-kueue");
     expect(manifest).toContain("name: perfpulse-campaign-skaha");
@@ -71,6 +82,10 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).toContain("CAMPAIGN_TYPE: benchmark");
     expect(manifest).toContain('TOTAL_JOBS: "12"');
     expect(manifest).toContain('LOGICAL_USERS: "3"');
+    expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
+    expect(manifest).toContain(
+      'WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04"',
+    );
     expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "120"');
     expect(manifest).toContain('COMPLETION_GATE_SECONDS: "300"');
     expect(manifest).toContain('SKAHA_API_URL: "https://ws.example/skaha/v1"');

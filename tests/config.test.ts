@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   DEFAULT_SKAHA_API_URL,
   DEFAULT_SKAHA_WORKLOAD_IMAGE,
+  DEFAULT_WORKLOAD_IMAGE,
   deriveRunConfigForJob,
   makeJobName,
   resolveRunConfig,
@@ -38,8 +39,8 @@ describe("resolveRunConfig", () => {
     expect(config.kubernetes.namespace).toBe("canfar-workloads");
     expect(config.jobName).toBe("perfpulse-kind-smoke-01-direct-0");
     expect(config.workload.durationSeconds).toBe(10);
-    expect(config.workload.image).toBe("docker.io/alexeiled/stress-ng");
-    expect(config.workload.command).toBeUndefined();
+    expect(config.workload.image).toBe(DEFAULT_WORKLOAD_IMAGE);
+    expect(config.workload.command).toEqual(["stress-ng"]);
     expect(config.workload.args).toEqual(["--cpu", "1", "--timeout", "10s", "--metrics-brief"]);
   });
 
@@ -206,11 +207,11 @@ describe("resolveRunConfig", () => {
       usernamePath: "/var/run/secrets/perfpulse/skaha-auth/username",
     });
     expect(config.workload.image).toBe(DEFAULT_SKAHA_WORKLOAD_IMAGE);
-    expect(config.workload.command).toBeUndefined();
+    expect(config.workload.command).toEqual(["stress-ng"]);
     expect(config.workload.args).toEqual(["--cpu", "1", "--timeout", "10s", "--metrics-brief"]);
   });
 
-  test("keeps Direct and Kueue on Docker Hub stress-ng while Skaha uses CANFAR stress-ng", () => {
+  test("uses the PerfPulse image and stress-ng command for all default workload surfaces", () => {
     const directConfig = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-direct",
@@ -224,9 +225,12 @@ describe("resolveRunConfig", () => {
       SURFACE: "skaha",
     });
 
-    expect(directConfig.workload.image).toBe("docker.io/alexeiled/stress-ng");
-    expect(kueueConfig.workload.image).toBe("docker.io/alexeiled/stress-ng");
-    expect(skahaConfig.workload.image).toBe("images.canfar.net/skaha/stress-ng:latest");
+    expect(directConfig.workload.image).toBe(DEFAULT_WORKLOAD_IMAGE);
+    expect(kueueConfig.workload.image).toBe(DEFAULT_WORKLOAD_IMAGE);
+    expect(skahaConfig.workload.image).toBe(DEFAULT_WORKLOAD_IMAGE);
+    expect(directConfig.workload.command).toEqual(["stress-ng"]);
+    expect(kueueConfig.workload.command).toEqual(["stress-ng"]);
+    expect(skahaConfig.workload.command).toEqual(["stress-ng"]);
     expect(skahaConfig.workload.args).toEqual(directConfig.workload.args);
     expect(skahaConfig.workload.args).toEqual(kueueConfig.workload.args);
   });
