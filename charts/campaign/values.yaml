@@ -5,7 +5,7 @@ serviceAccount:
   name: canfar-perfpulse
 image:
   repository: images.opencadc.org/platform/perfpulse
-  tag: v0.1.10 # x-release-please-version
+  tag: v0.1.11 # x-release-please-version
 workload:
   image: images.canfar.net/skaha/stress-ng:latest
 campaign:
