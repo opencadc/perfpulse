@@ -6,6 +6,8 @@ serviceAccount:
 image:
   repository: images.opencadc.org/platform/perfpulse
   tag: v0.1.10 # x-release-please-version
+workload:
+  image: images.canfar.net/skaha/stress-ng:latest
 schedule: '*/5 * * * *'
 testDurationSeconds: 60
 observeSeconds: 600

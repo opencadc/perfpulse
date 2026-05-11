@@ -24,7 +24,7 @@ describe("Skaha user-facing surface client", () => {
       cmd: "stress-ng",
       cores: 1,
       env: { PERF_PULSE_TESTID: "spot-1" },
-      image: "images.opencadc.org/platform/perfpulse:latest",
+      image: "images.canfar.net/skaha/stress-ng:latest",
       name: "perfpulse-spot-1-0",
       ram: 1,
     });
@@ -44,7 +44,7 @@ describe("Skaha user-facing surface client", () => {
           tags: requestTags("skaha_create_session"),
           timeout: "30s",
         },
-        url: "https://ws.example/skaha/v1/session?name=perfpulse-spot-1-0&image=images.opencadc.org%2Fplatform%2Fperfpulse%3Alatest&type=headless&cores=1&ram=1&cmd=stress-ng&args=--cpu+1+--timeout+10s+--metrics-brief&env=PERF_PULSE_TESTID%3Dspot-1",
+        url: "https://ws.example/skaha/v1/session?name=perfpulse-spot-1-0&image=images.canfar.net%2Fskaha%2Fstress-ng%3Alatest&type=headless&cores=1&ram=1&cmd=stress-ng&args=--cpu+1+--timeout+10s+--metrics-brief&env=PERF_PULSE_TESTID%3Dspot-1",
       },
     ]);
   });
@@ -62,7 +62,7 @@ describe("Skaha user-facing surface client", () => {
       args: ["--timeout", "10s"],
       cmd: "stress-ng",
       env: { PERF_PULSE_ATTEMPT: "0", PERF_PULSE_TESTID: "spot-1" },
-      image: "images.opencadc.org/platform/perfpulse:latest",
+      image: "images.canfar.net/skaha/stress-ng:latest",
       name: "perfpulse-spot-1-0",
     });
 
@@ -89,7 +89,7 @@ describe("Skaha user-facing surface client", () => {
       args: ["--cpu", "1", "--timeout", "10s", "--metrics-brief"],
       cmd: "stress-ng",
       env: { PERF_PULSE_TESTID: "spot-1" },
-      image: "images.opencadc.org/platform/perfpulse:latest",
+      image: "images.canfar.net/skaha/stress-ng:latest",
       name: "perfpulse-spot-1-0",
     });
 
@@ -113,7 +113,7 @@ describe("Skaha user-facing surface client", () => {
     const result = client.createSession({
       args: ["--timeout", "10s"],
       cmd: "stress-ng",
-      image: "images.opencadc.org/platform/perfpulse:latest",
+      image: "images.canfar.net/skaha/stress-ng:latest",
       name: "perfpulse-spot-1-0",
     });
 
@@ -133,7 +133,7 @@ describe("Skaha user-facing surface client", () => {
     client.createSession({
       args: ["--timeout", "10s"],
       cmd: "stress-ng",
-      image: "images.opencadc.org/platform/perfpulse:latest",
+      image: "images.canfar.net/skaha/stress-ng:latest",
       name: "perfpulse-spot-1-0",
     });
     client.getSession("session-abc");
@@ -159,7 +159,7 @@ describe("Skaha user-facing surface client", () => {
     client.createSession({
       args: ["--timeout", "10s"],
       cmd: "stress-ng",
-      image: "images.opencadc.org/platform/perfpulse:latest",
+      image: "images.canfar.net/skaha/stress-ng:latest",
       name: "perfpulse-spot-1-0",
     });
     client.getSession("session-abc");
@@ -373,7 +373,7 @@ function skahaSurfaceConfig(): SkahaSurfaceConfig {
     session: {
       args: ["--cpu", "1", "--timeout", "10s", "--metrics-brief"],
       cmd: "stress-ng",
-      image: "images.opencadc.org/platform/perfpulse:latest",
+      image: "images.canfar.net/skaha/stress-ng:latest",
       name: "perfpulse-spot-1-0",
     },
     visibilityGateSeconds: 60,

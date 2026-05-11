@@ -1,10 +1,12 @@
 {{- range $surface := .Values.surfaces }}
 {{- $short := include "perfpulse.nameForSurface" $surface }}
+{{- $testRunName := include "perfpulse.campaignSurfaceName" (dict "releaseName" $.Release.Name "surfaceShort" $short) }}
+{{- $configMapName := include "perfpulse.campaignConfigMapName" (dict "releaseName" $.Release.Name "surfaceShort" $short) }}
 ---
 apiVersion: k6.io/v1alpha1
 kind: TestRun
 metadata:
-  name: perfpulse-campaign-{{ $short }}
+  name: {{ $testRunName }}
   namespace: {{ $.Values.controlNamespace }}
   labels:
 {{ include "perfpulse.labels" $ | indent 4 }}
@@ -35,7 +37,7 @@ spec:
         value: {{ $.Values.campaign.testid | quote }}
     envFrom:
       - configMapRef:
-          name: perfpulse-campaign-{{ $short }}-config
+          name: {{ $configMapName }}
       - secretRef:
           name: {{ $.Values.otlp.credentialsSecretName }}
           optional: true

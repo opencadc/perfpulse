@@ -6,7 +6,7 @@ const cronValues = readFileSync("charts/cron/values.yaml", "utf8");
 const dockerfile = readFileSync("Dockerfile", "utf8");
 
 describe("PerfPulse Helm charts", () => {
-  test("runtime image includes every binary required by k6 operator pods and workloads", () => {
+  test("runtime image includes every binary required by k6 operator pods", () => {
     expect(dockerfile).toContain("FROM alpine:3.22");
     expect(dockerfile).toContain("COPY --from=k6 /usr/bin/k6 /usr/bin/k6");
     expect(dockerfile).toMatch(/apk add --no-cache .*ca-certificates.*curl.*kubectl.*stress-ng/u);
@@ -21,7 +21,6 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).not.toContain("docker.io/bitnami/kubectl");
     expect(manifest).not.toContain("bitnami/kubectl");
     expect(manifest).not.toContain("docker.io/alexeiled/stress-ng");
-    expect(manifest).not.toContain("images.canfar.net/skaha/stress-ng");
     expect(manifest).toContain("name: perfpulse-cron-direct");
     expect(manifest).toContain("name: perfpulse-cron-kueue");
     expect(manifest).toContain("name: perfpulse-cron-skaha");
@@ -34,9 +33,7 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).toContain("RUN_CLASS: cron");
     expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
     expect(manifest).toContain('WORKLOAD_DURATION_SECONDS: "60"');
-    expect(manifest).toContain(
-      'WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04"',
-    );
+    expect(manifest).toContain('WORKLOAD_IMAGE: "images.canfar.net/skaha/stress-ng:latest"');
     expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "600"');
     expect(manifest).not.toContain("OBSERVE_SECONDS");
     expect(manifest).toContain("kind: TestRun");
@@ -80,19 +77,19 @@ describe("PerfPulse Helm charts", () => {
     expect(count(manifest, 'image: "images.opencadc.org/platform/perfpulse:2026.05.04"')).toBe(9);
     expect(manifest).not.toContain("docker.io/bitnami/kubectl");
     expect(manifest).not.toContain("docker.io/alexeiled/stress-ng");
-    expect(manifest).not.toContain("images.canfar.net/skaha/stress-ng");
-    expect(manifest).toContain("name: perfpulse-campaign-direct");
-    expect(manifest).toContain("name: perfpulse-campaign-kueue");
-    expect(manifest).toContain("name: perfpulse-campaign-skaha");
+    expect(manifest).toContain("name: campaign-direct");
+    expect(manifest).toContain("name: campaign-direct-config");
+    expect(manifest).toContain("name: campaign-kueue");
+    expect(manifest).toContain("name: campaign-kueue-config");
+    expect(manifest).toContain("name: campaign-skaha");
+    expect(manifest).toContain("name: campaign-skaha-config");
     expect(manifest).toContain('PROFILE: "campaign"');
     expect(manifest).toContain("RUN_CLASS: campaign");
     expect(manifest).toContain("CAMPAIGN_TYPE: benchmark");
     expect(manifest).toContain('TOTAL_JOBS: "12"');
     expect(manifest).toContain('LOGICAL_USERS: "3"');
     expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
-    expect(manifest).toContain(
-      'WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04"',
-    );
+    expect(manifest).toContain('WORKLOAD_IMAGE: "images.canfar.net/skaha/stress-ng:latest"');
     expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "120"');
     expect(manifest).toContain('COMPLETION_GATE_SECONDS: "300"');
     expect(manifest).toContain('SKAHA_API_URL: "https://ws.example/skaha/v1"');
@@ -130,9 +127,10 @@ describe("PerfPulse Helm charts", () => {
     ]);
 
     expect(count(manifest, "kind: TestRun")).toBe(1);
-    expect(manifest).toContain("name: perfpulse-campaign-skaha");
-    expect(manifest).not.toContain("name: perfpulse-campaign-direct");
-    expect(manifest).not.toContain("name: perfpulse-campaign-kueue");
+    expect(manifest).toContain("name: campaign-skaha");
+    expect(manifest).toContain("name: campaign-skaha-config");
+    expect(manifest).not.toContain("name: campaign-direct");
+    expect(manifest).not.toContain("name: campaign-kueue");
     expect(manifest).toContain("name: otlp-custom");
     expect(manifest).toContain("secretName: skaha-custom");
     expect(manifest).toContain("CAMPAIGN_TYPE: stress");
@@ -154,6 +152,34 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).toMatch(/apiVersion: v1\nkind: ServiceAccount/u);
     expect(manifest).toContain("name: perfpulse-campaign");
     expect(manifest).toContain("serviceAccountName: perfpulse-campaign");
+  });
+
+  test("campaign chart scopes surface resources to the Helm release name", () => {
+    const benchmarkManifest = helmTemplateWithRelease("perfpulse-benchmark", "campaign", [
+      "--set-json",
+      'surfaces=["skaha"]',
+      "--set",
+      "campaign.totalJobs=10",
+      "--set",
+      "campaign.logicalUsers=5",
+    ]);
+    const skahaManifest = helmTemplateWithRelease("perfpulse-skaha", "campaign", [
+      "--set-json",
+      'surfaces=["skaha"]',
+      "--set",
+      "campaign.totalJobs=10",
+      "--set",
+      "campaign.logicalUsers=5",
+    ]);
+
+    expect(benchmarkManifest).toContain("name: perfpulse-benchmark-skaha");
+    expect(benchmarkManifest).toContain("name: perfpulse-benchmark-skaha-config");
+    expect(benchmarkManifest).toContain("name: perfpulse-benchmark-workload-writer");
+    expect(benchmarkManifest).not.toContain("perfpulse-campaign-skaha-config");
+    expect(skahaManifest).toContain("name: perfpulse-skaha-skaha");
+    expect(skahaManifest).toContain("name: perfpulse-skaha-skaha-config");
+    expect(skahaManifest).toContain("name: perfpulse-skaha-workload-writer");
+    expect(skahaManifest).not.toContain("perfpulse-campaign-skaha-config");
   });
 
   test("campaign chart requires sizing and rejects unsafe gates", () => {
@@ -210,8 +236,16 @@ describe("PerfPulse Helm charts", () => {
 });
 
 function helmTemplate(chartName: "campaign" | "cron", args: string[] = []): string {
+  return helmTemplateWithRelease(chartName, chartName, args);
+}
+
+function helmTemplateWithRelease(
+  releaseName: string,
+  chartName: "campaign" | "cron",
+  args: string[] = [],
+): string {
   const result = Bun.spawnSync({
-    cmd: ["helm", "template", chartName, `${repoRoot}charts/${chartName}`, ...args],
+    cmd: ["helm", "template", releaseName, `${repoRoot}charts/${chartName}`, ...args],
     stderr: "pipe",
     stdout: "pipe",
   });

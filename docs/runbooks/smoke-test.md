@@ -38,10 +38,10 @@ Purpose:
 
 - Validate the k6 Operator can run the custom PerfPulse image in kind.
 - Validate the runner can create, list, complete, and clean up one direct 10s `stress-ng`
-  Kubernetes Job using the same PerfPulse image as the k6 runner.
+  Kubernetes Job using the default workload image.
 - Capture k6 web dashboard HTML and runner logs without requiring Prometheus or Grafana.
 
-The tiny workload uses the PerfPulse image and overrides the workload command to `stress-ng`.
+The tiny workload uses `images.canfar.net/skaha/stress-ng:latest` and the `stress-ng` command.
 
 Prerequisites:
 

@@ -485,7 +485,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
     const url = new URL(String(createRequest?.url));
     expect(url.origin + url.pathname).toBe("https://ws.example/skaha/v1/session");
     expect(url.searchParams.get("name")).toBe("perfpulse-skaha-spot-skaha-0");
-    expect(url.searchParams.get("image")).toBe("images.opencadc.org/platform/perfpulse:latest");
+    expect(url.searchParams.get("image")).toBe("images.canfar.net/skaha/stress-ng:latest");
     expect(url.searchParams.get("type")).toBe("headless");
     expect(url.searchParams.get("cmd")).toBe("stress-ng");
     expect(url.searchParams.get("args")).toBe("--cpu 1 --timeout 10s --metrics-brief");

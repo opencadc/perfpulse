@@ -11,6 +11,14 @@ app.kubernetes.io/part-of: perfpulse
 {{- printf "%s-workload-writer" .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "perfpulse.campaignSurfaceName" -}}
+{{- printf "%s-%s" .releaseName .surfaceShort | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "perfpulse.campaignConfigMapName" -}}
+{{- printf "%s-%s-config" .releaseName .surfaceShort | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
 {{- define "perfpulse.serviceAccountName" -}}
 {{- .Values.serviceAccount.name -}}
 {{- end -}}

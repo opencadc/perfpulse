@@ -615,11 +615,12 @@ with completion recorded separately when feasible. For spot checks, completion i
 
 ## Workload Design
 
-Direct Kubernetes, Kueue, and Skaha workload fixtures use bounded `stress-ng` from the released
-PerfPulse image. The same container image is used for the cron helper, k6 Operator
-initializer/starter/runner pods, and the actual bounded workload pods or Skaha sessions. The
-workload exists to consume bounded time while keeping the primary measurement focused on submission,
-queueing, visibility, and status behavior.
+Direct Kubernetes, Kueue, and Skaha workload fixtures use bounded `stress-ng` from
+`images.canfar.net/skaha/stress-ng:latest`. The released PerfPulse image is used for the cron
+helper and k6 Operator initializer/starter/runner pods; the workload image is separate so Skaha
+session POST requests use a registry Skaha allows by default. The workload exists to consume
+bounded time while keeping the primary measurement focused on submission, queueing, visibility, and
+status behavior.
 
 ### Direct Kubernetes Default Workload
 
@@ -656,14 +657,14 @@ type: headless
 Skaha accepts the same workload command shape through a headless API session:
 
 ```text
-image: images.opencadc.org/platform/perfpulse:<release-tag>
+image: images.canfar.net/skaha/stress-ng:latest
 cmd: stress-ng
 args: --cpu 1 --timeout <duration-seconds>s --metrics-brief
 ```
 
 Operators can override `WORKLOAD_IMAGE`, `WORKLOAD_COMMAND`, and `WORKLOAD_ARGS` for one-off
-campaigns, but default benchmark parity keeps all surfaces on the released PerfPulse image and the
-same `stress-ng` command/args.
+campaigns, but default benchmark parity keeps all surfaces on the Skaha-allowed stress image and
+the same `stress-ng` command/args.
 
 ### Duration Profiles
 

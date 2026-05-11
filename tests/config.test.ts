@@ -211,7 +211,7 @@ describe("resolveRunConfig", () => {
     expect(config.workload.args).toEqual(["--cpu", "1", "--timeout", "10s", "--metrics-brief"]);
   });
 
-  test("uses the PerfPulse image and stress-ng command for all default workload surfaces", () => {
+  test("uses the Skaha-allowed stress-ng image and command for all default workload surfaces", () => {
     const directConfig = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-direct",

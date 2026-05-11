@@ -1,10 +1,11 @@
 {{- range $surface := .Values.surfaces }}
 {{- $short := include "perfpulse.nameForSurface" $surface }}
+{{- $configMapName := include "perfpulse.campaignConfigMapName" (dict "releaseName" $.Release.Name "surfaceShort" $short) }}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: perfpulse-campaign-{{ $short }}-config
+  name: {{ $configMapName }}
   namespace: {{ $.Values.controlNamespace }}
   labels:
 {{ include "perfpulse.labels" $ | indent 4 }}
@@ -35,7 +36,7 @@ data:
   TOTAL_JOBS: {{ $.Values.campaign.totalJobs | quote }}
   VISIBILITY_GATE_SECONDS: {{ $.Values.campaign.visibilityGateSeconds | quote }}
   WORKLOAD_COMMAND: '["stress-ng"]'
-  WORKLOAD_IMAGE: {{ include "perfpulse.image" $ | quote }}
+  WORKLOAD_IMAGE: {{ $.Values.workload.image | quote }}
   {{- if or (eq $surface "k8s-direct") (eq $surface "k8s-kueue") }}
   WORKLOAD_NAMESPACE: {{ $.Values.workloadNamespace }}
   {{- end }}

@@ -7,16 +7,12 @@ supported deployment interface.
 
 - `helm` with access to the target cluster.
 - `kubectl` context pointed at the target cluster.
-- k6 Operator installed and serving `k6.io/v1alpha1` `TestRun`.
+- `k6` operator installed and serving crds `k6.io/v1alpha1` `TestRun`.
 - Prometheus or an OTLP path that accepts PerfPulse k6 metrics.
-- Released PerfPulse image. Release Please maintains the default chart image tags. The same image is
-  used for cron helpers, k6 Operator initializer/starter/runner pods, and the bounded `stress-ng`
-  workload pods or Skaha sessions. It must include `k6`, `curl`, `kubectl`, and `stress-ng`; the
-  k6 Operator starter pod uses `curl` to unpause the runner.
-- `canfar-perfpulse` and workload namespaces allowed by cluster policy. The Helm command can create
-  `canfar-perfpulse` when it is missing; the chart does not adopt or manage a pre-existing namespace.
-  The workload namespace is always platform-owned and must exist before install, including when
-  `workloadNamespace` is overridden.
+- `canfar-perfpulse` and workload namespaces allowed by cluster policy. On namespace-scoped
+  clusters, create or confirm `canfar-perfpulse` before running Helm or RBAC/resource checks.
+  The chart does not adopt or manage the namespace. The workload namespace is always platform-owned
+  and must exist before install, including when `workloadNamespace` is overridden.
 - Existing Skaha credential Secret when Skaha surface is enabled.
 
 Do not put Skaha passwords, bearer tokens, OTLP headers, or basic-auth material into Helm values.
@@ -26,6 +22,75 @@ The `cron` chart creates the default `canfar-perfpulse` ServiceAccount. Campaign
 ServiceAccount by default, so benchmark and stress releases can run while cron checks stay installed.
 For a standalone campaign release, set `serviceAccount.create=true` and choose a unique
 `serviceAccount.name`.
+
+## Create Or Confirm Namespace
+
+Create the PerfPulse control namespace once before the first Helm install:
+
+```bash
+kubectl create namespace canfar-perfpulse
+```
+
+If the namespace may already exist, check first:
+
+```bash
+kubectl get namespace canfar-perfpulse
+```
+
+On clusters where user permissions are namespace scoped, do this before using Helm or `kubectl auth
+can-i` checks for PerfPulse resources. A missing namespace can produce misleading Forbidden errors
+for resources such as CronJobs, Jobs, TestRuns, Pods, and Helm release Secrets.
+
+## Preflight Checks
+
+After the control namespace exists, confirm the active namespace state and Helm release state:
+
+```bash
+kubectl get namespace canfar-perfpulse canfar-workloads
+helm list --namespace canfar-perfpulse
+```
+
+Run namespace-scoped permission checks before install or upgrade:
+
+```bash
+kubectl auth can-i list secrets --namespace canfar-perfpulse
+kubectl auth can-i create secrets --namespace canfar-perfpulse
+kubectl auth can-i create cronjobs.batch --namespace canfar-perfpulse
+kubectl auth can-i create jobs.batch --namespace canfar-perfpulse
+kubectl auth can-i create testruns.k6.io --namespace canfar-perfpulse
+kubectl auth can-i create roles.rbac.authorization.k8s.io --namespace canfar-perfpulse
+kubectl auth can-i create rolebindings.rbac.authorization.k8s.io --namespace canfar-perfpulse
+kubectl auth can-i create serviceaccounts --namespace canfar-perfpulse
+```
+
+Each `kubectl auth can-i` check should return `yes`. If Helm cannot query release state, fix that
+before installing because Helm stores release metadata as Secrets in the control namespace.
+
+## Set Up Skaha Auth
+
+The `cron` and `campaign` charts enable the Skaha surface by default. Before installing a release
+that includes Skaha, create the Skaha credential Secret in the PerfPulse control namespace:
+
+```bash
+bun run skaha-auth-setup
+```
+
+The command prompts for CANFAR username and password and applies the Secret
+`perfpulse-skaha-auth` in `canfar-perfpulse`. It does not log in to Skaha and does not store a bearer
+token. The runtime mounts the Secret and logs in from inside the k6 runner when it needs a Skaha
+token.
+
+Confirm the Secret exists without printing its values:
+
+```bash
+kubectl get secret perfpulse-skaha-auth --namespace canfar-perfpulse
+```
+
+To remove the Secret later:
+
+```bash
+bun run skaha-auth-cleanup
+```
 
 ## Install Or Upgrade Cron
 
@@ -39,8 +104,23 @@ Install or upgrade:
 
 ```bash
 helm upgrade --install perfpulse-cron ./charts/cron \
-  --namespace canfar-perfpulse \
-  --create-namespace
+  --namespace canfar-perfpulse
+```
+
+Verify the control namespace resources:
+
+```bash
+helm list --namespace canfar-perfpulse
+kubectl get cronjobs,jobs,testruns,pods --namespace canfar-perfpulse
+kubectl get serviceaccount,role,rolebinding --namespace canfar-perfpulse
+```
+
+Verify the workload namespace Role and RoleBinding by exact name:
+
+```bash
+kubectl get role perfpulse-cron-workload-writer --namespace canfar-workloads
+kubectl get rolebinding perfpulse-cron-workload-writer --namespace canfar-workloads
+kubectl describe rolebinding perfpulse-cron-workload-writer --namespace canfar-workloads
 ```
 
 Cron checks are acceptance evidence. Direct success means Job accepted and visible. Kueue success
@@ -53,19 +133,20 @@ percentages, so a failed submission still counts against the selected surface.
 
 ## Run Cron Check Manually
 
-Trigger an installed cron check outside its schedule by creating a Job from the Helm-managed
-CronJob. Choose one surface:
+Trigger installed cron checks outside their schedule by creating one manual Job from each
+Helm-managed CronJob. By default, the chart creates one CronJob per surface:
 
-- `direct`
-- `kueue`
-- `skaha`
+- `perfpulse-cron-direct`
+- `perfpulse-cron-kueue`
+- `perfpulse-cron-skaha`
 
 ```bash
-SURFACE=direct
 RUN_ID="$(date -u +%Y%m%d%H%M%S)"
-kubectl create job "perfpulse-cron-${SURFACE}-manual-${RUN_ID}" \
-  --from="cronjob/perfpulse-cron-${SURFACE}" \
-  --namespace canfar-perfpulse
+for SURFACE in direct kueue skaha; do
+  kubectl create job "perfpulse-cron-${SURFACE}-manual-${RUN_ID}" \
+    --from="cronjob/perfpulse-cron-${SURFACE}" \
+    --namespace canfar-perfpulse
+done
 ```
 
 Watch the helper Job and the k6 `TestRun` it creates:
@@ -95,6 +176,16 @@ Benchmark runtime taxonomy:
 - `runClass=campaign`
 - `profile=campaign`
 - `campaignType=benchmark`
+
+For a small Direct and Kueue validation benchmark, select those two surfaces explicitly:
+
+```bash
+helm upgrade --install perfpulse-benchmark-small ./charts/campaign \
+  --namespace canfar-perfpulse \
+  --set campaign.totalJobs=10 \
+  --set campaign.logicalUsers=1 \
+  --set-json 'surfaces=["k8s-direct","k8s-kueue"]'
+```
 
 ## Select Campaign Surfaces
 
