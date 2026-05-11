@@ -3,8 +3,15 @@ import { readFileSync } from "node:fs";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
 const cronValues = readFileSync("charts/cron/values.yaml", "utf8");
+const dockerfile = readFileSync("Dockerfile", "utf8");
 
 describe("PerfPulse Helm charts", () => {
+  test("runtime image includes every binary required by k6 operator pods and workloads", () => {
+    expect(dockerfile).toContain("FROM alpine:3.22");
+    expect(dockerfile).toContain("COPY --from=k6 /usr/bin/k6 /usr/bin/k6");
+    expect(dockerfile).toMatch(/apk add --no-cache .*ca-certificates.*curl.*kubectl.*stress-ng/u);
+  });
+
   test("cron chart renders one non-overlapping 5-minute CronJob per default surface", () => {
     const manifest = helmTemplate("cron", ["--set", "image.tag=2026.05.04"]);
 

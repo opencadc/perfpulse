@@ -102,8 +102,9 @@ PerfPulse may observe for up to 10 minutes because queueing or platform delay ca
 
 All pods created by the Helm path should use the same released PerfPulse image: the cron helper,
 k6 Operator initializer/starter/runner pods, and the bounded workload pods or Skaha sessions. The
-image includes `k6`, `kubectl`, and `stress-ng` so chart users do not need separate helper or
-workload images.
+image includes `k6`, `curl`, `kubectl`, and `stress-ng` so chart users do not need separate helper
+or workload images. `curl` is required because the k6 Operator starter pod patches the runner
+status endpoint before execution starts.
 
 Release Please updates the package version, chart version, chart app version, and chart image tag.
 The chart default image tag should match the release tag, for example `v0.1.8`. Digest pinning is
