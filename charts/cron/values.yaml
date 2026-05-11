@@ -5,7 +5,7 @@ serviceAccount:
   name: canfar-perfpulse
 image:
   repository: images.opencadc.org/platform/perfpulse
-  tag: v0.1.9 # x-release-please-version
+  tag: v0.1.10 # x-release-please-version
 schedule: '*/5 * * * *'
 testDurationSeconds: 60
 observeSeconds: 600

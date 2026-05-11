@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.10](https://github.com/opencadc/perfpulse/compare/v0.1.9...v0.1.10) (2026-05-11)
+
+
+### Bug Fixes
+
+* **dockefile:** deps ([195bb47](https://github.com/opencadc/perfpulse/commit/195bb4791c70c39813ae48f87efe6bbaff634853))
+
 ## [0.1.9](https://github.com/opencadc/perfpulse/compare/v0.1.8...v0.1.9) (2026-05-11)
 
 
