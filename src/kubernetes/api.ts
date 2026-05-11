@@ -83,6 +83,7 @@ export function pollUntil<T>(
   intervalSeconds: number,
   read: () => T,
   done: (value: T) => boolean,
+  jitterMaxMs = 0,
 ): T | undefined {
   const deadline = Date.now() + timeoutSeconds * 1000;
   while (Date.now() <= deadline) {
@@ -90,7 +91,11 @@ export function pollUntil<T>(
     if (done(value)) {
       return value;
     }
-    sleep(intervalSeconds);
+    sleep(intervalSeconds + randomJitterSeconds(jitterMaxMs));
   }
   return undefined;
+}
+
+function randomJitterSeconds(jitterMaxMs: number): number {
+  return jitterMaxMs <= 0 ? 0 : (Math.random() * jitterMaxMs) / 1000;
 }

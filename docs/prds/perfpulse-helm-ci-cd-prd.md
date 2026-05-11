@@ -138,32 +138,32 @@ The deployment runbook should become a short Helm-based operator guide:
    small but still exercises real workload scheduling.
 8. As a platform operator, I want cron checks to observe for up to 10 minutes, so that expected
    queue delay does not create false failures.
-9. As a platform operator, I want cron success to be based on platform acceptance, so that a full
-   cluster does not fail a check only because completion is delayed.
+9. As a platform operator, I want cron success to wait for terminal completion with a long timeout,
+   so that a full cluster can delay work without creating a short false failure.
 10. As a platform operator, I want Direct cron success to mean a Job is created and visible, so
     that the Kubernetes API and Job lifecycle are proven.
 11. As a platform operator, I want Kueue cron success to mean a Workload is visible, so that queue
     acceptance is proven without requiring admission under capacity pressure.
 12. As a platform operator, I want Skaha cron success to mean a session POST returns a visible or
     Pending state, so that the user-facing platform path is proven.
-13. As a platform operator, I want completion latency recorded when available, so that the
-    dashboard can still show how long work took after acceptance.
-14. As a platform operator, I want completion to be evidence only, so that large campaigns do not
-    fail on expected capacity limits.
+13. As a platform operator, I want completion latency recorded for every submitted job or session,
+    so that the dashboard can show how long work took after acceptance.
+14. As a platform operator, I want cron completion to allow a large timeout, so that scheduled
+    checks can survive capacity pressure while still proving the workload eventually ran.
 15. As a platform operator, I want to run a campaign by passing `totalJobs`, so that I do not edit
     Kubernetes manifests for every run size.
 16. As a platform operator, I want to run a campaign by passing `logicalUsers`, so that submission
     concurrency is explicit.
 17. As a platform operator, I want `totalJobs` to be per surface, so that selected surfaces are
     compared using the same workload count.
-18. As a platform operator, I want `totalJobs` to divide evenly across `logicalUsers`, so that
-    every logical user has the same number of sequential submissions.
+18. As a platform operator, I want exact `totalJobs` even when it does not divide evenly across
+    `logicalUsers`, so that any requested job count can run without rounding or padding.
 19. As a dashboard user, I want expected work emitted per surface, so that acceptance, visibility
     failure, and cleanup percentages are based on planned work rather than only submitted work.
-20. As a platform operator, I want invalid job/user shapes rejected before work is created, so
-    that a bad campaign configuration does not partially run.
-21. As a platform operator, I want each logical user to submit its jobs sequentially, so that the
-    user shape is predictable and does not create a hidden parallel burst.
+20. As a platform operator, I want invalid job/user safety gates rejected before work is created,
+    so that a bad campaign configuration does not partially run.
+21. As a platform operator, I want each logical user to run one full job lifecycle at a time, so
+    that submit, visibility, terminal completion, and cleanup are tied to the same unit of work.
 22. As a platform operator, I want logical users above 25 to require confirmation, so that high
     concurrency is intentional.
 23. As a platform operator, I want more than 10,000 jobs per surface to require a stress campaign,
@@ -259,8 +259,8 @@ The deployment runbook should become a short Helm-based operator guide:
 - Cron-generated test IDs must be stable enough for Grafana filtering and cleanup.
 - The cron workload duration is 60 seconds.
 - The cron observation window is up to 10 minutes.
-- The cron success model is platform acceptance, not completion.
-- Completion metrics remain useful but do not define the hard gate.
+- The cron success model waits for terminal completion with a long default timeout.
+- Completion metrics are part of the success gate and remain visible in Grafana.
 - Cron emits one expected job per enabled surface.
 
 ### Campaign Chart Behavior
@@ -272,10 +272,12 @@ The deployment runbook should become a short Helm-based operator guide:
 - Each selected surface emits `perfpulse_jobs_expected=totalJobs`.
 - The default selected surfaces are Direct, Kueue, and Skaha.
 - Operators can override surfaces for targeted diagnosis.
-- `totalJobs` must divide evenly across `logicalUsers`.
-- Each logical user submits its assigned jobs sequentially.
-- Campaign success is platform acceptance, not completion.
-- Completion is recorded when available and should appear in evidence.
+- Campaigns use shared k6 iterations so exact `totalJobs` run across bounded `logicalUsers`.
+- Each logical user runs one complete job lifecycle at a time: submit, visible, terminal
+  completion, cleanup, then the next job.
+- Campaign success requires submission, visibility, terminal completion, and cleanup attempts for
+  each submitted unit of work.
+- Completion is recorded for every submitted job or session and should appear in evidence.
 - A campaign release should be removable with standard Helm uninstall semantics.
 
 ### Campaign Safety Gates
@@ -302,14 +304,16 @@ The deployment runbook should become a short Helm-based operator guide:
 
 ### Acceptance Gates
 
-- Direct Kubernetes acceptance means the Job create request succeeds and the Job becomes visible.
-- Kueue acceptance means the Job create request succeeds and the corresponding Kueue Workload is
-  visible.
-- Skaha acceptance means the session POST succeeds and returns a recognizable visible or Pending
-  platform state.
+- Direct Kubernetes lifecycle success means the Job create request succeeds, the Job becomes
+  visible, and the Job reaches `Complete`.
+- Kueue lifecycle success means the Job create request succeeds, the Job and corresponding Kueue
+  Workload become visible, admission is measured, and the Job reaches `Complete`.
+- Skaha lifecycle success means the session POST returns a session id, that id is used to poll
+  session status through `Pending` or `Running`, and the session reaches `Completed` or
+  `Succeeded`.
 - Kueue admission is measured separately and can be displayed as evidence.
-- Workload completion is measured separately and can be displayed as evidence.
-- Completion should not be required for cron or campaign success.
+- Workload completion is measured and required for cron and campaign success within the configured
+  timeout.
 - Cleanup failures should still be visible and should remain a safety signal.
 
 ### Release Please

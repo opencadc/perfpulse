@@ -6,7 +6,7 @@ describe("k6 options contract", () => {
   test("runs the Kind smoke as exactly one bounded shared-iterations workload", () => {
     const options = createOptions(
       resolveRunConfig({
-        COMPLETION_GATE_SECONDS: "120",
+        COMPLETION_TIMEOUT_SECONDS: "120",
         VISIBILITY_GATE_SECONDS: "60",
       }),
     );
@@ -21,19 +21,20 @@ describe("k6 options contract", () => {
     });
   });
 
-  test("keeps failure thresholds focused on acceptance gates", () => {
+  test("keeps failure thresholds focused on lifecycle gates", () => {
     const options = createOptions(resolveRunConfig({}));
 
     expect(Object.keys(options.thresholds ?? {}).sort()).toEqual([
       "checks",
       "http_req_failed",
       "perfpulse_cleanup_failed",
+      "perfpulse_jobs_completion_failed",
       "perfpulse_jobs_submission_failed",
       "perfpulse_jobs_visibility_failed",
     ]);
   });
 
-  test("does not add campaign completion gates", () => {
+  test("adds campaign completion failure gates", () => {
     const options = createOptions(
       resolveRunConfig({
         CAMPAIGN_TYPE: "benchmark",
@@ -48,12 +49,13 @@ describe("k6 options contract", () => {
       "checks",
       "http_req_failed",
       "perfpulse_cleanup_failed",
+      "perfpulse_jobs_completion_failed",
       "perfpulse_jobs_submission_failed",
       "perfpulse_jobs_visibility_failed",
     ]);
   });
 
-  test("uses an arrival-rate executor for stress campaigns", () => {
+  test("uses exact-job shared iterations for stress campaigns", () => {
     const options = createOptions(
       resolveRunConfig({
         CAMPAIGN_TYPE: "stress",
@@ -67,13 +69,14 @@ describe("k6 options contract", () => {
     const scenario = options.scenarios?.campaign;
 
     expect(scenario).toMatchObject({
-      executor: "constant-arrival-rate",
-      preAllocatedVUs: 100,
-      timeUnit: "1s",
+      executor: "shared-iterations",
+      iterations: 10000,
+      maxDuration: "259320s",
+      vus: 100,
     });
   });
 
-  test("keeps stress campaign thresholds limited to safety and acceptance failures", () => {
+  test("keeps stress campaign thresholds limited to lifecycle failures", () => {
     const options = createOptions(
       resolveRunConfig({
         CAMPAIGN_TYPE: "stress",
@@ -87,6 +90,7 @@ describe("k6 options contract", () => {
 
     expect(Object.keys(options.thresholds ?? {}).sort()).toEqual([
       "perfpulse_cleanup_failed",
+      "perfpulse_jobs_completion_failed",
       "perfpulse_jobs_submission_failed",
       "perfpulse_jobs_visibility_failed",
     ]);

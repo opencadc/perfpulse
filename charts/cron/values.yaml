@@ -11,6 +11,9 @@ workload:
 schedule: '*/5 * * * *'
 testDurationSeconds: 60
 observeSeconds: 600
+completionTimeoutSeconds: 86400
+submissionJitterMaxMs: 1000
+pollJitterMaxMs: 1000
 otlp:
   credentialsSecretName: perfpulse-otlp-credentials
   endpoint: kube-prometheus-stack-prometheus.monitoring:9090

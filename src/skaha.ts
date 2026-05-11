@@ -84,6 +84,7 @@ export type SkahaPollUntil = <T>(
   intervalSeconds: number,
   read: () => T,
   done: (value: T) => boolean,
+  jitterMaxMs?: number,
 ) => T | undefined;
 
 export type SkahaFailureStage = "submission" | "visibility" | "completion";
@@ -94,8 +95,9 @@ export interface SkahaSurfaceFailure {
 }
 
 export interface SkahaSurfaceConfig {
-  completionGateSeconds: number;
+  completionTimeoutSeconds: number;
   pollIntervalSeconds: number;
+  pollJitterMaxMs: number;
   requireCompletion?: boolean;
   session: SkahaCreateSessionParams;
   visibilityGateSeconds: number;
@@ -229,6 +231,7 @@ export function runSkahaSurface(
     config.pollIntervalSeconds,
     () => client.getSession(createResponse.sessionId as string),
     (result) => result.found && result.status !== undefined,
+    config.pollJitterMaxMs,
   );
   if (visibleSession === undefined || !visibleSession.found) {
     return {
@@ -255,11 +258,12 @@ export function runSkahaSurface(
   }
 
   const completedSession = pollUntil(
-    config.completionGateSeconds,
+    config.completionTimeoutSeconds,
     config.pollIntervalSeconds,
     () => client.getSession(createResponse.sessionId as string),
     (result) =>
       isSuccessfulCompletionStatus(result.status) || isTerminalFailureStatus(result.status),
+    config.pollJitterMaxMs,
   );
 
   if (!isSuccessfulCompletionStatus(completedSession?.status)) {
@@ -267,7 +271,7 @@ export function runSkahaSurface(
       completed: false,
       createResponse,
       failure: {
-        message: `Skaha session did not reach Succeeded or Completed within ${config.completionGateSeconds}s`,
+        message: `Skaha session ${createResponse.sessionId} did not reach Succeeded or Completed within ${config.completionTimeoutSeconds}s`,
         stage: "completion",
       },
       submissionDurationMs,

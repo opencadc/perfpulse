@@ -48,6 +48,8 @@ describe("direct Kubernetes Kueue surface", () => {
     expect(result.workloadVisibilityLatencyMs).toBe(300);
     expect(result.admitted).toBe(true);
     expect(result.admissionLatencyMs).toBe(600);
+    expect(result.completed).toBe(true);
+    expect(result.completionLatencyMs).toBe(600);
     expect(createdManifests).toHaveLength(1);
     expect(createdManifests[0]?.spec.suspend).toBe(true);
     expect(createdManifests[0]?.metadata.labels["kueue.x-k8s.io/queue-name"]).toBe("cadc-default");
@@ -94,6 +96,7 @@ describe("direct Kubernetes Kueue surface", () => {
     expect(result.jobVisible).toBe(true);
     expect(result.workloadVisible).toBe(true);
     expect(result.admitted).toBe(false);
+    expect(result.completed).toBe(true);
     expect(pollCount).toBe(3);
   });
 });
@@ -106,7 +109,12 @@ function createClient(overrides: Partial<KueueKubernetesClient> = {}): KueueKube
     listJobsByTestId(): JobListLike {
       return (
         overrides.listJobsByTestId?.() ?? {
-          items: [{ metadata: { name: "perfpulse-kueue-spot-kueue-0" } }],
+          items: [
+            {
+              metadata: { name: "perfpulse-kueue-spot-kueue-0" },
+              status: { conditions: [{ status: "True", type: "Complete" }] },
+            },
+          ],
         }
       );
     },

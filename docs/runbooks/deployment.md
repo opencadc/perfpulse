@@ -123,13 +123,15 @@ kubectl get rolebinding perfpulse-cron-workload-writer --namespace canfar-worklo
 kubectl describe rolebinding perfpulse-cron-workload-writer --namespace canfar-workloads
 ```
 
-Cron checks are acceptance evidence. Direct success means Job accepted and visible. Kueue success
-means Workload visible. Skaha success means session POST accepted and visible or discoverable.
-Completion is evidence, not the success gate.
+Cron checks are lifecycle evidence. Direct success means Job accepted, visible, and terminal. Kueue
+success means Job and Workload visible, with the Job reaching a terminal state. Skaha success means
+session POST accepted, visible by returned session id, and terminal. The default cron completion
+timeout is 24 hours so checks can reveal resource-backlog behavior instead of failing quickly while
+the cluster is full.
 
 Each cron surface currently has one expected job. The dashboard emits and displays
-`perfpulse_jobs_expected` as the denominator for acceptance, visibility failure, and cleanup
-percentages, so a failed submission still counts against the selected surface.
+`perfpulse_jobs_expected` as the denominator for acceptance, visibility failure, completion
+failure, and cleanup percentages, so a failed submission still counts against the selected surface.
 
 ## Run Cron Check Manually
 
@@ -163,9 +165,11 @@ Manual benchmark uses the `campaign` chart. Campaign releases are intentionally 
 removed after evidence capture.
 
 ```bash
+TESTID="benchmark-$(date -u +%Y%m%d%H%M%S)"
 helm upgrade --install perfpulse-benchmark ./charts/campaign \
   --namespace canfar-perfpulse \
   --set campaign.type=benchmark \
+  --set campaign.testid="${TESTID}" \
   --set campaign.totalJobs=1000 \
   --set campaign.logicalUsers=100 \
   --set campaign.confirmHighUsers=true
@@ -177,11 +181,23 @@ Benchmark runtime taxonomy:
 - `profile=campaign`
 - `campaignType=benchmark`
 
+Benchmarks use exact-job lifecycle execution. k6 runs `campaign.totalJobs` shared iterations with
+up to `campaign.logicalUsers` VUs. Each VU submits one job or session, confirms it is visible, waits
+until it reaches a terminal state, cleans it up, waits for jitter, and then takes the next shared
+iteration. Direct and Kueue wait for Kubernetes Job `Complete` or `Failed`. Skaha uses the returned
+session id and polls that session until it transitions from `Pending` or `Running` to `Completed`,
+`Succeeded`, `Failed`, or `Error`.
+
+Always pass a unique `campaign.testid`. Reusing a testid makes Grafana and Prometheus aggregate
+separate campaign runs.
+
 For a small Direct and Kueue validation benchmark, select those two surfaces explicitly:
 
 ```bash
+TESTID="benchmark-small-$(date -u +%Y%m%d%H%M%S)"
 helm upgrade --install perfpulse-benchmark-small ./charts/campaign \
   --namespace canfar-perfpulse \
+  --set campaign.testid="${TESTID}" \
   --set campaign.totalJobs=10 \
   --set campaign.logicalUsers=1 \
   --set-json 'surfaces=["k8s-direct","k8s-kueue"]'
@@ -215,9 +231,11 @@ campaign expects 100 sessions, submits 90, and sees 80 become visible, the visib
 Use `surfaces` for a single-surface diagnostic campaign. Skaha only:
 
 ```bash
+TESTID="benchmark-skaha-$(date -u +%Y%m%d%H%M%S)"
 helm upgrade --install perfpulse-skaha ./charts/campaign \
   --namespace canfar-perfpulse \
   --set campaign.type=benchmark \
+  --set campaign.testid="${TESTID}" \
   --set campaign.totalJobs=1000 \
   --set campaign.logicalUsers=100 \
   --set campaign.confirmHighUsers=true \
@@ -227,9 +245,11 @@ helm upgrade --install perfpulse-skaha ./charts/campaign \
 Direct Kubernetes only:
 
 ```bash
+TESTID="benchmark-direct-$(date -u +%Y%m%d%H%M%S)"
 helm upgrade --install perfpulse-direct ./charts/campaign \
   --namespace canfar-perfpulse \
   --set campaign.type=benchmark \
+  --set campaign.testid="${TESTID}" \
   --set campaign.totalJobs=1000 \
   --set campaign.logicalUsers=100 \
   --set campaign.confirmHighUsers=true \
@@ -239,9 +259,11 @@ helm upgrade --install perfpulse-direct ./charts/campaign \
 Kueue only:
 
 ```bash
+TESTID="benchmark-kueue-$(date -u +%Y%m%d%H%M%S)"
 helm upgrade --install perfpulse-kueue ./charts/campaign \
   --namespace canfar-perfpulse \
   --set campaign.type=benchmark \
+  --set campaign.testid="${TESTID}" \
   --set campaign.totalJobs=1000 \
   --set campaign.logicalUsers=100 \
   --set campaign.confirmHighUsers=true \
@@ -254,9 +276,11 @@ Stress can create high control-plane pressure. Run it only in an approved window
 confirmation in values.
 
 ```bash
+TESTID="stress-$(date -u +%Y%m%d%H%M%S)"
 helm upgrade --install perfpulse-stress ./charts/campaign \
   --namespace canfar-perfpulse \
   --set campaign.type=stress \
+  --set campaign.testid="${TESTID}" \
   --set campaign.totalJobs=10000 \
   --set campaign.logicalUsers=100 \
   --set campaign.confirmHighUsers=true \
@@ -269,9 +293,9 @@ Stress runtime taxonomy:
 - `profile=campaign`
 - `campaignType=stress`
 
-Stress evidence focuses on accepted work, visible work, rejection categories, API-server pressure,
-Kueue controller health, workload execution, Grafana visibility, and cleanup status. Completion is
-recorded when available.
+Stress uses the same exact-job lifecycle as benchmark, with larger sizing and explicit confirmation.
+Evidence focuses on accepted work, visible work, completion, rejection categories, API-server
+pressure, Kueue controller health, workload execution, Grafana visibility, and cleanup status.
 
 ## Dashboard Evidence
 
@@ -297,7 +321,8 @@ surface. Counts remain available in the diagnosis matrix.
 - `k6_data_sent_bytes_total`
 - `k6_data_received_bytes_total`
 
-Completion is evidence, not the success gate.
+Completion is part of the success gate. A run is incomplete if expected jobs are not submitted,
+visible, completed, and cleaned up for the selected surface.
 
 ## Uninstall Campaign Release
 

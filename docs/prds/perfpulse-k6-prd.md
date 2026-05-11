@@ -63,8 +63,9 @@ Spot-check success is:
 
 - Submission succeeds.
 - The created work becomes visible within the configured visibility gate.
-- Tiny direct Kubernetes and Skaha work reaches the configured completion gate.
-- Kueue Workloads are admitted within the configured admission gate.
+- Tiny direct Kubernetes and Skaha work reaches terminal completion within the configured
+  completion timeout.
+- Kueue Workloads become visible and admission is recorded as a diagnostic signal.
 - Cleanup succeeds.
 - Expected low-cardinality metrics appear in Prometheus and Grafana.
 - A failed run is categorized well enough to identify whether the problem is auth, Kubernetes
@@ -211,7 +212,7 @@ Acceptance:
 - The runner authenticates to the Kubernetes API with a service account.
 - The runner creates exactly one direct Kubernetes Job without Kueue labels.
 - The Job is visible by PerfPulse labels.
-- The Job completes within the configured completion gate.
+- The Job completes within the configured completion timeout.
 - The runner cleanup removes the Job.
 - The script stores `k6-web-dashboard.html`, runner logs, `TestRun` describe output, and
   post-cleanup workload Job state under `artifacts/kind-smoke/<testid>/` after the `TestRun`
@@ -243,7 +244,7 @@ Acceptance:
 - The runner authenticates to the Kubernetes API.
 - The direct Job create call succeeds.
 - The Job is visible by PerfPulse labels.
-- The Job completes within the 120s completion gate.
+- The Job completes within the 120s completion timeout.
 - The runner emits submission, visibility, completion, HTTP, check, and cleanup metrics.
 - Prometheus stores the metrics with only approved tags.
 - The repo-managed Grafana dashboard can query the run by `testid`.
@@ -538,7 +539,7 @@ Completion success means:
 
 - The Job create call returned success.
 - The Job is visible through Kubernetes list/get by PerfPulse labels.
-- The Job reaches `Complete` within the configured completion gate for spot profiles.
+- The Job reaches `Complete` within the configured completion timeout for spot profiles.
 
 This surface is both a baseline comparator and an independent cluster sanity path.
 
@@ -580,16 +581,17 @@ spec.ttlSecondsAfterFinished=<configured TTL>
 spec.activeDeadlineSeconds=<bounded deadline>
 ```
 
-Admission success for this surface means:
+Lifecycle success for this surface means:
 
 - The Job create call returned success.
 - The Job is visible through Kubernetes list/get by PerfPulse labels.
 - The corresponding Kueue Workload becomes visible.
-- The corresponding Kueue Workload is admitted within the configured admission gate.
+- Kueue admission is recorded when observed.
+- The Job reaches `Complete` within the configured completion timeout.
 
-For spot checks, visible-but-not-admitted is a hard failure because the tiny workload should
-enter the queue and be admitted quickly. For stress campaigns, accepted and visible/admitted
-counts are recorded separately so capacity limits are characterized rather than hidden.
+Visible-but-not-admitted remains a diagnostic signal, not a separate gate. Cron and campaign runs
+wait for terminal Job completion within the configured timeout so delayed admission is visible as
+queueing time rather than a second failure mode.
 
 ### Skaha API
 
@@ -608,10 +610,12 @@ Completion success means:
 - `GET /session/{id}` returns a recognizable session object.
 - The session status is `Pending`, `Running`, `Succeeded`, `Completed`, or another expected Skaha status
   that proves the session has entered the platform status model.
-- For spot profiles, the session reaches `Succeeded` or `Completed` within the configured completion gate.
+- For spot profiles, the session reaches `Succeeded` or `Completed` within the configured
+  completion timeout.
 
-For stress campaigns, `Pending` or queued visibility is enough for the primary success path,
-with completion recorded separately when feasible. For spot checks, completion is a hard gate.
+For stress campaigns and benchmark campaigns, `Pending` or queued visibility is not enough by
+itself. The session id returned from creation is used for status polling until `Succeeded` or
+`Completed`, or until a terminal failure or timeout is observed.
 
 ## Workload Design
 
@@ -866,18 +870,22 @@ total_jobs: 100
 
 This models concurrent users applying pressure while other work exists in the cluster.
 
-### `throughput-stress`
+### Exact-Job Stress
 
-The test drives a target creation rate or controlled concurrency and records:
+Stress uses the same exact-job lifecycle model as benchmark runs. The test runs a bounded number
+of shared iterations and records:
 
 - Accepted jobs per second.
 - Failed submissions.
 - Visibility latency.
+- Completion latency and terminal failures.
 - Dropped iterations.
 - API response status distribution.
 - Queue visibility over time.
 
-This is the right shape when the question is "how fast can this surface accept work?"
+This is the right shape when the question is "can this surface submit, observe, complete, and
+clean up this many jobs?" PerfPulse does not use an open-ended throughput executor for stress
+campaigns.
 
 ### Mixed Background and Foreground Pressure
 
@@ -900,7 +908,7 @@ Use small closed-model scenarios. A tiny number of VUs is enough.
 Recommended executor:
 
 ```text
-shared-iterations or per-vu-iterations
+shared-iterations
 ```
 
 Rationale:
@@ -924,26 +932,29 @@ Rationale:
 - VU count should be bounded to avoid k6 runner overhead becoming the measured bottleneck.
 - Logical users are represented by stable synthetic buckets, not by one VU per real user.
 
-### Throughput Stress
+### Stress Campaigns
 
-Use an open-model executor.
+Use the same closed exact-job executor as benchmarks, with larger `totalJobs`, explicit operator
+confirmation, and longer timeouts.
 
 Recommended executor:
 
 ```text
-constant-arrival-rate or ramping-arrival-rate
+shared-iterations
 ```
 
 Rationale:
 
-- The test asks how many create attempts per time unit the target can sustain.
-- `dropped_iterations` becomes a meaningful signal when k6 cannot keep up.
-- `preAllocatedVUs` and `maxVUs` must be sized from observed p95 create latency.
+- The test asks whether the requested number of jobs can pass the full lifecycle.
+- `iterations=totalJobs` preserves exact expected-work accounting.
+- `vus=logicalUsers` bounds parallel lifecycle workers without requiring `totalJobs` to divide
+  evenly across users.
 
 ### Completion Tracking
 
-Completion tracking should not create one VU per Job. For large tests, aggregate polling by
-labels should record cohort-level state.
+Completion tracking is part of each iteration. A VU submits one job or session, confirms
+visibility, waits for terminal completion with poll jitter, performs cleanup, and then takes the
+next shared iteration if one remains.
 
 ## Metrics
 
@@ -970,11 +981,11 @@ Do not name k6 Counters with `_total` in code.
 | `perfpulse_jobs_submitted` | Count accepted Job/session create attempts. |
 | `perfpulse_jobs_submission_failed` | Count create attempts that failed. |
 | `perfpulse_jobs_visible` | Count Jobs/sessions that became visible. |
-| `perfpulse_jobs_visibility_failed` | Count Jobs/sessions that did not become visible within the gate. |
+| `perfpulse_jobs_visibility_failed` | Count Jobs/sessions that did not become visible within the visibility gate. |
 | `perfpulse_jobs_completed` | Count Jobs/sessions that reached the required terminal state. |
-| `perfpulse_jobs_completion_failed` | Count Jobs/sessions that did not complete within the gate. |
-| `perfpulse_kueue_workloads_admitted` | Count Kueue Workloads admitted within the gate. |
-| `perfpulse_kueue_workloads_admission_failed` | Count Kueue Workloads visible but not admitted within the gate. |
+| `perfpulse_jobs_completion_failed` | Count Jobs/sessions that did not complete within the completion timeout. |
+| `perfpulse_kueue_workloads_admitted` | Count Kueue Workloads observed as admitted. |
+| `perfpulse_kueue_workloads_admission_failed` | Count Kueue admission failures when admission is configured as a gate. |
 | `perfpulse_cleanup_deleted` | Count resources deleted during cleanup. |
 | `perfpulse_cleanup_failed` | Count cleanup delete failures. |
 
@@ -1085,7 +1096,7 @@ Do not use a raw session ID or job ID as a Prometheus tag.
 
 ### First PoC Thresholds
 
-The first PoC should use a loose but end-to-end completion gate:
+The first PoC should use a loose but end-to-end completion timeout:
 
 - Create calls must succeed.
 - The created direct Kubernetes Job must become visible within 60s.
@@ -1096,7 +1107,7 @@ The first PoC should use a loose but end-to-end completion gate:
 
 The 60s visibility gate is intentionally loose. It catches broken auth, missing status
 propagation, bad labels, and stuck polling without pretending the cluster baseline is already
-known. The 120s completion gate gives the tiny `stress-ng` Job enough room for scheduling,
+known. The 120s completion timeout gives the tiny `stress-ng` Job enough room for scheduling,
 image pull, execution, status propagation, and polling without allowing a stuck path to hide.
 Kueue and Skaha receive their own first-run gates when those surfaces are added.
 

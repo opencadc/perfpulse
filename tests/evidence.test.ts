@@ -78,7 +78,7 @@ describe("run evidence report", () => {
       campaignType: "benchmark" as const,
       cleanupResult: "succeeded" as const,
       completedWorkCount: 95,
-      executor: "constant-arrival-rate",
+      executor: "shared-iterations",
       expectedWorkCount: 100,
       imageTag: "ghcr.io/opencadc/perfpulse:v1",
       profile: "campaign",

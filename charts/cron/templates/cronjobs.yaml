@@ -17,7 +17,7 @@ spec:
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
-      activeDeadlineSeconds: 1260
+      activeDeadlineSeconds: {{ add (int $.Values.completionTimeoutSeconds) (int $.Values.observeSeconds) 60 }}
       backoffLimit: 0
       ttlSecondsAfterFinished: 900
       template:

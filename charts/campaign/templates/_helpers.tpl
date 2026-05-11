@@ -50,13 +50,16 @@ seccompProfile:
 {{- define "perfpulse.validateCampaign" -}}
 {{- $_ := required "campaign.totalJobs is required" .Values.campaign.totalJobs -}}
 {{- $_ := required "campaign.logicalUsers is required" .Values.campaign.logicalUsers -}}
+{{- $_ := required "campaign.testid is required" .Values.campaign.testid -}}
+{{- if hasKey .Values.campaign "completionGateSeconds" -}}{{ fail "campaign.completionGateSeconds has been replaced by campaign.completionTimeoutSeconds" }}{{- end -}}
 {{- if and (eq .Values.campaign.type "stress") (not .Values.campaign.confirmStress) -}}{{ fail "stress campaigns require campaign.confirmStress=true" }}{{- end -}}
 {{- if and (ne .Values.campaign.type "benchmark") (ne .Values.campaign.type "stress") -}}{{ fail "campaign.type must be benchmark or stress" }}{{- end -}}
 {{- if lt (int .Values.campaign.totalJobs) 1 -}}{{ fail "campaign.totalJobs must be greater than 0" }}{{- end -}}
 {{- if lt (int .Values.campaign.logicalUsers) 1 -}}{{ fail "campaign.logicalUsers must be greater than 0" }}{{- end -}}
-{{- if ne (mod (int .Values.campaign.totalJobs) (int .Values.campaign.logicalUsers)) 0 -}}{{ fail "campaign.totalJobs must divide evenly across campaign.logicalUsers" }}{{- end -}}
 {{- if and (gt (int .Values.campaign.logicalUsers) 25) (not .Values.campaign.confirmHighUsers) -}}{{ fail "campaign.logicalUsers above 25 require campaign.confirmHighUsers=true" }}{{- end -}}
 {{- if and (gt (int .Values.campaign.totalJobs) 10000) (ne .Values.campaign.type "stress") -}}{{ fail "campaign.totalJobs above 10000 requires campaign.type=stress" }}{{- end -}}
 {{- if lt (int .Values.campaign.visibilityGateSeconds) 1 -}}{{ fail "campaign.visibilityGateSeconds must be greater than 0" }}{{- end -}}
-{{- if lt (int .Values.campaign.completionGateSeconds) (int .Values.campaign.visibilityGateSeconds) -}}{{ fail "campaign.completionGateSeconds must be greater than or equal to campaign.visibilityGateSeconds" }}{{- end -}}
+{{- if lt (int .Values.campaign.completionTimeoutSeconds) (int .Values.campaign.visibilityGateSeconds) -}}{{ fail "campaign.completionTimeoutSeconds must be greater than or equal to campaign.visibilityGateSeconds" }}{{- end -}}
+{{- if lt (int .Values.campaign.submissionJitterMaxMs) 0 -}}{{ fail "campaign.submissionJitterMaxMs must be greater than or equal to 0" }}{{- end -}}
+{{- if lt (int .Values.campaign.pollJitterMaxMs) 0 -}}{{ fail "campaign.pollJitterMaxMs must be greater than or equal to 0" }}{{- end -}}
 {{- end -}}

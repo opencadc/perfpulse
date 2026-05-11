@@ -198,7 +198,7 @@ describe("Grafana dashboard contracts", () => {
     expect(panelDescriptions["Completion Latency When Observed"]).toContain(
       "measured from accepted create response",
     );
-    expect(panelDescriptions["Completion Latency When Observed"]).toContain("evidence-only");
+    expect(panelDescriptions["Completion Latency When Observed"]).toContain("wait for completion");
     expect(panelDescriptions["Kueue Admission Latency"]).toContain(
       "measured from accepted create response",
     );

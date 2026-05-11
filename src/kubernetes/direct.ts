@@ -1,6 +1,12 @@
 import type { RunConfig } from "../config";
 import { buildDirectJobManifest, type KubernetesJobManifest } from "./job";
-import { findJobByName, isJobComplete, type JobListLike } from "./status";
+import {
+  findJobByName,
+  isJobComplete,
+  isJobFailed,
+  type JobLike,
+  type JobListLike,
+} from "./status";
 
 export interface KubernetesResponseLike {
   body?: unknown;
@@ -17,6 +23,7 @@ export type PollUntil = <T>(
   intervalSeconds: number,
   read: () => T,
   done: (value: T) => boolean,
+  jitterMaxMs?: number,
 ) => T | undefined;
 
 export type DirectKubernetesFailureStage = "submission" | "visibility" | "completion";
@@ -68,6 +75,7 @@ export function runDirectKubernetesSurface(
     config.kubernetes.pollIntervalSeconds,
     () => client.listJobsByTestId(),
     (list) => findJobByName(list, config.jobName) !== undefined,
+    config.pollJitterMaxMs,
   );
   if (visibleList === undefined) {
     return {
@@ -84,14 +92,57 @@ export function runDirectKubernetesSurface(
 
   const visibilityLatencyMs = now() - submittedAt;
   const visibleJob = findJobByName(visibleList, config.jobName);
-  const completed = visibleJob !== undefined && isJobComplete(visibleJob);
+  const terminalJob = isTerminalJob(visibleJob)
+    ? visibleJob
+    : findJobByName(
+        pollUntil(
+          config.completionTimeoutSeconds,
+          config.kubernetes.pollIntervalSeconds,
+          () => client.listJobsByTestId(),
+          (list) => isTerminalJob(findJobByName(list, config.jobName)),
+          config.pollJitterMaxMs,
+        ) ?? {},
+        config.jobName,
+      );
+
+  if (terminalJob === undefined) {
+    return {
+      completed: false,
+      createResponse,
+      failure: {
+        message: `Kubernetes Job ${config.jobName} did not complete within ${config.completionTimeoutSeconds}s`,
+        stage: "completion",
+      },
+      submissionDurationMs,
+      visible: true,
+      visibilityLatencyMs,
+    };
+  }
+
+  if (isJobFailed(terminalJob)) {
+    return {
+      completed: false,
+      createResponse,
+      failure: {
+        message: `Kubernetes Job ${config.jobName} reached Failed`,
+        stage: "completion",
+      },
+      submissionDurationMs,
+      visible: true,
+      visibilityLatencyMs,
+    };
+  }
 
   return {
-    completed,
-    ...(completed ? { completionLatencyMs: visibilityLatencyMs } : {}),
+    completed: true,
+    completionLatencyMs: now() - submittedAt,
     createResponse,
     submissionDurationMs,
     visible: true,
     visibilityLatencyMs,
   };
+}
+
+function isTerminalJob(job: JobLike | undefined): boolean {
+  return job !== undefined && (isJobComplete(job) || isJobFailed(job));
 }

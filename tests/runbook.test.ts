@@ -58,6 +58,7 @@ describe("PerfPulse runbooks", () => {
     expect(runbook).toContain("--set-json 'surfaces=[\"k8s-kueue\"]'");
     expect(runbook).toContain("helm upgrade --install perfpulse-stress");
     expect(runbook).toContain("--set campaign.type=benchmark");
+    expect(runbook).toContain("--set campaign.testid=");
     expect(runbook).toContain("--set campaign.totalJobs=1000");
     expect(runbook).toContain("--set campaign.logicalUsers=100");
     expect(runbook).toContain("--set campaign.confirmHighUsers=true");
@@ -75,7 +76,7 @@ describe("PerfPulse runbooks", () => {
     expect(runbook).not.toContain("--set totalJobs=");
     expect(runbook).not.toContain("--set logicalUsers=");
     expect(runbook).toContain("helm uninstall perfpulse-benchmark");
-    expect(runbook).toContain("Completion is evidence, not the success gate.");
+    expect(runbook).toContain("Completion is part of the success gate.");
     expect(runbook).toContain("Dashboard evidence");
     expect(runbook).toContain("Expected Jobs");
     expect(normalizedRunbook).toContain("Target State Reached");
@@ -95,6 +96,8 @@ describe("PerfPulse runbooks", () => {
       "--set",
       "campaign.type=benchmark",
       "--set",
+      "campaign.testid=benchmark-20260511",
+      "--set",
       "campaign.totalJobs=1000",
       "--set",
       "campaign.logicalUsers=100",
@@ -108,6 +111,8 @@ describe("PerfPulse runbooks", () => {
       "canfar-perfpulse",
       "--set",
       "campaign.type=stress",
+      "--set",
+      "campaign.testid=stress-20260511",
       "--set",
       "campaign.totalJobs=10000",
       "--set",

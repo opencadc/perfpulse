@@ -228,7 +228,7 @@
       ],
       "title": "Diagnosis Matrix",
       "type": "table",
-      "description": "Surface-level funnel counts shown as one table. Expected is the planned jobs per selected surface; Submitted is the accepted create response count; Visible and Target state are work observed after that response. Completion and Kueue admission are evidence-only signals."
+      "description": "Surface-level funnel counts shown as one table. Expected is the planned jobs per selected surface; Submitted is the accepted create response count; Visible and Target state are work observed after that response. Campaign and cron runs now wait for terminal completion before cleanup."
     },
     {
       "datasource": {
@@ -606,7 +606,7 @@
       ],
       "title": "Run Outcome Trend",
       "type": "timeseries",
-      "description": "Accepted and visible work by test and surface over time. Completion and Kueue admission are evidence-only signals."
+      "description": "Accepted and visible work by test and surface over time. Completion is part of the per-job lifecycle; Kueue admission remains a separate diagnostic signal."
     },
     {
       "datasource": {
@@ -671,7 +671,7 @@
       ],
       "title": "Target State Reached",
       "type": "timeseries",
-      "description": "Acceptance target percentage by surface: visible work divided by expected jobs for the selected run. Completion remains evidence-only."
+      "description": "Target-state percentage by surface: visible work divided by expected jobs for the selected run. Completion latency and failures show whether visible work reached a terminal state."
     },
     {
       "datasource": {
@@ -961,7 +961,7 @@
       ],
       "title": "Completion Latency When Observed",
       "type": "timeseries",
-      "description": "Optional post-submit completion latency, measured from accepted create response until terminal completion when the surface observes one. Completion is evidence-only and missing data does not mean the run failed."
+      "description": "Post-submit completion latency, measured from accepted create response until terminal completion. Campaign and cron runs now wait for completion before each lifecycle iteration finishes."
     },
     {
       "datasource": {

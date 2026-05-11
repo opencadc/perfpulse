@@ -67,7 +67,6 @@ export interface SkahaConfig {
   loginUrl: string;
   passwordPath: string;
   requestTimeoutSeconds: number;
-  submissionStaggerSeconds: number;
   usernamePath: string;
 }
 
@@ -76,7 +75,7 @@ export interface RunConfig {
   cleanup: boolean;
   clientMode: ClientMode;
   cohort: "baseline";
-  completionGateSeconds: number;
+  completionTimeoutSeconds: number;
   jobIndex: number;
   jobName: string;
   jobProfile: JobProfile;
@@ -87,6 +86,7 @@ export interface RunConfig {
   logicalUsers: number;
   metricProfile: MetricProfile;
   noopSleepSeconds: number;
+  pollJitterMaxMs: number;
   preserveOnFailure: boolean;
   profile: Profile;
   runClass: RunClass;
@@ -100,6 +100,7 @@ export interface RunConfig {
   userBucket: string;
   userBucketIndex: number;
   userShape: string;
+  submissionJitterMaxMs: number;
   visibilityGateSeconds: number;
   workload: WorkloadConfig;
 }
@@ -107,8 +108,12 @@ export interface RunConfig {
 const SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 const DEFAULT_SKAHA_PASSWORD_PATH = "/var/run/secrets/perfpulse/skaha-auth/password";
 const DEFAULT_SKAHA_USERNAME_PATH = "/var/run/secrets/perfpulse/skaha-auth/username";
+const DEFAULT_CAMPAIGN_COMPLETION_TIMEOUT_SECONDS = 259_200;
+const DEFAULT_CRON_COMPLETION_TIMEOUT_SECONDS = 86_400;
+const DEFAULT_JITTER_MAX_MS = 1_000;
 
 export function resolveRunConfig(env: EnvSource = {}): RunConfig {
+  rejectRemovedEnv(env);
   const clientMode = parseClientMode(env.PERF_PULSE_CLIENT_MODE ?? env.PERFPULSE_CLIENT_MODE);
   const profile = parseProfile(env.PROFILE ?? DEFAULT_PROFILE);
   const runClass = parseOptionalRunClass(env.RUN_CLASS, profile);
@@ -124,10 +129,7 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
 
   const surfaces = resolveSurfaces(env, profile);
   const surface = surfaces[0] ?? DEFAULT_SURFACE;
-  const scenario = parseOptionalScenario(
-    env.SCENARIO,
-    campaignType === "stress" ? "throughput-stress" : DEFAULT_SCENARIO,
-  );
+  const scenario = parseOptionalScenario(env.SCENARIO, DEFAULT_SCENARIO);
   const jobProfile = parseOptionalJobProfile(
     env.JOB_PROFILE,
     campaignType === "benchmark" ? "small" : DEFAULT_JOB_PROFILE,
@@ -148,18 +150,13 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     1,
     env.TOTAL_JOBS === undefined ? "JOBS_PER_SURFACE" : "TOTAL_JOBS",
   );
-  if (jobsPerSurface % logicalUsers !== 0) {
-    throw new Error(
-      `TOTAL_JOBS/JOBS_PER_SURFACE (${jobsPerSurface}) must divide evenly across LOGICAL_USERS (${logicalUsers})`,
-    );
-  }
   if (runClass === "campaign" && logicalUsers > 25 && env.CONFIRM_HIGH_USERS !== "true") {
     throw new Error("Campaigns with more than 25 logical users require CONFIRM_HIGH_USERS=true");
   }
   if (runClass === "campaign" && jobsPerSurface > 10000 && campaignType !== "stress") {
     throw new Error("Campaigns with more than 10000 jobs per surface require CAMPAIGN_TYPE=stress");
   }
-  const jobsPerLogicalUser = jobsPerSurface / logicalUsers;
+  const jobsPerLogicalUser = Math.ceil(jobsPerSurface / logicalUsers);
   const skahaConfig: SkahaConfig = {
     apiUrl: env.SKAHA_API_URL ?? DEFAULT_SKAHA_API_URL,
     loginUrl: env.SKAHA_LOGIN_URL ?? DEFAULT_SKAHA_LOGIN_URL,
@@ -168,11 +165,6 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
       env.SKAHA_REQUEST_TIMEOUT_SECONDS,
       30,
       "SKAHA_REQUEST_TIMEOUT_SECONDS",
-    ),
-    submissionStaggerSeconds: parseNonNegativeInteger(
-      env.SUBMISSION_STAGGER_SECONDS,
-      0,
-      "SUBMISSION_STAGGER_SECONDS",
     ),
     usernamePath: env.SKAHA_USERNAME_PATH ?? DEFAULT_SKAHA_USERNAME_PATH,
   };
@@ -222,17 +214,20 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   if (workloadCommand !== undefined) {
     workload.command = workloadCommand;
   }
+  const completionTimeoutSeconds = parsePositiveInteger(
+    env.COMPLETION_TIMEOUT_SECONDS,
+    runClass === "campaign"
+      ? DEFAULT_CAMPAIGN_COMPLETION_TIMEOUT_SECONDS
+      : DEFAULT_CRON_COMPLETION_TIMEOUT_SECONDS,
+    "COMPLETION_TIMEOUT_SECONDS",
+  );
 
   return {
     ...(campaignType === undefined ? {} : { campaignType }),
     cleanup: parseBoolean(env.CLEANUP, true),
     clientMode,
     cohort: "baseline",
-    completionGateSeconds: parsePositiveInteger(
-      env.COMPLETION_GATE_SECONDS,
-      120,
-      "COMPLETION_GATE_SECONDS",
-    ),
+    completionTimeoutSeconds,
     jobIndex: 0,
     jobName: makeJobName(testid, surface, 0),
     jobProfile,
@@ -241,7 +236,7 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     kueue: {
       admissionGateSeconds: parsePositiveInteger(
         env.KUEUE_ADMISSION_GATE_SECONDS,
-        120,
+        completionTimeoutSeconds,
         "KUEUE_ADMISSION_GATE_SECONDS",
       ),
       priorityClass: env.KUEUE_PRIORITY_CLASS ?? "low",
@@ -264,6 +259,11 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     logicalUsers,
     metricProfile: campaignType === "stress" ? "lean" : "full",
     noopSleepSeconds: parsePositiveInteger(env.NOOP_SLEEP_SECONDS, 1, "NOOP_SLEEP_SECONDS"),
+    pollJitterMaxMs: parseNonNegativeInteger(
+      env.POLL_JITTER_MAX_MS,
+      DEFAULT_JITTER_MAX_MS,
+      "POLL_JITTER_MAX_MS",
+    ),
     preserveOnFailure: parseBoolean(env.PRESERVE_ON_FAILURE, false),
     profile,
     runClass,
@@ -276,6 +276,11 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     totalJobs: jobsPerSurface,
     userBucket: "bucket-0",
     userBucketIndex: 0,
+    submissionJitterMaxMs: parseNonNegativeInteger(
+      env.SUBMISSION_JITTER_MAX_MS,
+      DEFAULT_JITTER_MAX_MS,
+      "SUBMISSION_JITTER_MAX_MS",
+    ),
     userShape: `${logicalUsers}x${jobsPerLogicalUser}`,
     visibilityGateSeconds: parsePositiveInteger(
       env.VISIBILITY_GATE_SECONDS,
@@ -286,22 +291,28 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   };
 }
 
-export function deriveRunConfigForJob(config: RunConfig, jobIndex: number): RunConfig {
+export function deriveRunConfigForJob(
+  config: RunConfig,
+  jobIndex: number,
+  userBucketIndex = Math.min(
+    config.logicalUsers - 1,
+    Math.floor(jobIndex / config.jobsPerLogicalUser),
+  ),
+): RunConfig {
   if (!Number.isInteger(jobIndex) || jobIndex < 0) {
     throw new Error(`Job index must be a non-negative integer, got ${jobIndex}`);
   }
-
-  const userBucketIndex = Math.min(
-    config.logicalUsers - 1,
-    Math.floor(jobIndex / config.jobsPerLogicalUser),
-  );
+  if (!Number.isInteger(userBucketIndex) || userBucketIndex < 0) {
+    throw new Error(`User bucket index must be a non-negative integer, got ${userBucketIndex}`);
+  }
+  const boundedUserBucketIndex = Math.min(config.logicalUsers - 1, userBucketIndex);
 
   return {
     ...config,
     jobIndex,
     jobName: makeJobName(config.testid, config.surface, jobIndex),
-    userBucket: `bucket-${userBucketIndex}`,
-    userBucketIndex,
+    userBucket: `bucket-${boundedUserBucketIndex}`,
+    userBucketIndex: boundedUserBucketIndex,
   };
 }
 
@@ -355,6 +366,18 @@ function parseClientMode(value: string | undefined): ClientMode {
     return value;
   }
   throw new Error(`PERF_PULSE_CLIENT_MODE must be "noop" or "kubernetes", got "${value}"`);
+}
+
+function rejectRemovedEnv(env: EnvSource): void {
+  const removed: Record<string, string> = {
+    COMPLETION_GATE_SECONDS: "COMPLETION_TIMEOUT_SECONDS",
+    SUBMISSION_STAGGER_SECONDS: "SUBMISSION_JITTER_MAX_MS",
+  };
+  for (const [oldName, newName] of Object.entries(removed)) {
+    if (env[oldName] !== undefined) {
+      throw new Error(`${oldName} has been replaced by ${newName}`);
+    }
+  }
 }
 
 function parseProfile(value: string): Profile {

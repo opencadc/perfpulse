@@ -23,6 +23,7 @@ describe("CI workflow contract", () => {
     expect(ciWorkflow).toContain("helm lint charts/campaign");
     expect(ciWorkflow).toContain("--set campaign.totalJobs=12");
     expect(ciWorkflow).toContain("--set campaign.logicalUsers=3");
+    expect(ciWorkflow).toContain("--set campaign.testid=ci-campaign-smoke");
     expect(ciWorkflow).toContain("helm template perfpulse-cron charts/cron");
     expect(ciWorkflow).toContain("helm template perfpulse-campaign charts/campaign");
     expect(ciWorkflow).toContain("docker/build-push-action");

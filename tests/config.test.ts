@@ -203,7 +203,6 @@ describe("resolveRunConfig", () => {
       loginUrl: "https://ws-cadc.canfar.net/ac/login",
       passwordPath: "/var/run/secrets/perfpulse/skaha-auth/password",
       requestTimeoutSeconds: 30,
-      submissionStaggerSeconds: 0,
       usernamePath: "/var/run/secrets/perfpulse/skaha-auth/username",
     });
     expect(config.workload.image).toBe(DEFAULT_SKAHA_WORKLOAD_IMAGE);
@@ -245,24 +244,32 @@ describe("resolveRunConfig", () => {
     expect(config.skaha.apiUrl).toBe("https://ws.example/skaha/v1");
   });
 
-  test("accepts Skaha request timeout and deterministic submission stagger controls", () => {
+  test("accepts Skaha request timeout and lifecycle jitter controls", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
+      POLL_JITTER_MAX_MS: "250",
       SKAHA_REQUEST_TIMEOUT_SECONDS: "120",
-      SUBMISSION_STAGGER_SECONDS: "60",
+      SUBMISSION_JITTER_MAX_MS: "500",
       SURFACE: "skaha",
     });
 
     expect(config.skaha.requestTimeoutSeconds).toBe(120);
-    expect(config.skaha.submissionStaggerSeconds).toBe(60);
+    expect(config.pollJitterMaxMs).toBe(250);
+    expect(config.submissionJitterMaxMs).toBe(500);
   });
 
-  test("rejects malformed Skaha request timeout and submission stagger values", () => {
+  test("rejects malformed Skaha request timeout and jitter values", () => {
     expect(() => resolveRunConfig({ SKAHA_REQUEST_TIMEOUT_SECONDS: "0" })).toThrow(
       'SKAHA_REQUEST_TIMEOUT_SECONDS must be a positive integer, got "0"',
     );
-    expect(() => resolveRunConfig({ SUBMISSION_STAGGER_SECONDS: "-1" })).toThrow(
-      'SUBMISSION_STAGGER_SECONDS must be a non-negative integer, got "-1"',
+    expect(() => resolveRunConfig({ SUBMISSION_JITTER_MAX_MS: "-1" })).toThrow(
+      'SUBMISSION_JITTER_MAX_MS must be a non-negative integer, got "-1"',
+    );
+    expect(() => resolveRunConfig({ POLL_JITTER_MAX_MS: "-1" })).toThrow(
+      'POLL_JITTER_MAX_MS must be a non-negative integer, got "-1"',
+    );
+    expect(() => resolveRunConfig({ SUBMISSION_STAGGER_SECONDS: "1" })).toThrow(
+      "SUBMISSION_STAGGER_SECONDS has been replaced by SUBMISSION_JITTER_MAX_MS",
     );
   });
 

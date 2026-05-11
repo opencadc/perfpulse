@@ -28,7 +28,10 @@ describe("PerfPulse Helm charts", () => {
     expect(count(manifest, "kind: CronJob")).toBe(3);
     expect(manifest).toContain('schedule: "*/5 * * * *"');
     expect(manifest).toContain("concurrencyPolicy: Forbid");
-    expect(manifest).toContain("activeDeadlineSeconds: 1260");
+    expect(manifest).toContain("activeDeadlineSeconds: 87060");
+    expect(manifest).toContain('COMPLETION_TIMEOUT_SECONDS: "86400"');
+    expect(manifest).toContain('POLL_JITTER_MAX_MS: "1000"');
+    expect(manifest).toContain('SUBMISSION_JITTER_MAX_MS: "1000"');
     expect(manifest).toContain("PROFILE: cron");
     expect(manifest).toContain("RUN_CLASS: cron");
     expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
@@ -67,7 +70,7 @@ describe("PerfPulse Helm charts", () => {
       "--set",
       "campaign.visibilityGateSeconds=120",
       "--set",
-      "campaign.completionGateSeconds=300",
+      "campaign.completionTimeoutSeconds=300",
       "--set",
       "skaha.apiUrl=https://ws.example/skaha/v1",
     ]);
@@ -91,7 +94,9 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
     expect(manifest).toContain('WORKLOAD_IMAGE: "images.canfar.net/skaha/stress-ng:latest"');
     expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "120"');
-    expect(manifest).toContain('COMPLETION_GATE_SECONDS: "300"');
+    expect(manifest).toContain('COMPLETION_TIMEOUT_SECONDS: "300"');
+    expect(manifest).toContain('POLL_JITTER_MAX_MS: "1000"');
+    expect(manifest).toContain('SUBMISSION_JITTER_MAX_MS: "1000"');
     expect(manifest).toContain('SKAHA_API_URL: "https://ws.example/skaha/v1"');
     expect(manifest).toContain('value: "manual-20260507"');
     expect(manifest).toContain("secretName: perfpulse-skaha-auth");
@@ -114,6 +119,8 @@ describe("PerfPulse Helm charts", () => {
       "campaign.totalJobs=4",
       "--set",
       "campaign.logicalUsers=2",
+      "--set",
+      "campaign.testid=stress-skaha-20260507",
       "--set",
       "otlp.credentialsSecretName=otlp-custom",
       "--set",
@@ -144,6 +151,8 @@ describe("PerfPulse Helm charts", () => {
       "--set",
       "campaign.logicalUsers=2",
       "--set",
+      "campaign.testid=sa-20260507",
+      "--set",
       "serviceAccount.create=true",
       "--set",
       "serviceAccount.name=perfpulse-campaign",
@@ -162,6 +171,8 @@ describe("PerfPulse Helm charts", () => {
       "campaign.totalJobs=10",
       "--set",
       "campaign.logicalUsers=5",
+      "--set",
+      "campaign.testid=benchmark-skaha-20260507",
     ]);
     const skahaManifest = helmTemplateWithRelease("perfpulse-skaha", "campaign", [
       "--set-json",
@@ -170,6 +181,8 @@ describe("PerfPulse Helm charts", () => {
       "campaign.totalJobs=10",
       "--set",
       "campaign.logicalUsers=5",
+      "--set",
+      "campaign.testid=skaha-20260507",
     ]);
 
     expect(benchmarkManifest).toContain("name: perfpulse-benchmark-skaha");
@@ -191,12 +204,14 @@ describe("PerfPulse Helm charts", () => {
         "--set",
         "campaign.logicalUsers=1",
         "--set",
+        "campaign.testid=manual-20260507",
+        "--set",
         "campaign.visibilityGateSeconds=300",
         "--set",
-        "campaign.completionGateSeconds=60",
+        "campaign.completionTimeoutSeconds=60",
       ]),
     ).toContain(
-      "campaign.completionGateSeconds must be greater than or equal to campaign.visibilityGateSeconds",
+      "campaign.completionTimeoutSeconds must be greater than or equal to campaign.visibilityGateSeconds",
     );
     expect(
       expectHelmTemplateFailure("campaign", [
@@ -204,6 +219,16 @@ describe("PerfPulse Helm charts", () => {
         "campaign.totalJobs=1",
         "--set",
         "campaign.logicalUsers=1",
+      ]),
+    ).toContain("campaign.testid is required");
+    expect(
+      expectHelmTemplateFailure("campaign", [
+        "--set",
+        "campaign.totalJobs=1",
+        "--set",
+        "campaign.logicalUsers=1",
+        "--set",
+        "campaign.testid=stress-20260507",
         "--set",
         "campaign.type=stress",
       ]),
@@ -211,17 +236,25 @@ describe("PerfPulse Helm charts", () => {
     expect(
       expectHelmTemplateFailure("campaign", [
         "--set",
-        "campaign.totalJobs=13",
+        "campaign.totalJobs=1",
         "--set",
-        "campaign.logicalUsers=3",
+        "campaign.logicalUsers=1",
+        "--set",
+        "campaign.testid=manual-20260507",
+        "--set",
+        "campaign.completionGateSeconds=60",
       ]),
-    ).toContain("campaign.totalJobs must divide evenly across campaign.logicalUsers");
+    ).toContain(
+      "campaign.completionGateSeconds has been replaced by campaign.completionTimeoutSeconds",
+    );
     expect(
       expectHelmTemplateFailure("campaign", [
         "--set",
         "campaign.totalJobs=260",
         "--set",
         "campaign.logicalUsers=26",
+        "--set",
+        "campaign.testid=manual-20260507",
       ]),
     ).toContain("campaign.logicalUsers above 25 require campaign.confirmHighUsers=true");
     expect(
@@ -230,6 +263,8 @@ describe("PerfPulse Helm charts", () => {
         "campaign.totalJobs=10001",
         "--set",
         "campaign.logicalUsers=1",
+        "--set",
+        "campaign.testid=manual-20260507",
       ]),
     ).toContain("campaign.totalJobs above 10000 requires campaign.type=stress");
   });

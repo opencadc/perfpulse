@@ -1,4 +1,4 @@
-export const SCENARIOS = ["single-bulk-user", "many-small-users", "throughput-stress"] as const;
+export const SCENARIOS = ["single-bulk-user", "many-small-users"] as const;
 export const SURFACES = ["k8s-direct", "k8s-kueue", "skaha"] as const;
 export const JOB_PROFILES = ["tiny", "small", "standard", "heavy"] as const;
 

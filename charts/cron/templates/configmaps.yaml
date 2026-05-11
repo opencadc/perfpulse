@@ -11,7 +11,7 @@ metadata:
     perfpulse.opencadc.org/surface: {{ $surface }}
 data:
   CLEANUP: "true"
-  COMPLETION_GATE_SECONDS: "120"
+  COMPLETION_TIMEOUT_SECONDS: {{ $.Values.completionTimeoutSeconds | quote }}
   K6_OTEL_EXPORTER_PROTOCOL: http/protobuf
   K6_OTEL_HTTP_EXPORTER_ENDPOINT: {{ $.Values.otlp.endpoint | quote }}
   K6_OTEL_HTTP_EXPORTER_INSECURE: "true"
@@ -20,8 +20,10 @@ data:
   K6_OTEL_SERVICE_NAME: perfpulse
   K6_OTEL_EXPORT_INTERVAL: 1s
   PERF_PULSE_CLIENT_MODE: kubernetes
+  POLL_JITTER_MAX_MS: {{ $.Values.pollJitterMaxMs | quote }}
   PROFILE: cron
   RUN_CLASS: cron
+  SUBMISSION_JITTER_MAX_MS: {{ $.Values.submissionJitterMaxMs | quote }}
   SURFACE: {{ $surface }}
   WORKLOAD_COMMAND: '["stress-ng"]'
   WORKLOAD_DURATION_SECONDS: {{ $.Values.testDurationSeconds | quote }}
@@ -31,7 +33,7 @@ data:
   WORKLOAD_NAMESPACE: {{ $.Values.workloadNamespace }}
   {{- end }}
   {{- if eq $surface "k8s-kueue" }}
-  KUEUE_ADMISSION_GATE_SECONDS: "120"
+  KUEUE_ADMISSION_GATE_SECONDS: {{ $.Values.completionTimeoutSeconds | quote }}
   KUEUE_PRIORITY_CLASS: low
   KUEUE_QUEUE_NAME: cadc-default
   {{- end }}

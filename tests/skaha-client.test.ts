@@ -250,7 +250,7 @@ describe("Skaha user-facing surface client", () => {
     expect(result.failure).toBeUndefined();
   });
 
-  test("succeeds when a visible session reaches Succeeded within the completion gate", () => {
+  test("succeeds when a visible session reaches Succeeded within the completion timeout", () => {
     const config = skahaSurfaceConfig();
     config.requireCompletion = true;
     const statuses: Array<"Pending" | "Succeeded"> = ["Pending", "Succeeded"];
@@ -367,8 +367,9 @@ function requestTags(name: string): { name: string } & ReturnType<typeof metricT
 
 function skahaSurfaceConfig(): SkahaSurfaceConfig {
   return {
-    completionGateSeconds: 120,
+    completionTimeoutSeconds: 120,
     pollIntervalSeconds: 2,
+    pollJitterMaxMs: 0,
     requireCompletion: false,
     session: {
       args: ["--cpu", "1", "--timeout", "10s", "--metrics-brief"],

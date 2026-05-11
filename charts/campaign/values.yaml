@@ -12,11 +12,13 @@ campaign:
   type: benchmark
   confirmStress: false
   confirmHighUsers: false
-  testid: campaign-manual
+  testid: null
   totalJobs: null
   logicalUsers: null
   visibilityGateSeconds: 120
-  completionGateSeconds: 300
+  completionTimeoutSeconds: 259200
+  submissionJitterMaxMs: 1000
+  pollJitterMaxMs: 1000
   profile: campaign
   scenario: many-small-users
 otlp:
