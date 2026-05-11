@@ -21,16 +21,18 @@ Required fields:
 - `thresholdsUsed`
 - `runnerImage`
 - `targetNamespaces`
+- `expectedWorkCount`
 - `acceptedWorkCount`
 - `visibleWorkCount`
 - `completedWorkCount`
 - `cleanupResult`
 
 Include `admittedKueueWorkloadCount` when the Kueue surface is enabled.
+Include `campaignType` when `runClass` is `campaign`.
 
 Include `dashboardLinks`, `prometheusLinks`, and `artifactLinks` when those links are available.
 
-Benchmark and stress run notes must include `activeHypothesis`. Spot runs do not require it.
+Campaign run notes must include `activeHypothesis`. Cron run notes do not require it.
 
 ## Secret Handling
 
@@ -53,7 +55,7 @@ const markdown = createRunEvidenceReport({
   artifactLinks: [
     {
       label: "raw run archive",
-      url: "https://artifacts.example.test/perfpulse/spot-20260501-180000.tar.gz",
+      url: "https://artifacts.example.test/perfpulse/cron-20260501-180000.tar.gz",
     },
   ],
   cleanupResult: "succeeded",
@@ -61,26 +63,31 @@ const markdown = createRunEvidenceReport({
   dashboardLinks: [
     {
       label: "PerfPulse overview",
-      url: "https://grafana.example.test/d/perfpulse?var-testid=spot-20260501-180000",
+      url: "https://grafana.example.test/d/perfpulse?var-testid=cron-20260501-180000",
     },
   ],
   executor: "shared-iterations",
+  expectedWorkCount: 1,
   gitSha: "abc1234",
-  profile: "spot-direct-tiny",
+  profile: "cron",
   prometheusLinks: [
     {
-      label: "submitted jobs",
-      url: "https://prometheus.example.test/graph?g0.expr=perfpulse_jobs_submitted%7Btestid%3D%22spot-20260501-180000%22%7D",
+      label: "expected jobs",
+      url: "https://prometheus.example.test/graph?g0.expr=perfpulse_jobs_expected%7Btestid%3D%22cron-20260501-180000%22%7D",
     },
   ],
-  runClass: "spot",
+  runClass: "cron",
   runnerImage: "ghcr.io/opencadc/perfpulse:v1",
   scenario: "single-bulk-user",
   surface: "k8s-direct",
   targetNamespaces: ["canfar-perfpulse", "canfar-workloads"],
-  testid: "spot-20260501-180000",
+  testid: "cron-20260501-180000",
   thresholdsUsed: ["perfpulse_jobs_submission_failed count==0"],
   visibleWorkCount: 1,
   workloadModel: "closed",
 });
 ```
+
+For campaign evidence, set `runClass: "campaign"`, add `campaignType: "benchmark"` or
+`campaignType: "stress"`, and set `expectedWorkCount` to the selected surface's
+`campaign.totalJobs` value.

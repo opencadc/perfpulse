@@ -1,4 +1,5 @@
-export type CampaignRunClass = "benchmark" | "stress";
+export type CampaignRunClass = "campaign";
+export type CampaignType = "benchmark" | "stress";
 export type CampaignSurface = "k8s-direct" | "k8s-kueue" | "skaha";
 export type CleanupStatus = "succeeded" | "failed" | "skipped" | "unknown";
 
@@ -44,6 +45,7 @@ export interface SurfaceComparisonEvidence {
   cleanupStatus: CleanupStatus;
   clusterMetrics: ClusterMetricEvidence[];
   droppedIterations: number;
+  expectedWork: number;
   latency: LatencyEvidence;
   surface: CampaignSurface;
   visibleWork: number;
@@ -72,6 +74,7 @@ export interface StressCampaignEvidence {
   cleanupStatus: CleanupStatus;
   completion: StressCompletionEvidence;
   droppedIterations: number;
+  expectedWork: number;
   grafanaVisibility: string;
   kueueControllerHealth: string;
   rejectionCategories: Record<string, number>;
@@ -82,20 +85,22 @@ export interface StressCampaignEvidence {
 export interface BenchmarkCampaignInput {
   activeHypothesis: string;
   baselines: BaselineEvidence;
+  campaignType: "benchmark";
   preserveOnFailure: PreserveOnFailureEvidence;
-  profile: "benchmark-small" | "benchmark-medium";
-  runClass: "benchmark";
+  profile: "campaign";
+  runClass: "campaign";
   surfaces: SurfaceComparisonEvidence[];
   testid: string;
 }
 
 export interface StressCampaignInput {
   activeHypothesis: string;
+  campaignType: "stress";
   confirmStress: boolean;
   explicitProfileSelection: boolean;
   preserveOnFailure: PreserveOnFailureEvidence;
-  profile: "stress-medium" | "stress-high";
-  runClass: "stress";
+  profile: "campaign";
+  runClass: "campaign";
   stress: StressCampaignEvidence;
   testid: string;
 }
@@ -105,7 +110,7 @@ export type CampaignReportInput = BenchmarkCampaignInput | StressCampaignInput;
 export function createCampaignReport(input: CampaignReportInput): CampaignReport {
   rejectSensitiveValues(input);
 
-  if (input.runClass === "stress") {
+  if (input.campaignType === "stress") {
     return createStressCampaignReport(input);
   }
 
@@ -131,7 +136,7 @@ export function createMixedPressureProfile(input: MixedPressureProfileInput): Mi
 
 function createBenchmarkCampaignReport(input: BenchmarkCampaignInput): CampaignReport {
   const markdown = [
-    `# PerfPulse ${titleCase(input.runClass)} Campaign: ${input.testid}`,
+    `# PerfPulse ${titleCase(input.campaignType)} Campaign: ${input.testid}`,
     "",
     "## Safety",
     "",
@@ -152,11 +157,11 @@ function createBenchmarkCampaignReport(input: BenchmarkCampaignInput): CampaignR
     "",
     "## Surface Comparison",
     "",
-    "| Surface | Accepted work | Visible work | p50 latency | p95 latency | p99 latency | Dropped iterations | Cleanup |",
-    "| --- | ---: | ---: | --- | --- | --- | ---: | --- |",
+    "| Surface | Expected work | Accepted work | Visible work | Visible % | p50 latency | p95 latency | p99 latency | Dropped iterations | Cleanup |",
+    "| --- | ---: | ---: | ---: | ---: | --- | --- | --- | ---: | --- |",
     ...input.surfaces.map(
       (surface) =>
-        `| ${surface.surface} | ${surface.acceptedWork} | ${surface.visibleWork} | ${surface.latency.p50} | ${surface.latency.p95} | ${surface.latency.p99} | ${surface.droppedIterations} | ${surface.cleanupStatus} |`,
+        `| ${surface.surface} | ${surface.expectedWork} | ${surface.acceptedWork} | ${surface.visibleWork} | ${formatPercent(surface.visibleWork, surface.expectedWork)} | ${surface.latency.p50} | ${surface.latency.p95} | ${surface.latency.p99} | ${surface.droppedIterations} | ${surface.cleanupStatus} |`,
     ),
     "",
     "## Cluster Metrics",
@@ -202,8 +207,10 @@ function createStressCampaignReport(input: StressCampaignInput): CampaignReport 
     "",
     "| Field | Value |",
     "| --- | --- |",
+    `| Expected work | ${input.stress.expectedWork} |`,
     `| Accepted work | ${input.stress.acceptedWork} |`,
     `| Visible work | ${input.stress.visibleWork} |`,
+    `| Visible % | ${formatPercent(input.stress.visibleWork, input.stress.expectedWork)} |`,
     `| Dropped iterations | ${input.stress.droppedIterations} |`,
     `| API-server pressure | ${input.stress.apiServerPressure} |`,
     `| Kueue controller health | ${input.stress.kueueControllerHealth} |`,
@@ -269,6 +276,13 @@ function isBlank(value: string | undefined): boolean {
 
 function titleCase(value: string): string {
   return `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`;
+}
+
+function formatPercent(numerator: number, denominator: number): string {
+  if (denominator <= 0) {
+    return "n/a";
+  }
+  return `${((numerator / denominator) * 100).toFixed(1)}%`;
 }
 
 function rejectSensitiveValues(value: unknown): void {

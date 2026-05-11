@@ -78,6 +78,17 @@ mock.module("k6/metrics", () => ({
       metricRecords.push({ metric: this.name, tags, value });
     }
   },
+  Gauge: class Gauge {
+    readonly name: string;
+
+    constructor(name: string) {
+      this.name = name;
+    }
+
+    add(value: number, tags?: Record<string, string>): void {
+      metricRecords.push({ metric: this.name, tags, value });
+    }
+  },
   Trend: class Trend {
     readonly name: string;
 
@@ -207,6 +218,15 @@ describe("PerfPulse k6 runtime dispatch", () => {
 
     runtime.default(config);
 
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.jobsExpected,
+      tags: expect.objectContaining({
+        namespace: "canfar-workloads",
+        surface: "k8s-kueue",
+        testid: "kueue-spot",
+      }),
+      value: 1,
+    });
     expect(httpRequests.some((request) => request.options?.tags?.name === "k8s_create_job")).toBe(
       true,
     );
@@ -320,6 +340,11 @@ describe("PerfPulse k6 runtime dispatch", () => {
 
     runtime.default(config);
 
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.jobsExpected,
+      tags: expect.objectContaining({ surface: "k8s-direct", testid: "direct-benchmark" }),
+      value: 100,
+    });
     const createRequest = httpRequests.find(
       (request) => request.options?.tags?.name === "k8s_create_job",
     );

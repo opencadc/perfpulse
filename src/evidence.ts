@@ -1,4 +1,5 @@
-export type RunClass = "spot" | "benchmark" | "stress";
+export type RunClass = "cron" | "campaign";
+export type CampaignType = "benchmark" | "stress";
 export type WorkloadModel = "closed" | "open";
 export type CleanupResult = "succeeded" | "failed" | "skipped" | "unknown";
 
@@ -12,10 +13,12 @@ export interface RunEvidenceInput {
   activeHypothesis?: string;
   admittedKueueWorkloadCount?: number;
   artifactLinks?: EvidenceLink[];
+  campaignType?: CampaignType;
   cleanupResult: CleanupResult;
   completedWorkCount: number;
   dashboardLinks?: EvidenceLink[];
   executor: string;
+  expectedWorkCount: number;
   gitSha?: string;
   imageTag?: string;
   profile: string;
@@ -43,8 +46,10 @@ export function createRunEvidenceReport(input: RunEvidenceInput): string {
     ["scenario", input.scenario],
     ["executor", input.executor],
     ["workload model", input.workloadModel],
+    ["run class", input.runClass],
     ["runner image", input.runnerImage],
     ["target namespaces", input.targetNamespaces.join(", ")],
+    ["expected work count", `${input.expectedWorkCount}`],
     ["accepted work count", `${input.acceptedWorkCount}`],
     ["visible work count", `${input.visibleWorkCount}`],
     ["completed work count", `${input.completedWorkCount}`],
@@ -53,6 +58,9 @@ export function createRunEvidenceReport(input: RunEvidenceInput): string {
 
   if (input.admittedKueueWorkloadCount !== undefined) {
     rows.push(["admitted Kueue Workload count", `${input.admittedKueueWorkloadCount}`]);
+  }
+  if (input.campaignType !== undefined) {
+    rows.push(["campaign type", input.campaignType]);
   }
   if (input.activeHypothesis !== undefined) {
     rows.push(["active hypothesis", input.activeHypothesis]);
@@ -86,11 +94,16 @@ function validateRunEvidenceInput(input: RunEvidenceInput): void {
     throw new Error("run evidence requires gitSha or imageTag");
   }
 
-  if (
-    (input.runClass === "benchmark" || input.runClass === "stress") &&
-    isBlank(input.activeHypothesis)
-  ) {
-    throw new Error(`${input.runClass} run evidence requires activeHypothesis`);
+  if (input.runClass === "campaign" && input.campaignType === undefined) {
+    throw new Error("campaign run evidence requires campaignType");
+  }
+
+  if (input.runClass === "cron" && input.campaignType !== undefined) {
+    throw new Error("cron run evidence must not include campaignType");
+  }
+
+  if (input.runClass === "campaign" && isBlank(input.activeHypothesis)) {
+    throw new Error("campaign run evidence requires activeHypothesis");
   }
 }
 

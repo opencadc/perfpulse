@@ -37,6 +37,12 @@ describe("Grafana dashboard contracts", () => {
     expect(dashboard.templating.list.map((variable) => variable.refresh)).toEqual(
       dashboard.templating.list.map(() => 2),
     );
+    const expectedWorkVariableQueries = dashboard.templating.list
+      .filter((variable) => variable.name !== "request_name")
+      .flatMap((variable) => [variable.definition ?? "", variable.query?.query ?? ""])
+      .join("\n");
+    expect(expectedWorkVariableQueries).toContain("k6_perfpulse_jobs_expected");
+    expect(expectedWorkVariableQueries).not.toContain("k6_perfpulse_jobs_submitted_total");
 
     const datasourceRefs = [
       ...dashboard.panels.map((panel) => panel.datasource),
@@ -54,7 +60,7 @@ describe("Grafana dashboard contracts", () => {
     expect(dashboard.panels.map((panel) => [panel.title, panel.type])).toEqual(
       expect.arrayContaining([
         ["Diagnosis Matrix", "table"],
-        ["Run Outcome", "stat"],
+        ["Expected Jobs", "stat"],
         ["Run Outcome Trend", "timeseries"],
         ["No Data Warning", "stat"],
         ["k6 Runtime", "row"],
@@ -79,11 +85,11 @@ describe("Grafana dashboard contracts", () => {
 
     expect(statExpressions).toMatchObject({
       "Cleanup Failures": `sum(last_over_time(k6_perfpulse_cleanup_failed_total{${dashboardFilters}}[$__range]))`,
+      "Expected Jobs": `sum(last_over_time(k6_perfpulse_jobs_expected{${dashboardFilters}}[$__range]))`,
       "Jobs Submitted": `sum(last_over_time(k6_perfpulse_jobs_submitted_total{${dashboardFilters}}[$__range]))`,
       "Jobs Visible": `sum(last_over_time(k6_perfpulse_jobs_visible_total{${dashboardFilters}}[$__range]))`,
-      "Run Outcome": `sum(last_over_time(k6_perfpulse_jobs_visible_total{${dashboardFilters}}[$__range]))`,
     });
-    expect(statExpressions["Run Outcome"]).not.toContain("or vector(0)");
+    expect(statExpressions["Expected Jobs"]).not.toContain("or vector(0)");
     expect(Object.values(statExpressions).join("\n")).toContain('testid=~"$testid"');
     expect(Object.values(statExpressions).join("\n")).toContain("last_over_time(");
     expect(Object.values(statExpressions).join("\n")).not.toContain("increase(");
@@ -96,7 +102,7 @@ describe("Grafana dashboard contracts", () => {
       dashboard.panels
         .filter((panel) =>
           [
-            "Completion Latency",
+            "Completion Latency When Observed",
             "Kueue Admission Latency",
             "Submission Latency",
             "Visibility Latency",
@@ -106,7 +112,7 @@ describe("Grafana dashboard contracts", () => {
     );
 
     expect(Object.keys(latencyExpressions).sort()).toEqual([
-      "Completion Latency",
+      "Completion Latency When Observed",
       "Kueue Admission Latency",
       "Submission Latency",
       "Visibility Latency",
@@ -189,9 +195,10 @@ describe("Grafana dashboard contracts", () => {
       "measured from accepted create response",
     );
     expect(panelDescriptions["Visibility Latency"]).toContain("excludes submission duration");
-    expect(panelDescriptions["Completion Latency"]).toContain(
+    expect(panelDescriptions["Completion Latency When Observed"]).toContain(
       "measured from accepted create response",
     );
+    expect(panelDescriptions["Completion Latency When Observed"]).toContain("evidence-only");
     expect(panelDescriptions["Kueue Admission Latency"]).toContain(
       "measured from accepted create response",
     );
@@ -281,14 +288,17 @@ describe("Grafana dashboard contracts", () => {
     const targetStatePanel = dashboard.panels.find(
       (panel) => panel.title === "Target State Reached",
     );
+    const cleanupPanel = dashboard.panels.find((panel) => panel.title === "Cleanup");
     const targetStateExpressions = targetStatePanel
       ? targetExpressions(targetStatePanel).join("\n")
       : "";
+    const cleanupExpressions = cleanupPanel ? targetExpressions(cleanupPanel).join("\n") : "";
 
     expect(firstPanel.title).toBe("Diagnosis Matrix");
     expect(firstPanel.type).toBe("table");
     expect(firstPanel.transformations).toEqual([{ id: "merge", options: {} }]);
     expect(displayNameOverrides(firstPanel)).toEqual([
+      "Expected",
       "Submitted",
       "Visible",
       "Target state",
@@ -298,6 +308,7 @@ describe("Grafana dashboard contracts", () => {
       "Cleanup failed",
     ]);
     expect(diagnosisExpressions).toContain("sum by (surface)");
+    expect(diagnosisExpressions).toContain("k6_perfpulse_jobs_expected");
     expect(diagnosisExpressions).not.toContain("perfpulse_surface_expected");
 
     expect(diagnosisExpressions).toContain("k6_perfpulse_jobs_visible_total");
@@ -305,7 +316,10 @@ describe("Grafana dashboard contracts", () => {
     expect(diagnosisExpressions).not.toContain("k6_perfpulse_jobs_completed_total");
     expect(diagnosisExpressions).not.toContain("k6_perfpulse_kueue_workloads_admitted_total");
     expect(targetStateExpressions).toContain("k6_perfpulse_jobs_visible_total");
+    expect(targetStateExpressions).toContain("k6_perfpulse_jobs_expected");
+    expect(targetStateExpressions).toContain("/ clamp_min(");
     expect(targetStateExpressions).toContain('surface=~"$surface"');
+    expect(targetStatePanel?.fieldConfig?.defaults.custom?.axisLabel).toBe("% of expected jobs");
     expect(targetStateExpressions).not.toContain("k6_perfpulse_jobs_completed_total");
     expect(targetStateExpressions).not.toContain("k6_perfpulse_kueue_workloads_admitted_total");
 
@@ -319,12 +333,23 @@ describe("Grafana dashboard contracts", () => {
     expect(targetStateFailureExpressions).toContain(
       'k6_perfpulse_jobs_visibility_failed_total{testid=~"$testid",run_class=~"$runClass",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace",campaign_type=~"$campaignType"}',
     );
+    expect(targetStateFailureExpressions).toContain("k6_perfpulse_jobs_expected");
+    expect(targetStateFailureExpressions).toContain("/ clamp_min(");
+    expect(targetStateFailuresPanel?.fieldConfig?.defaults.custom?.axisLabel).toBe(
+      "% of expected jobs",
+    );
     expect(targetStateFailureExpressions).not.toContain(
       "k6_perfpulse_jobs_completion_failed_total",
     );
     expect(targetStateFailureExpressions).not.toContain(
       "k6_perfpulse_kueue_workloads_admission_failed_total",
     );
+
+    expect(cleanupExpressions).toContain("k6_perfpulse_cleanup_deleted_total");
+    expect(cleanupExpressions).toContain("k6_perfpulse_cleanup_failed_total");
+    expect(cleanupExpressions).toContain("k6_perfpulse_jobs_expected");
+    expect(cleanupExpressions).toContain("/ clamp_min(");
+    expect(cleanupPanel?.fieldConfig?.defaults.custom?.axisLabel).toBe("% of expected jobs");
   });
 
   test("uses a Prometheus-backed stat for no-data warnings", async () => {
@@ -337,7 +362,7 @@ describe("Grafana dashboard contracts", () => {
     expect(noDataExpression).toContain("absent(");
     expect(noDataExpression).toContain("last_over_time(");
     expect(noDataExpression).toContain(
-      'k6_perfpulse_jobs_submitted_total{testid=~"$testid",run_class=~"$runClass",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace",campaign_type=~"$campaignType"}',
+      'k6_perfpulse_jobs_expected{testid=~"$testid",run_class=~"$runClass",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace",campaign_type=~"$campaignType"}',
     );
     expect(noDataExpression).not.toContain('testid="$testid"');
     expect(JSON.stringify(noDataPanel?.options ?? {})).not.toContain("No PerfPulse series found");
@@ -357,6 +382,10 @@ describe("Grafana dashboard contracts", () => {
     expect(expressionsByTitle["Dropped Iterations"]).toContain("k6_dropped_iterations_total");
     expect(expressionsByTitle.Iterations).toContain("k6_iterations_total");
     expect(expressionsByTitle["Virtual Users"]).toContain("k6_vus");
+    expect(expressionsByTitle["Data IO"]).toContain("k6_data_sent_bytes_total");
+    expect(expressionsByTitle["Data IO"]).toContain("k6_data_received_bytes_total");
+    expect(expressionsByTitle["Data IO"]).not.toContain("k6_data_sent_total");
+    expect(expressionsByTitle["Data IO"]).not.toContain("k6_data_received_total");
     expect(expressionsByTitle["HTTP Requests"]).toContain("k6_http_reqs_total");
     expect(expressionsByTitle["HTTP Failure Rate"]).toContain("k6_http_req_failed_total");
     expect(expressionsByTitle["HTTP Duration p95"]).toContain(

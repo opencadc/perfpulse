@@ -44,6 +44,10 @@ Cron checks are acceptance evidence. Direct success means Job accepted and visib
 means Workload visible. Skaha success means session POST accepted and visible or discoverable.
 Completion is evidence, not the success gate.
 
+Each cron surface currently has one expected job. The dashboard emits and displays
+`perfpulse_jobs_expected` as the denominator for acceptance, visibility failure, and cleanup
+percentages, so a failed submission still counts against the selected surface.
+
 ## Run Cron Check Manually
 
 Trigger an installed cron check outside its schedule by creating a Job from the Helm-managed
@@ -108,6 +112,11 @@ the same submitted workload shape.
 - 1000 Direct Kubernetes jobs
 - 1000 Kueue jobs
 - 1000 Skaha sessions
+
+This same value is emitted as `perfpulse_jobs_expected` for each selected surface. Dashboard
+percentage panels divide by expected jobs, not by submitted or visible jobs. For example, if a Skaha
+campaign expects 100 sessions, submits 90, and sees 80 become visible, the visible percentage is
+80%, not 88.9%.
 
 Use `surfaces` for a single-surface diagnostic campaign. Skaha only:
 
@@ -184,6 +193,15 @@ Use Grafana dashboard `PerfPulse Overview` and filter by:
 Dashboard evidence is complete when operators can show accepted work, visible work, dropped
 iterations, data I/O, HTTP request rate, HTTP p95, Kubernetes API request rate, Kubernetes API p95,
 and cleanup status for selected run labels.
+
+Use the top-row `Expected Jobs` panel and the diagnosis matrix to confirm the denominator. `Target
+State Reached`, `Target State Failures`, and `Cleanup` are percentages of expected jobs per
+surface. Counts remain available in the diagnosis matrix.
+
+`Data IO` uses k6 byte counter metrics:
+
+- `k6_data_sent_bytes_total`
+- `k6_data_received_bytes_total`
 
 Completion is evidence, not the success gate.
 

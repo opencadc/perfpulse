@@ -52,7 +52,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Submitted"
+                "value": "Expected"
               }
             ]
           },
@@ -64,7 +64,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Visible"
+                "value": "Submitted"
               }
             ]
           },
@@ -76,7 +76,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Target state"
+                "value": "Visible"
               }
             ]
           },
@@ -88,7 +88,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Submit failed"
+                "value": "Target state"
               }
             ]
           },
@@ -100,7 +100,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Visible failed"
+                "value": "Submit failed"
               }
             ]
           },
@@ -112,7 +112,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Target failed"
+                "value": "Visible failed"
               }
             ]
           },
@@ -120,6 +120,18 @@
             "matcher": {
               "id": "byName",
               "options": "Value #G"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Target failed"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #H"
             },
             "properties": [
               {
@@ -152,53 +164,60 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "expected",
+          "refId": "A"
+        },
+        {
           "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "submitted",
-          "refId": "A"
-        },
-        {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "visible",
           "refId": "B"
         },
         {
           "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "format": "table",
           "instant": true,
-          "legendFormat": "accepted-visible",
+          "legendFormat": "visible",
           "refId": "C"
+        },
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "accepted-visible",
+          "refId": "D"
         },
         {
           "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_submission_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "submit-failed",
-          "refId": "D"
-        },
-        {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visibility_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "visible-failed",
           "refId": "E"
         },
         {
           "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visibility_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "format": "table",
           "instant": true,
-          "legendFormat": "acceptance-failed",
+          "legendFormat": "visible-failed",
           "refId": "F"
+        },
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visibility_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "acceptance-failed",
+          "refId": "G"
         },
         {
           "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "cleanup-failed",
-          "refId": "G"
+          "refId": "H"
         }
       ],
       "transformations": [
@@ -209,7 +228,7 @@
       ],
       "title": "Diagnosis Matrix",
       "type": "table",
-      "description": "Surface-level funnel counts shown as one table. Submitted is the accepted create response count; Visible and Target state are work observed after that response. Completion and Kueue admission are evidence-only signals."
+      "description": "Surface-level funnel counts shown as one table. Expected is the planned jobs per selected surface; Submitted is the accepted create response count; Visible and Target state are work observed after that response. Completion and Kueue admission are evidence-only signals."
     },
     {
       "datasource": {
@@ -279,14 +298,14 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "(absent(sum(last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))) or vector(0))",
+          "expr": "(absent(sum(last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))) or vector(0))",
           "legendFormat": "no data warning",
           "refId": "A"
         }
       ],
       "title": "No Data Warning",
       "type": "stat",
-      "description": "Warns when selected filters have no PerfPulse job-submission samples in the dashboard time range."
+      "description": "Warns when selected filters have no PerfPulse expected-job samples in the dashboard time range."
     },
     {
       "datasource": {
@@ -338,14 +357,14 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum(last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
-          "legendFormat": "run outcome",
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
+          "legendFormat": "expected jobs",
           "refId": "A"
         }
       ],
-      "title": "Run Outcome",
+      "title": "Expected Jobs",
       "type": "stat",
-      "description": "Accepted and visible work for selected filters. Completion and Kueue admission are evidence-only signals."
+      "description": "Planned work count across selected surfaces. Cron currently expects one job per surface; campaigns expect campaign.totalJobs per selected surface."
     },
     {
       "datasource": {
@@ -609,9 +628,9 @@
               }
             ]
           },
-          "unit": "short",
+          "unit": "percentunit",
           "custom": {
-            "axisLabel": "Target-state count",
+            "axisLabel": "% of expected jobs",
             "drawStyle": "line",
             "lineInterpolation": "smooth",
             "lineWidth": 2,
@@ -645,14 +664,14 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
-          "legendFormat": "{{surface}} visible",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])) / clamp_min(sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])), 1)",
+          "legendFormat": "{{surface}} visible / expected",
           "refId": "A"
         }
       ],
       "title": "Target State Reached",
       "type": "timeseries",
-      "description": "Acceptance target counts by surface. Target state is accepted work that became visible."
+      "description": "Acceptance target percentage by surface: visible work divided by expected jobs for the selected run. Completion remains evidence-only."
     },
     {
       "datasource": {
@@ -674,9 +693,9 @@
               }
             ]
           },
-          "unit": "short",
+          "unit": "percentunit",
           "custom": {
-            "axisLabel": "Failure count",
+            "axisLabel": "% of expected jobs",
             "drawStyle": "line",
             "lineInterpolation": "smooth",
             "lineWidth": 2,
@@ -710,14 +729,14 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visibility_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
-          "legendFormat": "{{surface}} visibility failed",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visibility_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])) / clamp_min(sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])), 1)",
+          "legendFormat": "{{surface}} visibility failed / expected",
           "refId": "A"
         }
       ],
       "title": "Target State Failures",
       "type": "timeseries",
-      "description": "Acceptance target failure counts by surface. Target failure means work did not become visible within the visibility gate."
+      "description": "Visibility failure percentage by surface: visibility failures divided by expected jobs for the selected run."
     },
     {
       "datasource": {
@@ -940,9 +959,9 @@
           "refId": "C"
         }
       ],
-      "title": "Completion Latency",
+      "title": "Completion Latency When Observed",
       "type": "timeseries",
-      "description": "Post-submit completion latency for direct and Skaha cron work, measured from accepted create response until terminal completion. This excludes submission duration."
+      "description": "Optional post-submit completion latency, measured from accepted create response until terminal completion when the surface observes one. Completion is evidence-only and missing data does not mean the run failed."
     },
     {
       "datasource": {
@@ -1039,9 +1058,9 @@
               }
             ]
           },
-          "unit": "short",
+          "unit": "percentunit",
           "custom": {
-            "axisLabel": "Cleanup count",
+            "axisLabel": "% of expected jobs",
             "drawStyle": "line",
             "lineInterpolation": "smooth",
             "lineWidth": 2,
@@ -1075,19 +1094,19 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_deleted_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
-          "legendFormat": "{{surface}} deleted",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_deleted_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])) / clamp_min(sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])), 1)",
+          "legendFormat": "{{surface}} cleanup deleted / expected",
           "refId": "A"
         },
         {
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
-          "legendFormat": "{{surface}} failed",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])) / clamp_min(sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])), 1)",
+          "legendFormat": "{{surface}} cleanup failed / expected",
           "refId": "B"
         }
       ],
       "title": "Cleanup",
       "type": "timeseries",
-      "description": "Cleanup delete and failure counts by surface."
+      "description": "Cleanup coverage and failure percentages by surface, divided by expected jobs. Cleanup failure is an event signal, so use the diagnosis table for exact counts."
     },
     {
       "collapsed": false,
@@ -1428,19 +1447,19 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum(rate(k6_data_sent_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__rate_interval]))",
+          "expr": "sum(rate(k6_data_sent_bytes_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__rate_interval]))",
           "legendFormat": "sent",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(k6_data_received_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__rate_interval]))",
+          "expr": "sum(rate(k6_data_received_bytes_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__rate_interval]))",
           "legendFormat": "received",
           "refId": "B"
         }
       ],
       "title": "Data IO",
       "type": "timeseries",
-      "description": "k6 network data sent and received rates."
+      "description": "k6 network data sent and received rates from byte counter metrics."
     },
     {
       "collapsed": false,
@@ -2172,7 +2191,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(k6_perfpulse_jobs_submitted_total, testid)",
+        "definition": "label_values(k6_perfpulse_jobs_expected, testid)",
         "hide": 0,
         "includeAll": true,
         "label": "testid",
@@ -2180,7 +2199,7 @@
         "name": "testid",
         "options": [],
         "query": {
-          "query": "label_values(k6_perfpulse_jobs_submitted_total, testid)",
+          "query": "label_values(k6_perfpulse_jobs_expected, testid)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -2201,7 +2220,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(k6_perfpulse_jobs_submitted_total{profile=~\"cron|campaign\"}, run_class)",
+        "definition": "label_values(k6_perfpulse_jobs_expected{profile=~\"cron|campaign\"}, run_class)",
         "hide": 0,
         "includeAll": true,
         "label": "runClass",
@@ -2209,7 +2228,7 @@
         "name": "runClass",
         "options": [],
         "query": {
-          "query": "label_values(k6_perfpulse_jobs_submitted_total{profile=~\"cron|campaign\"}, run_class)",
+          "query": "label_values(k6_perfpulse_jobs_expected{profile=~\"cron|campaign\"}, run_class)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -2230,7 +2249,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(k6_perfpulse_jobs_submitted_total{profile=~\"cron|campaign\"}, profile)",
+        "definition": "label_values(k6_perfpulse_jobs_expected{profile=~\"cron|campaign\"}, profile)",
         "hide": 0,
         "includeAll": true,
         "label": "profile",
@@ -2238,7 +2257,7 @@
         "name": "profile",
         "options": [],
         "query": {
-          "query": "label_values(k6_perfpulse_jobs_submitted_total{profile=~\"cron|campaign\"}, profile)",
+          "query": "label_values(k6_perfpulse_jobs_expected{profile=~\"cron|campaign\"}, profile)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -2259,7 +2278,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(k6_perfpulse_jobs_submitted_total{profile=~\"campaign\"}, campaign_type)",
+        "definition": "label_values(k6_perfpulse_jobs_expected{profile=~\"campaign\"}, campaign_type)",
         "hide": 0,
         "includeAll": true,
         "label": "campaignType",
@@ -2267,7 +2286,7 @@
         "name": "campaignType",
         "options": [],
         "query": {
-          "query": "label_values(k6_perfpulse_jobs_submitted_total{profile=~\"campaign\"}, campaign_type)",
+          "query": "label_values(k6_perfpulse_jobs_expected{profile=~\"campaign\"}, campaign_type)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -2288,7 +2307,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(k6_perfpulse_jobs_submitted_total, surface)",
+        "definition": "label_values(k6_perfpulse_jobs_expected, surface)",
         "hide": 0,
         "includeAll": true,
         "label": "surface",
@@ -2296,7 +2315,7 @@
         "name": "surface",
         "options": [],
         "query": {
-          "query": "label_values(k6_perfpulse_jobs_submitted_total, surface)",
+          "query": "label_values(k6_perfpulse_jobs_expected, surface)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -2317,7 +2336,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(k6_perfpulse_jobs_submitted_total, scenario)",
+        "definition": "label_values(k6_perfpulse_jobs_expected, scenario)",
         "hide": 0,
         "includeAll": true,
         "label": "scenario",
@@ -2325,7 +2344,7 @@
         "name": "scenario",
         "options": [],
         "query": {
-          "query": "label_values(k6_perfpulse_jobs_submitted_total, scenario)",
+          "query": "label_values(k6_perfpulse_jobs_expected, scenario)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -2346,7 +2365,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(k6_perfpulse_jobs_submitted_total, cohort)",
+        "definition": "label_values(k6_perfpulse_jobs_expected, cohort)",
         "hide": 0,
         "includeAll": true,
         "label": "cohort",
@@ -2354,7 +2373,7 @@
         "name": "cohort",
         "options": [],
         "query": {
-          "query": "label_values(k6_perfpulse_jobs_submitted_total, cohort)",
+          "query": "label_values(k6_perfpulse_jobs_expected, cohort)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -2375,7 +2394,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(k6_perfpulse_jobs_submitted_total, job_profile)",
+        "definition": "label_values(k6_perfpulse_jobs_expected, job_profile)",
         "hide": 0,
         "includeAll": true,
         "label": "job_profile",
@@ -2383,7 +2402,7 @@
         "name": "job_profile",
         "options": [],
         "query": {
-          "query": "label_values(k6_perfpulse_jobs_submitted_total, job_profile)",
+          "query": "label_values(k6_perfpulse_jobs_expected, job_profile)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -2404,7 +2423,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(k6_perfpulse_jobs_submitted_total, namespace)",
+        "definition": "label_values(k6_perfpulse_jobs_expected, namespace)",
         "hide": 0,
         "includeAll": true,
         "label": "namespace",
@@ -2412,7 +2431,7 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(k6_perfpulse_jobs_submitted_total, namespace)",
+          "query": "label_values(k6_perfpulse_jobs_expected, namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -2463,5 +2482,5 @@
   "uid": "perfpulse",
   "version": 1,
   "weekStart": "",
-  "description": "Operator overview for PerfPulse run health, workload progress, k6 runtime behavior, HTTP behavior, and cluster signals. Submission latency is create request duration; visibility, completion, and Kueue admission latency start after the accepted create response."
+  "description": "Operator overview for PerfPulse run health, workload progress, k6 runtime behavior, HTTP behavior, and cluster signals. Submission latency is create request duration; visibility, optional completion, and Kueue admission latency start after the accepted create response. Percent panels use expected jobs as the denominator."
 }

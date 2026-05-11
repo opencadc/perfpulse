@@ -6,6 +6,7 @@ export const METRIC_NAMES = {
   completionLatencyMs: "perfpulse_completion_latency_ms",
   jobsCompleted: "perfpulse_jobs_completed",
   jobsCompletionFailed: "perfpulse_jobs_completion_failed",
+  jobsExpected: "perfpulse_jobs_expected",
   jobsSubmissionFailed: "perfpulse_jobs_submission_failed",
   jobsSubmitted: "perfpulse_jobs_submitted",
   jobsVisibilityFailed: "perfpulse_jobs_visibility_failed",
@@ -29,6 +30,8 @@ export const CUSTOM_COUNTERS = [
   METRIC_NAMES.cleanupDeleted,
   METRIC_NAMES.cleanupFailed,
 ] as const;
+
+export const CUSTOM_GAUGES = [METRIC_NAMES.jobsExpected] as const;
 
 export const CUSTOM_TRENDS = [
   METRIC_NAMES.submissionDurationMs,

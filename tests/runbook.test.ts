@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 describe("PerfPulse runbooks", () => {
   test("deployment runbook is a concise Helm guide for cron and campaigns", async () => {
     const runbook = await Bun.file("docs/runbooks/deployment.md").text();
+    const normalizedRunbook = runbook.replace(/\s+/g, " ");
 
     expect(runbook).toContain("# PerfPulse Helm Runbook");
     expect(runbook).toContain("## Prerequisites");
@@ -12,10 +13,13 @@ describe("PerfPulse runbooks", () => {
       'kubectl create job "perfpulse-cron-$' + "{SURFACE}-manual-$" + '{RUN_ID}"',
     );
     expect(runbook).toContain('--from="cronjob/perfpulse-cron-$' + '{SURFACE}"');
+    expect(runbook).toContain("Each cron surface currently has one expected job.");
+    expect(runbook).toContain("perfpulse_jobs_expected");
     expect(runbook).toContain("helm upgrade --install perfpulse-benchmark");
     expect(runbook).toContain("## Select Campaign Surfaces");
     expect(runbook).toContain("run concurrently");
     expect(runbook).toContain("`campaign.totalJobs` is per selected surface");
+    expect(runbook).toContain("percentage panels divide by expected jobs");
     expect(runbook).toContain("--set-json 'surfaces=[\"skaha\"]'");
     expect(runbook).toContain("--set-json 'surfaces=[\"k8s-direct\"]'");
     expect(runbook).toContain("--set-json 'surfaces=[\"k8s-kueue\"]'");
@@ -33,6 +37,10 @@ describe("PerfPulse runbooks", () => {
     expect(runbook).toContain("helm uninstall perfpulse-benchmark");
     expect(runbook).toContain("Completion is evidence, not the success gate.");
     expect(runbook).toContain("Dashboard evidence");
+    expect(runbook).toContain("Expected Jobs");
+    expect(normalizedRunbook).toContain("Target State Reached");
+    expect(runbook).toContain("k6_data_sent_bytes_total");
+    expect(runbook).toContain("k6_data_received_bytes_total");
     expect(runbook).not.toContain("kubectl apply -f docs/manifests");
     expect(runbook).not.toContain("--set image.repository=");
     expect(runbook).not.toContain("--set image.tag=");

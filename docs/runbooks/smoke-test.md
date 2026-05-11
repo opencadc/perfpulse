@@ -26,8 +26,8 @@ Export a local k6 web dashboard HTML report:
 bun run k6:dry-run:html
 ```
 
-The M0 executor is `shared-iterations`, a closed-model executor, because
-`spot-direct-tiny` creates one bounded workload and exits.
+The M0 executor is `shared-iterations`, a closed-model executor, because the cron-shaped direct
+smoke creates one bounded workload and exits.
 
 The HTML export uses `K6_WEB_DASHBOARD_PERIOD=1s` so the short local validation run has enough
 aggregation windows for k6 to write the report.

@@ -8,7 +8,7 @@ describe("run evidence report", () => {
       artifactLinks: [
         {
           label: "raw run archive",
-          url: "https://artifacts.example.test/perfpulse/spot-20260501-180000.tar.gz",
+          url: "https://artifacts.example.test/perfpulse/cron-20260501-180000.tar.gz",
         },
       ],
       cleanupResult: "succeeded",
@@ -16,24 +16,25 @@ describe("run evidence report", () => {
       dashboardLinks: [
         {
           label: "PerfPulse overview",
-          url: "https://grafana.example.test/d/perfpulse?var-testid=spot-20260501-180000",
+          url: "https://grafana.example.test/d/perfpulse?var-testid=cron-20260501-180000",
         },
       ],
       executor: "shared-iterations",
+      expectedWorkCount: 1,
       gitSha: "abc1234",
-      profile: "spot-direct-tiny",
+      profile: "cron",
       prometheusLinks: [
         {
-          label: "submitted jobs",
-          url: "https://prometheus.example.test/graph?g0.expr=perfpulse_jobs_submitted%7Btestid%3D%22spot-20260501-180000%22%7D",
+          label: "expected jobs",
+          url: "https://prometheus.example.test/graph?g0.expr=perfpulse_jobs_expected%7Btestid%3D%22cron-20260501-180000%22%7D",
         },
       ],
-      runClass: "spot",
+      runClass: "cron",
       runnerImage: "ghcr.io/opencadc/perfpulse:v1",
       scenario: "single-bulk-user",
       surface: "k8s-direct",
       targetNamespaces: ["canfar-perfpulse", "canfar-workloads"],
-      testid: "spot-20260501-180000",
+      testid: "cron-20260501-180000",
       thresholdsUsed: [
         "perfpulse_jobs_submission_failed count==0",
         "perfpulse_jobs_visibility_failed count==0",
@@ -42,42 +43,46 @@ describe("run evidence report", () => {
       workloadModel: "closed",
     });
 
-    expect(report).toContain("# PerfPulse Run Evidence: spot-20260501-180000");
-    expect(report).toContain("| testid | spot-20260501-180000 |");
+    expect(report).toContain("# PerfPulse Run Evidence: cron-20260501-180000");
+    expect(report).toContain("| testid | cron-20260501-180000 |");
     expect(report).toContain("| git SHA | abc1234 |");
-    expect(report).toContain("| profile | spot-direct-tiny |");
+    expect(report).toContain("| profile | cron |");
     expect(report).toContain("| surface | k8s-direct |");
     expect(report).toContain("| scenario | single-bulk-user |");
     expect(report).toContain("| executor | shared-iterations |");
     expect(report).toContain("| workload model | closed |");
+    expect(report).toContain("| run class | cron |");
     expect(report).toContain("| runner image | ghcr.io/opencadc/perfpulse:v1 |");
     expect(report).toContain("| target namespaces | canfar-perfpulse, canfar-workloads |");
+    expect(report).toContain("| expected work count | 1 |");
     expect(report).toContain("| accepted work count | 1 |");
     expect(report).toContain("| visible work count | 1 |");
     expect(report).toContain("| completed work count | 1 |");
     expect(report).toContain("| cleanup result | succeeded |");
     expect(report).toContain("- `perfpulse_jobs_submission_failed count==0`");
     expect(report).toContain(
-      "- [PerfPulse overview](https://grafana.example.test/d/perfpulse?var-testid=spot-20260501-180000)",
+      "- [PerfPulse overview](https://grafana.example.test/d/perfpulse?var-testid=cron-20260501-180000)",
     );
     expect(report).toContain(
-      "- [submitted jobs](https://prometheus.example.test/graph?g0.expr=perfpulse_jobs_submitted%7Btestid%3D%22spot-20260501-180000%22%7D)",
+      "- [expected jobs](https://prometheus.example.test/graph?g0.expr=perfpulse_jobs_expected%7Btestid%3D%22cron-20260501-180000%22%7D)",
     );
     expect(report).toContain("## Artifacts");
     expect(report).toContain(
-      "- [raw run archive](https://artifacts.example.test/perfpulse/spot-20260501-180000.tar.gz)",
+      "- [raw run archive](https://artifacts.example.test/perfpulse/cron-20260501-180000.tar.gz)",
     );
   });
 
-  test("requires an active hypothesis for benchmark and stress run notes", () => {
-    const benchmarkInput = {
+  test("requires campaign type and active hypothesis for campaign run notes", () => {
+    const campaignInput = {
       acceptedWorkCount: 100,
+      campaignType: "benchmark" as const,
       cleanupResult: "succeeded" as const,
       completedWorkCount: 95,
       executor: "constant-arrival-rate",
+      expectedWorkCount: 100,
       imageTag: "ghcr.io/opencadc/perfpulse:v1",
-      profile: "benchmark-direct-small",
-      runClass: "benchmark" as const,
+      profile: "campaign",
+      runClass: "campaign" as const,
       runnerImage: "ghcr.io/opencadc/perfpulse:v1",
       scenario: "many-logical-users",
       surface: "k8s-direct",
@@ -88,22 +93,31 @@ describe("run evidence report", () => {
       workloadModel: "open" as const,
     };
 
-    expect(() => createRunEvidenceReport(benchmarkInput)).toThrow(
-      "benchmark run evidence requires activeHypothesis",
+    expect(() => createRunEvidenceReport(campaignInput)).toThrow(
+      "campaign run evidence requires activeHypothesis",
     );
     expect(() =>
       createRunEvidenceReport({
-        ...benchmarkInput,
+        ...campaignInput,
         activeHypothesis:
           "If API-server pressure is the bottleneck, increasing create rate should increase API latency.",
       }),
     ).not.toThrow();
     expect(() =>
       createRunEvidenceReport({
-        ...benchmarkInput,
-        runClass: "spot",
+        ...omitCampaignType(campaignInput),
+        activeHypothesis:
+          "If API-server pressure is the bottleneck, increasing create rate should increase API latency.",
       }),
-    ).not.toThrow();
+    ).toThrow("campaign run evidence requires campaignType");
+    expect(() =>
+      createRunEvidenceReport({
+        ...campaignInput,
+        activeHypothesis:
+          "If API-server pressure is the bottleneck, increasing create rate should increase API latency.",
+        runClass: "cron",
+      }),
+    ).toThrow("cron run evidence must not include campaignType");
   });
 
   test("rejects sensitive values without echoing the secret", () => {
@@ -113,9 +127,10 @@ describe("run evidence report", () => {
       cleanupResult: "succeeded" as const,
       completedWorkCount: 1,
       executor: "shared-iterations",
+      expectedWorkCount: 1,
       imageTag: "ghcr.io/opencadc/perfpulse:v1",
-      profile: "spot-direct-tiny",
-      runClass: "spot" as const,
+      profile: "cron",
+      runClass: "cron" as const,
       runnerImage: "ghcr.io/opencadc/perfpulse:v1",
       scenario: "single-bulk-user",
       surface: "k8s-direct",
@@ -147,9 +162,10 @@ describe("run evidence report", () => {
       cleanupResult: "succeeded" as const,
       completedWorkCount: 1,
       executor: "shared-iterations",
+      expectedWorkCount: 1,
       imageTag: "ghcr.io/opencadc/perfpulse:v1",
-      profile: "spot-direct-tiny",
-      runClass: "spot" as const,
+      profile: "cron",
+      runClass: "cron" as const,
       runnerImage: "ghcr.io/opencadc/perfpulse:v1",
       scenario: "single-bulk-user",
       surface: "k8s-direct",
@@ -175,8 +191,9 @@ describe("run evidence report", () => {
         cleanupResult: "succeeded",
         completedWorkCount: 1,
         executor: "shared-iterations",
-        profile: "spot-direct-tiny",
-        runClass: "spot",
+        expectedWorkCount: 1,
+        profile: "cron",
+        runClass: "cron",
         runnerImage: "ghcr.io/opencadc/perfpulse:v1",
         scenario: "single-bulk-user",
         surface: "k8s-direct",
@@ -196,9 +213,10 @@ describe("run evidence report", () => {
       cleanupResult: "succeeded",
       completedWorkCount: 2,
       executor: "shared-iterations",
+      expectedWorkCount: 3,
       imageTag: "ghcr.io/opencadc/perfpulse:v1",
-      profile: "spot-kueue-tiny",
-      runClass: "spot",
+      profile: "cron",
+      runClass: "cron",
       runnerImage: "ghcr.io/opencadc/perfpulse:v1",
       scenario: "single-bulk-user",
       surface: "k8s-kueue",
@@ -212,3 +230,9 @@ describe("run evidence report", () => {
     expect(report).toContain("| admitted Kueue Workload count | 2 |");
   });
 });
+
+function omitCampaignType<T extends { campaignType: unknown }>(input: T): Omit<T, "campaignType"> {
+  const { campaignType: _campaignType, ...withoutCampaignType } = input;
+  void _campaignType;
+  return withoutCampaignType;
+}

@@ -2,7 +2,7 @@ import { check, fail, sleep } from "k6";
 import { b64encode } from "k6/encoding";
 import * as exec from "k6/execution";
 import http from "k6/http";
-import { Counter, Trend } from "k6/metrics";
+import { Counter, Gauge, Trend } from "k6/metrics";
 import { deriveRunConfigForJob, type RunConfig, resolveRunConfig } from "./config";
 import { createKubernetesClient, pollUntil } from "./kubernetes/api";
 import { runDirectKubernetesSurface } from "./kubernetes/direct";
@@ -36,6 +36,7 @@ export const options = createOptions(config);
 
 const jobsSubmitted = new Counter(METRIC_NAMES.jobsSubmitted);
 const jobsSubmissionFailed = new Counter(METRIC_NAMES.jobsSubmissionFailed);
+const jobsExpected = new Gauge(METRIC_NAMES.jobsExpected);
 const jobsVisible = new Counter(METRIC_NAMES.jobsVisible);
 const jobsVisibilityFailed = new Counter(METRIC_NAMES.jobsVisibilityFailed);
 const jobsCompleted = new Counter(METRIC_NAMES.jobsCompleted);
@@ -71,6 +72,7 @@ export default function (data: RunConfig | RuntimeData): void {
   const runConfig = deriveRuntimeConfig(runtimeData.config);
   const tags = metricTags(runConfig);
   seedFailureCounters(tags);
+  jobsExpected.add(runConfig.totalJobs, tags);
 
   if (runConfig.clientMode === "noop") {
     runNoop(runConfig, tags);

@@ -10,9 +10,10 @@ describe("campaign evidence reports", () => {
         exists: false,
         note: "Need three successful benchmark-small runs before thresholds can fail TestRuns.",
       },
-      profile: "benchmark-small",
+      campaignType: "benchmark",
+      profile: "campaign",
       preserveOnFailure: { enabled: false },
-      runClass: "benchmark",
+      runClass: "campaign",
       surfaces: [
         {
           acceptedWork: 100,
@@ -22,6 +23,7 @@ describe("campaign evidence reports", () => {
             { name: "kueue_pending_workloads", value: "4" },
           ],
           droppedIterations: 0,
+          expectedWork: 100,
           latency: { p50: "12s", p95: "33s", p99: "45s" },
           surface: "k8s-kueue",
           visibleWork: 98,
@@ -31,6 +33,7 @@ describe("campaign evidence reports", () => {
           cleanupStatus: "succeeded",
           clusterMetrics: [{ name: "apiserver_request_duration_seconds p95", value: "180ms" }],
           droppedIterations: 1,
+          expectedWork: 100,
           latency: { p50: "8s", p95: "18s", p99: "26s" },
           surface: "k8s-direct",
           visibleWork: 100,
@@ -41,9 +44,11 @@ describe("campaign evidence reports", () => {
 
     expect(report.runnable).toBe(true);
     expect(report.markdown).toContain("| Baselines exist | no |");
-    expect(report.markdown).toContain("| k8s-kueue | 100 | 98 | 12s | 33s | 45s | 0 | succeeded |");
     expect(report.markdown).toContain(
-      "| k8s-direct | 100 | 100 | 8s | 18s | 26s | 1 | succeeded |",
+      "| k8s-kueue | 100 | 100 | 98 | 98.0% | 12s | 33s | 45s | 0 | succeeded |",
+    );
+    expect(report.markdown).toContain(
+      "| k8s-direct | 100 | 100 | 100 | 100.0% | 8s | 18s | 26s | 1 | succeeded |",
     );
     expect(report.markdown).toContain("- k8s-kueue: apiserver_request_duration_seconds p95=220ms");
     expect(report.markdown).toContain(
@@ -60,14 +65,16 @@ describe("campaign evidence reports", () => {
       confirmStress: false,
       explicitProfileSelection: false,
       preserveOnFailure: { enabled: false },
-      profile: "stress-medium",
-      runClass: "stress",
+      campaignType: "stress",
+      profile: "campaign",
+      runClass: "campaign",
       stress: {
         acceptedWork: 8000,
         apiServerPressure: "elevated but observable",
         cleanupStatus: "succeeded",
         completion: { completedWork: 6000, note: "completion recorded for context only" },
         droppedIterations: 50,
+        expectedWork: 10000,
         grafanaVisibility: "PerfPulse dashboard queryable by testid",
         kueueControllerHealth: "controller available; no restart increase",
         rejectionCategories: { rate_limited: 100, server_error: 0, validation: 0 },
@@ -90,8 +97,9 @@ describe("campaign evidence reports", () => {
       confirmStress: true,
       explicitProfileSelection: true,
       preserveOnFailure: { enabled: false },
-      profile: "stress-high",
-      runClass: "stress",
+      campaignType: "stress",
+      profile: "campaign",
+      runClass: "campaign",
       stress: {
         acceptedWork: 100000,
         apiServerPressure: "p95 create latency 900ms; no sustained 5xx increase",
@@ -101,6 +109,7 @@ describe("campaign evidence reports", () => {
           note: "large batch still draining after evidence window",
         },
         droppedIterations: 120,
+        expectedWork: 100000,
         grafanaVisibility: "dashboard panels queryable by testid and surface",
         kueueControllerHealth: "controller CPU elevated; no restart increase",
         rejectionCategories: { rate_limited: 240, server_error: 3, validation: 0 },
@@ -112,7 +121,9 @@ describe("campaign evidence reports", () => {
 
     expect(report.runnable).toBe(true);
     expect(report.markdown).toContain("| Accepted work | 100000 |");
+    expect(report.markdown).toContain("| Expected work | 100000 |");
     expect(report.markdown).toContain("| Visible work | 99500 |");
+    expect(report.markdown).toContain("| Visible % | 99.5% |");
     expect(report.markdown).toContain("| Dropped iterations | 120 |");
     expect(report.markdown).toContain(
       "| API-server pressure | p95 create latency 900ms; no sustained 5xx increase |",
@@ -141,18 +152,20 @@ describe("campaign evidence reports", () => {
       preserveOnFailure: {
         enabled: true,
         labels: {
-          profile: "stress-medium",
+          profile: "campaign",
           testid: "stress-20260504-150000",
         },
       },
-      profile: "stress-medium",
-      runClass: "stress",
+      campaignType: "stress",
+      profile: "campaign",
+      runClass: "campaign",
       stress: {
         acceptedWork: 10000,
         apiServerPressure: "normal",
         cleanupStatus: "skipped",
         completion: { completedWork: 4000, note: "preserved for inspection" },
         droppedIterations: 0,
+        expectedWork: 10000,
         grafanaVisibility: "visible",
         kueueControllerHealth: "healthy",
         rejectionCategories: { rate_limited: 0, server_error: 0, validation: 0 },
@@ -192,15 +205,17 @@ describe("campaign evidence reports", () => {
       createCampaignReport({
         activeHypothesis: secret,
         baselines: { exists: true, note: "three prior successful runs" },
+        campaignType: "benchmark",
         preserveOnFailure: { enabled: false },
-        profile: "benchmark-small",
-        runClass: "benchmark",
+        profile: "campaign",
+        runClass: "campaign",
         surfaces: [
           {
             acceptedWork: 1,
             cleanupStatus: "succeeded",
             clusterMetrics: [],
             droppedIterations: 0,
+            expectedWork: 1,
             latency: { p50: "1s", p95: "2s", p99: "3s" },
             surface: "k8s-direct",
             visibleWork: 1,
@@ -214,15 +229,17 @@ describe("campaign evidence reports", () => {
       createCampaignReport({
         activeHypothesis: secret,
         baselines: { exists: true, note: "three prior successful runs" },
+        campaignType: "benchmark",
         preserveOnFailure: { enabled: false },
-        profile: "benchmark-small",
-        runClass: "benchmark",
+        profile: "campaign",
+        runClass: "campaign",
         surfaces: [
           {
             acceptedWork: 1,
             cleanupStatus: "succeeded",
             clusterMetrics: [],
             droppedIterations: 0,
+            expectedWork: 1,
             latency: { p50: "1s", p95: "2s", p99: "3s" },
             surface: "k8s-direct",
             visibleWork: 1,

@@ -60,6 +60,11 @@ surfaces. If a campaign selects all three surfaces with `totalJobs=2500`, the ca
 2,500 Direct jobs, 2,500 Kueue jobs, and 2,500 Skaha sessions. This preserves apples-to-apples
 surface comparison.
 
+Every run emits expected work as `perfpulse_jobs_expected`. For cron, expected work is currently one
+job per enabled surface. For campaigns, expected work is `totalJobs` for each selected surface.
+Dashboard percentages use expected work as the denominator so failed submissions remain visible in
+surface health.
+
 Runtime taxonomy changes to:
 
 - `runClass=cron`
@@ -146,70 +151,72 @@ The deployment runbook should become a short Helm-based operator guide:
     compared using the same workload count.
 18. As a platform operator, I want `totalJobs` to divide evenly across `logicalUsers`, so that
     every logical user has the same number of sequential submissions.
-19. As a platform operator, I want invalid job/user shapes rejected before work is created, so
+19. As a dashboard user, I want expected work emitted per surface, so that acceptance, visibility
+    failure, and cleanup percentages are based on planned work rather than only submitted work.
+20. As a platform operator, I want invalid job/user shapes rejected before work is created, so
     that a bad campaign configuration does not partially run.
-20. As a platform operator, I want each logical user to submit its jobs sequentially, so that the
+21. As a platform operator, I want each logical user to submit its jobs sequentially, so that the
     user shape is predictable and does not create a hidden parallel burst.
-21. As a platform operator, I want logical users above 25 to require confirmation, so that high
+22. As a platform operator, I want logical users above 25 to require confirmation, so that high
     concurrency is intentional.
-22. As a platform operator, I want more than 10,000 jobs per surface to require a stress campaign,
+23. As a platform operator, I want more than 10,000 jobs per surface to require a stress campaign,
     so that large quiet-window work is not launched as a normal benchmark.
-23. As a platform operator, I want stress campaigns to require explicit stress confirmation, so
+24. As a platform operator, I want stress campaigns to require explicit stress confirmation, so
     that high-load runs are deliberate.
-24. As a platform operator, I want benchmark and stress to be campaign types, so that the public
+25. As a platform operator, I want benchmark and stress to be campaign types, so that the public
     model stays small without losing dashboard grouping.
-25. As a platform operator, I want a campaign release to be uninstallable with Helm, so that
+26. As a platform operator, I want a campaign release to be uninstallable with Helm, so that
     cleanup is auditable and standard.
-26. As a platform operator, I want surface selection to be configurable, so that I can run all
+27. As a platform operator, I want surface selection to be configurable, so that I can run all
     surfaces for comparison or a single surface for diagnosis.
-27. As a platform operator, I want all surfaces selected by default for campaigns, so that the
+28. As a platform operator, I want all surfaces selected by default for campaigns, so that the
     common path compares Direct, Kueue, and Skaha without extra values.
-28. As a release owner, I want Release Please to update chart versions, so that the chart version
+29. As a release owner, I want Release Please to update chart versions, so that the chart version
     matches the application release.
-29. As a release owner, I want Release Please to update chart app versions, so that Helm metadata
+30. As a release owner, I want Release Please to update chart app versions, so that Helm metadata
     reflects the released runner.
-30. As a release owner, I want Release Please to update chart image tags, so that deployers use
+31. As a release owner, I want Release Please to update chart image tags, so that deployers use
     the released container image by default.
-31. As a release owner, I want version-tag pinning, so that release PRs can update chart values
+32. As a release owner, I want version-tag pinning, so that release PRs can update chart values
     before image build completion.
-32. As a maintainer, I want static rendered manifests removed, so that the chart is the source of
+33. As a maintainer, I want static rendered manifests removed, so that the chart is the source of
     truth.
-33. As a maintainer, I want chart rendering validated in CI, so that deleting static manifests
+34. As a maintainer, I want chart rendering validated in CI, so that deleting static manifests
     does not reduce deployment safety.
-34. As a maintainer, I want the kind proof-of-concept workflow removed from maintained CI, so that
+35. As a maintainer, I want the kind proof-of-concept workflow removed from maintained CI, so that
     CI reflects the production deployment path.
-35. As a maintainer, I want Bun to remain only the TypeScript tooling layer, so that deployment
+36. As a maintainer, I want Bun to remain only the TypeScript tooling layer, so that deployment
     behavior does not depend on a custom CLI.
-36. As a developer, I want runtime config tests for `cron` and `campaign`, so that old profile
+37. As a developer, I want runtime config tests for `cron` and `campaign`, so that old profile
     names cannot silently reappear.
-37. As a developer, I want safety-gate tests for campaign sizes and logical users, so that high
+38. As a developer, I want safety-gate tests for campaign sizes and logical users, so that high
     load cannot be triggered accidentally.
-38. As a developer, I want chart tests for RBAC and security contexts, so that Helm output keeps
+39. As a developer, I want chart tests for RBAC and security contexts, so that Helm output keeps
     the production admission contract.
-39. As a dashboard user, I want Grafana filters for `runClass=cron|campaign`, so that dashboard
+40. As a dashboard user, I want Grafana filters for `runClass=cron|campaign`, so that dashboard
     language matches the deployment model.
-40. As a dashboard user, I want Grafana filters for `campaignType`, so that benchmark and stress
+41. As a dashboard user, I want Grafana filters for `campaignType`, so that benchmark and stress
     campaigns can be separated.
-41. As a dashboard user, I want dropped iterations to show data when k6 emits it, so that runner
+42. As a dashboard user, I want dropped iterations to show data when k6 emits it, so that runner
     pressure is visible.
-42. As a dashboard user, I want data I/O to show data when k6 emits it, so that network behavior
+43. As a dashboard user, I want data I/O to show data when k6 emits it, so that network behavior
     is visible.
-43. As a dashboard user, I want Kubernetes API request rate to show data, so that control-plane
+44. As a dashboard user, I want Kubernetes API request rate to show data, so that control-plane
     pressure is visible.
-44. As a dashboard user, I want Kubernetes API p95 latency to show data, so that API-server
+45. As a dashboard user, I want Kubernetes API p95 latency to show data, so that API-server
     latency is visible.
-45. As a platform maintainer, I want the deployment runbook reduced to Helm commands, so that
+46. As a platform maintainer, I want the deployment runbook reduced to Helm commands, so that
     operators can run PerfPulse without learning the full manifest internals.
-46. As a platform maintainer, I want prerequisites documented separately, so that PerfPulse does
+47. As a platform maintainer, I want prerequisites documented separately, so that PerfPulse does
     not accidentally become responsible for installing the k6 Operator or shared platform
     namespaces.
-47. As a platform maintainer, I want the control namespace managed by the chart, so that the
+48. As a platform maintainer, I want the control namespace managed by the chart, so that the
     PerfPulse deployment can be installed predictably.
-48. As a platform maintainer, I want the workload namespace treated as platform-owned, so that a
+49. As a platform maintainer, I want the workload namespace treated as platform-owned, so that a
     PerfPulse release does not claim shared cluster resources.
-49. As a platform maintainer, I want Skaha credentials kept as a prerequisite Secret, so that
+50. As a platform maintainer, I want Skaha credentials kept as a prerequisite Secret, so that
     charts do not store or create sensitive credentials.
-50. As a platform maintainer, I want metrics credentials kept out of ConfigMaps, so that the
+51. As a platform maintainer, I want metrics credentials kept out of ConfigMaps, so that the
     existing secret-handling discipline remains intact.
 
 ## Implementation Decisions
@@ -247,6 +254,7 @@ The deployment runbook should become a short Helm-based operator guide:
 - The cron observation window is up to 10 minutes.
 - The cron success model is platform acceptance, not completion.
 - Completion metrics remain useful but do not define the hard gate.
+- Cron emits one expected job per enabled surface.
 
 ### Campaign Chart Behavior
 
@@ -254,6 +262,7 @@ The deployment runbook should become a short Helm-based operator guide:
 - `totalJobs` is required for every campaign run.
 - `logicalUsers` is required for every campaign run.
 - `totalJobs` is interpreted per selected surface.
+- Each selected surface emits `perfpulse_jobs_expected=totalJobs`.
 - The default selected surfaces are Direct, Kueue, and Skaha.
 - Operators can override surfaces for targeted diagnosis.
 - `totalJobs` must divide evenly across `logicalUsers`.
@@ -281,6 +290,8 @@ The deployment runbook should become a short Helm-based operator guide:
 - Preserve job profile terminology only where it still describes workload duration or shape.
 - Runtime labels, metric tags, dashboard variables, run evidence, and reports should use the new
   taxonomy.
+- Runtime evidence should expose expected work beside accepted, visible, completed, and cleanup
+  counts.
 
 ### Acceptance Gates
 
@@ -399,6 +410,7 @@ Surface tests should cover:
 - Skaha reports success when session creation returns a visible or Pending state.
 - Skaha records completion evidence separately when completion occurs.
 - Cleanup metrics remain emitted.
+- Expected work metrics remain emitted before acceptance outcomes are interpreted.
 - Secret material does not appear in metric tags, logs, or evidence output.
 
 ### Helm Chart Tests
@@ -433,6 +445,8 @@ Dashboard tests should cover:
 - PromQL expressions use the new runtime tag model.
 - Dropped-iteration panels query valid k6 OTLP/Prometheus metric names.
 - Data I/O panels query valid k6 OTLP/Prometheus metric names.
+- Expected jobs are available as a top-row stat and in the diagnosis matrix.
+- Target-state and cleanup percentage panels use expected jobs as the denominator.
 - API server request-rate panels use deployed Kubernetes API metric label values.
 - API server p95 latency panels use deployed Kubernetes API metric label values.
 - No-data warning panels still work after the taxonomy change.

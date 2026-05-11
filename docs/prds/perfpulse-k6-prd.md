@@ -955,6 +955,12 @@ appear as a Prometheus series like `k6_perfpulse_jobs_submitted_total`.
 
 Do not name k6 Counters with `_total` in code.
 
+### Required Custom Gauges
+
+| k6 metric name | Purpose |
+| --- | --- |
+| `perfpulse_jobs_expected` | Planned work count for the selected surface. Dashboard percentages use this as the denominator. |
+
 ### Required Custom Counters
 
 | k6 metric name | Purpose |
@@ -1207,21 +1213,22 @@ Variables:
 Panels:
 
 1. Run summary by `testid`.
-2. Jobs submitted by surface.
-3. Submission failures by surface.
-4. Jobs visible by surface.
-5. Visibility failures by surface.
-6. Jobs completed or Kueue Workloads admitted by surface.
-7. Completion or admission failures by surface.
-8. Submission latency p50/p95/p99 by surface.
-9. Visibility latency p50/p95/p99 by surface.
-10. Completion or admission latency p50/p95/p99 by surface.
-11. k6 dropped iterations.
-12. k6 HTTP request duration and failure rate by stable request name.
-13. Cleanup deleted and cleanup failures.
-14. Kueue pending and admitted workloads from existing Kueue metrics.
-15. Kueue controller CPU, memory, and restarts from existing cluster metrics.
-16. Kubernetes API-server pressure and latency from existing Prometheus metrics.
+2. Expected jobs by surface.
+3. Jobs submitted by surface.
+4. Submission failures by surface.
+5. Jobs visible by surface.
+6. Visibility failures by surface.
+7. Jobs completed or Kueue Workloads admitted by surface.
+8. Completion or admission failures by surface.
+9. Submission latency p50/p95/p99 by surface.
+10. Visibility latency p50/p95/p99 by surface.
+11. Completion or admission latency p50/p95/p99 by surface.
+12. k6 dropped iterations.
+13. k6 HTTP request duration and failure rate by stable request name.
+14. Cleanup deleted and cleanup failures.
+15. Kueue pending and admitted workloads from existing Kueue metrics.
+16. Kueue controller CPU, memory, and restarts from existing cluster metrics.
+17. Kubernetes API-server pressure and latency from existing Prometheus metrics.
 
 The dashboard should be useful for both a single run and comparisons across runs. The first
 version should prove that production Prometheus and Grafana are the primary PerfPulse evidence
