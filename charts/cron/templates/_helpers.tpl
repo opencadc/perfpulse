@@ -19,6 +19,10 @@ app.kubernetes.io/part-of: perfpulse
 {{- .Values.serviceAccount.name -}}
 {{- end -}}
 
+{{- define "perfpulse.image" -}}
+{{- printf "%s:%s" .Values.image.repository .Values.image.tag -}}
+{{- end -}}
+
 {{- define "perfpulse.podSecurityContext" -}}
 runAsGroup: 1000
 runAsNonRoot: true

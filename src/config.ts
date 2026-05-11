@@ -26,8 +26,8 @@ export const DEFAULT_SCENARIO = "single-bulk-user" as const;
 export const DEFAULT_SURFACE = "k8s-direct" as const;
 export const DEFAULT_JOB_PROFILE = "tiny" as const;
 export const DEFAULT_WORKLOAD_NAMESPACE = "canfar-workloads" as const;
-export const DEFAULT_WORKLOAD_IMAGE = "docker.io/alexeiled/stress-ng" as const;
-export const DEFAULT_SKAHA_WORKLOAD_IMAGE = "images.canfar.net/skaha/stress-ng:latest" as const;
+export const DEFAULT_WORKLOAD_IMAGE = "images.opencadc.org/platform/perfpulse:latest" as const;
+export const DEFAULT_SKAHA_WORKLOAD_IMAGE = DEFAULT_WORKLOAD_IMAGE;
 export const DEFAULT_SKAHA_API_URL =
   "http://canfar-skaha-staging-skaha-tomcat-svc.canfar-system-staging.svc.keel-prod.local:8080/skaha/v1" as const;
 export const DEFAULT_SKAHA_LOGIN_URL = "https://ws-cadc.canfar.net/ac/login" as const;
@@ -196,7 +196,12 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     "WORKLOAD_DURATION_SECONDS",
   );
 
-  const workloadCommand = parseOptionalStringArray(env.WORKLOAD_COMMAND, "WORKLOAD_COMMAND");
+  const workloadImage =
+    env.WORKLOAD_IMAGE ??
+    (surface === "skaha" ? DEFAULT_SKAHA_WORKLOAD_IMAGE : DEFAULT_WORKLOAD_IMAGE);
+  const workloadCommand =
+    parseOptionalStringArray(env.WORKLOAD_COMMAND, "WORKLOAD_COMMAND") ??
+    defaultWorkloadCommand(workloadImage);
   const defaultWorkloadArgs = defaultStressNgArgs(workloadDurationSeconds);
   const workload: WorkloadConfig = {
     activeDeadlineSeconds: parsePositiveInteger(
@@ -206,9 +211,7 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     ),
     args: parseStringArray(env.WORKLOAD_ARGS, defaultWorkloadArgs, "WORKLOAD_ARGS"),
     durationSeconds: workloadDurationSeconds,
-    image:
-      env.WORKLOAD_IMAGE ??
-      (surface === "skaha" ? DEFAULT_SKAHA_WORKLOAD_IMAGE : DEFAULT_WORKLOAD_IMAGE),
+    image: workloadImage,
     imagePullPolicy: parseImagePullPolicy(env.WORKLOAD_IMAGE_PULL_POLICY),
     ttlSecondsAfterFinished: parsePositiveInteger(
       env.WORKLOAD_TTL_SECONDS_AFTER_FINISHED,
@@ -496,6 +499,10 @@ function parseImagePullPolicy(value: string | undefined): WorkloadConfig["imageP
     return value;
   }
   throw new Error(`WORKLOAD_IMAGE_PULL_POLICY has unsupported value "${value}"`);
+}
+
+function defaultWorkloadCommand(image: string): string[] | undefined {
+  return image.startsWith("images.opencadc.org/platform/perfpulse:") ? ["stress-ng"] : undefined;
 }
 
 function parseOptionalStringArray(value: string | undefined, name: string): string[] | undefined {

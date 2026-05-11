@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { deriveRunConfigForJob, resolveRunConfig } from "../src/config";
+import { DEFAULT_WORKLOAD_IMAGE, deriveRunConfigForJob, resolveRunConfig } from "../src/config";
 import { buildDirectJobManifest, buildKueueJobManifest } from "../src/kubernetes/job";
 import { KUBERNETES_LABEL_KEYS } from "../src/labels";
 
@@ -21,8 +21,8 @@ describe("direct Kubernetes Job manifest", () => {
     expect(manifest.spec.suspend).toBe(false);
     expect(manifest.spec.backoffLimit).toBe(0);
     expect(manifest.spec.template.spec.restartPolicy).toBe("Never");
-    expect(manifest.spec.template.spec.containers[0]?.image).toBe("docker.io/alexeiled/stress-ng");
-    expect(manifest.spec.template.spec.containers[0]?.command).toBeUndefined();
+    expect(manifest.spec.template.spec.containers[0]?.image).toBe(DEFAULT_WORKLOAD_IMAGE);
+    expect(manifest.spec.template.spec.containers[0]?.command).toEqual(["stress-ng"]);
     expect(manifest.spec.template.spec.containers[0]?.args).toEqual([
       "--cpu",
       "1",

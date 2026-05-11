@@ -23,7 +23,9 @@ data:
   PROFILE: cron
   RUN_CLASS: cron
   SURFACE: {{ $surface }}
+  WORKLOAD_COMMAND: '["stress-ng"]'
   WORKLOAD_DURATION_SECONDS: {{ $.Values.testDurationSeconds | quote }}
+  WORKLOAD_IMAGE: {{ include "perfpulse.image" $ | quote }}
   VISIBILITY_GATE_SECONDS: {{ $.Values.observeSeconds | quote }}
   {{- if or (eq $surface "k8s-direct") (eq $surface "k8s-kueue") }}
   WORKLOAD_NAMESPACE: {{ $.Values.workloadNamespace }}

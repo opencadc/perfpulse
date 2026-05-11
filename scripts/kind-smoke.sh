@@ -114,6 +114,10 @@ spec:
   parallelism: 1
   script:
     localFile: /test/perfpulse.js
+  initializer:
+    image: ${IMAGE}
+    imagePullPolicy: IfNotPresent
+    serviceAccountName: canfar-perfpulse
   runner:
     image: ${IMAGE}
     imagePullPolicy: IfNotPresent
@@ -129,6 +133,10 @@ spec:
         value: ${TESTID}
       - name: WORKLOAD_NAMESPACE
         value: ${WORKLOAD_NAMESPACE}
+      - name: WORKLOAD_IMAGE
+        value: ${IMAGE}
+      - name: WORKLOAD_COMMAND
+        value: '["stress-ng"]'
       - name: K8S_INSECURE_SKIP_TLS_VERIFY
         value: "true"
       - name: K6_WEB_DASHBOARD
@@ -136,6 +144,8 @@ spec:
       - name: K6_WEB_DASHBOARD_PERIOD
         value: 1s
   starter:
+    image: ${IMAGE}
+    imagePullPolicy: IfNotPresent
     serviceAccountName: canfar-perfpulse
 YAML
 

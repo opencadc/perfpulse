@@ -615,11 +615,11 @@ with completion recorded separately when feasible. For spot checks, completion i
 
 ## Workload Design
 
-Direct Kubernetes, Kueue, and Skaha workload fixtures use bounded `stress-ng`. Direct Kubernetes
-and Kueue keep the Docker Hub image `docker.io/alexeiled/stress-ng`. Skaha uses the CANFAR registry
-image `images.canfar.net/skaha/stress-ng:latest` because the Skaha API rejects Docker Hub images in
-this environment. The workload exists to consume bounded time while keeping the primary measurement
-focused on submission, queueing, visibility, and status behavior.
+Direct Kubernetes, Kueue, and Skaha workload fixtures use bounded `stress-ng` from the released
+PerfPulse image. The same container image is used for the cron helper, k6 Operator
+initializer/starter/runner pods, and the actual bounded workload pods or Skaha sessions. The
+workload exists to consume bounded time while keeping the primary measurement focused on submission,
+queueing, visibility, and status behavior.
 
 ### Direct Kubernetes Default Workload
 
@@ -656,13 +656,14 @@ type: headless
 Skaha accepts the same workload command shape through a headless API session:
 
 ```text
-image: images.canfar.net/skaha/stress-ng:latest
+image: images.opencadc.org/platform/perfpulse:<release-tag>
 cmd: stress-ng
 args: --cpu 1 --timeout <duration-seconds>s --metrics-brief
 ```
 
 Operators can override `WORKLOAD_IMAGE`, `WORKLOAD_COMMAND`, and `WORKLOAD_ARGS` for one-off
-campaigns, but default benchmark parity keeps all surfaces on the same `stress-ng` command/args.
+campaigns, but default benchmark parity keeps all surfaces on the released PerfPulse image and the
+same `stress-ng` command/args.
 
 ### Duration Profiles
 
