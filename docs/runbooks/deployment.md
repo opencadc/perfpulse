@@ -314,7 +314,9 @@ and cleanup status for selected run labels.
 
 Use the top-row `Expected Jobs` panel and the diagnosis matrix to confirm the denominator. `Target
 State Reached`, `Target State Failures`, and `Cleanup` are percentages of expected jobs per
-surface. Counts remain available in the diagnosis matrix.
+surface. Counts remain available in the diagnosis matrix. In the diagnosis matrix, `Submit failed`
+is the submission deficit, `expected - submitted`, so a run that exits after submitting only part of
+the expected work is visible even when no explicit submit-failed counter was emitted.
 
 `Data IO` uses k6 byte counter metrics:
 
@@ -322,7 +324,10 @@ surface. Counts remain available in the diagnosis matrix.
 - `k6_data_received_bytes_total`
 
 Completion is part of the success gate. A run is incomplete if expected jobs are not submitted,
-visible, completed, and cleaned up for the selected surface.
+visible, completed, and cleaned up for the selected surface. `Completion Latency When Observed`
+requires `k6_perfpulse_jobs_completed_total` and `k6_perfpulse_completion_latency_ms_*` series for
+the selected `testid`; if it is empty while cleanup succeeded, the runtime did not emit terminal
+completion observations for that run.
 
 ## Uninstall Campaign Release
 

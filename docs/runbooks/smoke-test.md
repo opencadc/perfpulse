@@ -41,7 +41,9 @@ Purpose:
   Kubernetes Job using the default workload image.
 - Capture k6 web dashboard HTML and runner logs without requiring Prometheus or Grafana.
 
-The tiny workload uses `images.canfar.net/skaha/stress-ng:latest` and the `stress-ng` command.
+The direct Kubernetes tiny workload uses the released PerfPulse image and the `stress-ng` command.
+Skaha smoke paths use `images.canfar.net/skaha/stress-ng:latest` because Skaha allows that
+registry by default.
 
 Prerequisites:
 

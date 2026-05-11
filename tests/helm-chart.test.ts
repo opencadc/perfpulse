@@ -7,7 +7,7 @@ const dockerfile = readFileSync("Dockerfile", "utf8");
 
 describe("PerfPulse Helm charts", () => {
   test("runtime image includes every binary required by k6 operator pods", () => {
-    expect(dockerfile).toContain("FROM alpine:3.22");
+    expect(dockerfile).toMatch(/^FROM alpine:3\.\d+$/m);
     expect(dockerfile).toContain("COPY --from=k6 /usr/bin/k6 /usr/bin/k6");
     expect(dockerfile).toMatch(/apk add --no-cache .*ca-certificates.*curl.*kubectl.*stress-ng/u);
   });
@@ -36,7 +36,10 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).toContain("RUN_CLASS: cron");
     expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
     expect(manifest).toContain('WORKLOAD_DURATION_SECONDS: "60"');
-    expect(manifest).toContain('WORKLOAD_IMAGE: "images.canfar.net/skaha/stress-ng:latest"');
+    expect(
+      count(manifest, 'WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04"'),
+    ).toBe(2);
+    expect(count(manifest, 'WORKLOAD_IMAGE: "images.canfar.net/skaha/stress-ng:latest"')).toBe(1);
     expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "600"');
     expect(manifest).not.toContain("OBSERVE_SECONDS");
     expect(manifest).toContain("kind: TestRun");
@@ -92,7 +95,10 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).toContain('TOTAL_JOBS: "12"');
     expect(manifest).toContain('LOGICAL_USERS: "3"');
     expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
-    expect(manifest).toContain('WORKLOAD_IMAGE: "images.canfar.net/skaha/stress-ng:latest"');
+    expect(
+      count(manifest, 'WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04"'),
+    ).toBe(2);
+    expect(count(manifest, 'WORKLOAD_IMAGE: "images.canfar.net/skaha/stress-ng:latest"')).toBe(1);
     expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "120"');
     expect(manifest).toContain('COMPLETION_TIMEOUT_SECONDS: "300"');
     expect(manifest).toContain('POLL_JITTER_MAX_MS: "1000"');

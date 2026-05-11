@@ -619,12 +619,12 @@ itself. The session id returned from creation is used for status polling until `
 
 ## Workload Design
 
-Direct Kubernetes, Kueue, and Skaha workload fixtures use bounded `stress-ng` from
-`images.canfar.net/skaha/stress-ng:latest`. The released PerfPulse image is used for the cron
-helper and k6 Operator initializer/starter/runner pods; the workload image is separate so Skaha
-session POST requests use a registry Skaha allows by default. The workload exists to consume
-bounded time while keeping the primary measurement focused on submission, queueing, visibility, and
-status behavior.
+Direct Kubernetes and Kueue workload fixtures use bounded `stress-ng` from the released PerfPulse
+image so the workload binary matches the cluster node architecture. Skaha workload fixtures use
+bounded `stress-ng` from `images.canfar.net/skaha/stress-ng:latest` because Skaha session POST
+requests must use a registry Skaha allows by default. The workload exists to consume bounded time
+while keeping the primary measurement focused on submission, queueing, visibility, and status
+behavior.
 
 ### Direct Kubernetes Default Workload
 
@@ -663,7 +663,7 @@ Skaha accepts the same workload command shape through a headless API session:
 ```text
 image: images.canfar.net/skaha/stress-ng:latest
 cmd: stress-ng
-args: --cpu 1 --timeout <duration-seconds>s --metrics-brief
+args: --cpu 1 --temp-path /tmp --timeout <duration-seconds>s --metrics-brief
 ```
 
 Operators can override `WORKLOAD_IMAGE`, `WORKLOAD_COMMAND`, and `WORKLOAD_ARGS` for one-off

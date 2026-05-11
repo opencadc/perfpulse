@@ -26,6 +26,8 @@ describe("direct Kubernetes Job manifest", () => {
     expect(manifest.spec.template.spec.containers[0]?.args).toEqual([
       "--cpu",
       "1",
+      "--temp-path",
+      "/tmp",
       "--timeout",
       "3s",
       "--metrics-brief",

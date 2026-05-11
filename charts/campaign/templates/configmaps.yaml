@@ -38,7 +38,13 @@ data:
   TOTAL_JOBS: {{ $.Values.campaign.totalJobs | quote }}
   VISIBILITY_GATE_SECONDS: {{ $.Values.campaign.visibilityGateSeconds | quote }}
   WORKLOAD_COMMAND: '["stress-ng"]'
+  WORKLOAD_ARGS: '["--cpu","1","--temp-path","/tmp","--timeout","{{ $.Values.workload.durationSeconds }}s","--metrics-brief"]'
+  WORKLOAD_DURATION_SECONDS: {{ $.Values.workload.durationSeconds | quote }}
+  {{- if eq $surface "skaha" }}
   WORKLOAD_IMAGE: {{ $.Values.workload.image | quote }}
+  {{- else }}
+  WORKLOAD_IMAGE: {{ default (printf "%s:%s" $.Values.image.repository $.Values.image.tag) $.Values.workload.kubernetesImage | quote }}
+  {{- end }}
   {{- if or (eq $surface "k8s-direct") (eq $surface "k8s-kueue") }}
   WORKLOAD_NAMESPACE: {{ $.Values.workloadNamespace }}
   {{- end }}

@@ -96,14 +96,17 @@ Acceptance means:
 - Kueue: the Job create request succeeds and the corresponding Kueue Workload becomes visible.
 - Skaha: the session POST succeeds and returns a recognizable visible or Pending platform state.
 
-The `cron` workload uses a 60-second `stress-ng` runtime from
-`images.canfar.net/skaha/stress-ng:latest`.
+The Direct and Kueue `cron` workloads use the released PerfPulse image, which contains
+`stress-ng`. The Skaha `cron` workload request uses
+`images.canfar.net/skaha/stress-ng:latest` because Skaha allows that registry by default.
 PerfPulse may observe for up to 10 minutes because queueing or platform delay can dominate. The
 10-minute observation window should not imply that workload completion is a hard gate.
 
 All control pods created by the Helm path should use the same released PerfPulse image: the cron
-helper and k6 Operator initializer/starter/runner pods. The bounded Direct, Kueue, and Skaha
-workloads use the Skaha-allowed workload image `images.canfar.net/skaha/stress-ng:latest`.
+helper and k6 Operator initializer/starter/runner pods. Bounded Direct and Kueue Kubernetes
+workloads also default to the released PerfPulse image so they match the cluster node
+architecture. Skaha session requests use the Skaha-allowed workload image
+`images.canfar.net/skaha/stress-ng:latest`.
 The PerfPulse image includes `k6`, `curl`, and `kubectl`; `curl` is required because the k6
 Operator starter pod patches the runner status endpoint before execution starts.
 

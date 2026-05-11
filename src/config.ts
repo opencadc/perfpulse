@@ -564,5 +564,13 @@ function jobProfileDurationSeconds(jobProfile: JobProfile): number {
 }
 
 function defaultStressNgArgs(durationSeconds: number): string[] {
-  return ["--cpu", "1", "--timeout", `${durationSeconds}s`, "--metrics-brief"];
+  return [
+    "--cpu",
+    "1",
+    "--temp-path",
+    "/tmp",
+    "--timeout",
+    `${durationSeconds}s`,
+    "--metrics-brief",
+  ];
 }

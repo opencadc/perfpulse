@@ -311,16 +311,20 @@ describe("Grafana dashboard contracts", () => {
     expect(diagnosisExpressions).toContain("k6_perfpulse_jobs_expected");
     expect(diagnosisExpressions).not.toContain("perfpulse_surface_expected");
 
+    expect(diagnosisExpressions).toContain("clamp_min(");
+    expect(diagnosisExpressions).toContain("k6_perfpulse_jobs_submitted_total");
+    expect(diagnosisExpressions).toContain("or on(surface)");
     expect(diagnosisExpressions).toContain("k6_perfpulse_jobs_visible_total");
     expect(diagnosisExpressions).toContain("k6_perfpulse_jobs_visibility_failed_total");
-    expect(diagnosisExpressions).not.toContain("k6_perfpulse_jobs_completed_total");
+    expect(diagnosisExpressions).toContain("k6_perfpulse_jobs_completed_total");
+    expect(diagnosisExpressions).toContain("k6_perfpulse_jobs_completion_failed_total");
     expect(diagnosisExpressions).not.toContain("k6_perfpulse_kueue_workloads_admitted_total");
-    expect(targetStateExpressions).toContain("k6_perfpulse_jobs_visible_total");
+    expect(targetStateExpressions).toContain("k6_perfpulse_jobs_completed_total");
     expect(targetStateExpressions).toContain("k6_perfpulse_jobs_expected");
     expect(targetStateExpressions).toContain("/ clamp_min(");
     expect(targetStateExpressions).toContain('surface=~"$surface"');
     expect(targetStatePanel?.fieldConfig?.defaults.custom?.axisLabel).toBe("% of expected jobs");
-    expect(targetStateExpressions).not.toContain("k6_perfpulse_jobs_completed_total");
+    expect(targetStateExpressions).not.toContain("k6_perfpulse_jobs_visible_total");
     expect(targetStateExpressions).not.toContain("k6_perfpulse_kueue_workloads_admitted_total");
 
     const targetStateFailuresPanel = dashboard.panels.find(
@@ -333,13 +337,13 @@ describe("Grafana dashboard contracts", () => {
     expect(targetStateFailureExpressions).toContain(
       'k6_perfpulse_jobs_visibility_failed_total{testid=~"$testid",run_class=~"$runClass",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace",campaign_type=~"$campaignType"}',
     );
+    expect(targetStateFailureExpressions).toContain("k6_perfpulse_jobs_submitted_total");
+    expect(targetStateFailureExpressions).toContain("k6_perfpulse_jobs_completion_failed_total");
+    expect(targetStateFailureExpressions).toContain("or on(surface)");
     expect(targetStateFailureExpressions).toContain("k6_perfpulse_jobs_expected");
     expect(targetStateFailureExpressions).toContain("/ clamp_min(");
     expect(targetStateFailuresPanel?.fieldConfig?.defaults.custom?.axisLabel).toBe(
       "% of expected jobs",
-    );
-    expect(targetStateFailureExpressions).not.toContain(
-      "k6_perfpulse_jobs_completion_failed_total",
     );
     expect(targetStateFailureExpressions).not.toContain(
       "k6_perfpulse_kueue_workloads_admission_failed_total",

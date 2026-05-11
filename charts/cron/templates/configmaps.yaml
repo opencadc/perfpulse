@@ -26,8 +26,13 @@ data:
   SUBMISSION_JITTER_MAX_MS: {{ $.Values.submissionJitterMaxMs | quote }}
   SURFACE: {{ $surface }}
   WORKLOAD_COMMAND: '["stress-ng"]'
+  WORKLOAD_ARGS: '["--cpu","1","--temp-path","/tmp","--timeout","{{ $.Values.testDurationSeconds }}s","--metrics-brief"]'
   WORKLOAD_DURATION_SECONDS: {{ $.Values.testDurationSeconds | quote }}
+  {{- if eq $surface "skaha" }}
   WORKLOAD_IMAGE: {{ $.Values.workload.image | quote }}
+  {{- else }}
+  WORKLOAD_IMAGE: {{ default (printf "%s:%s" $.Values.image.repository $.Values.image.tag) $.Values.workload.kubernetesImage | quote }}
+  {{- end }}
   VISIBILITY_GATE_SECONDS: {{ $.Values.observeSeconds | quote }}
   {{- if or (eq $surface "k8s-direct") (eq $surface "k8s-kueue") }}
   WORKLOAD_NAMESPACE: {{ $.Values.workloadNamespace }}

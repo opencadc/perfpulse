@@ -353,6 +353,16 @@ describe("PerfPulse k6 runtime dispatch", () => {
       tags: expect.objectContaining({ surface: "k8s-direct", testid: "direct-benchmark" }),
       value: 100,
     });
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.jobsCompleted,
+      tags: expect.objectContaining({ surface: "k8s-direct", testid: "direct-benchmark" }),
+      value: 1,
+    });
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.completionLatencyMs,
+      tags: expect.objectContaining({ surface: "k8s-direct", testid: "direct-benchmark" }),
+      value: expect.any(Number),
+    });
     const createRequest = httpRequests.find(
       (request) => request.options?.tags?.name === "k8s_create_job",
     );
@@ -430,6 +440,16 @@ describe("PerfPulse k6 runtime dispatch", () => {
     );
     expect(manifest.metadata.labels["canfar-net-userid"]).toBe("perfpulse-bucket-1");
     expect(manifest.metadata.labels[KUBERNETES_LABEL_KEYS.userBucket]).toBe("bucket-1");
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.jobsCompleted,
+      tags: expect.objectContaining({ surface: "k8s-kueue", testid: "kueue-benchmark" }),
+      value: 1,
+    });
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.completionLatencyMs,
+      tags: expect.objectContaining({ surface: "k8s-kueue", testid: "kueue-benchmark" }),
+      value: expect.any(Number),
+    });
   });
 
   test("creates distinct direct and Kueue Job names for the same benchmark testid", async () => {
@@ -499,7 +519,9 @@ describe("PerfPulse k6 runtime dispatch", () => {
     expect(url.searchParams.get("image")).toBe("images.canfar.net/skaha/stress-ng:latest");
     expect(url.searchParams.get("type")).toBe("headless");
     expect(url.searchParams.get("cmd")).toBe("stress-ng");
-    expect(url.searchParams.get("args")).toBe("--cpu 1 --timeout 10s --metrics-brief");
+    expect(url.searchParams.get("args")).toBe(
+      "--cpu 1 --temp-path /tmp --timeout 10s --metrics-brief",
+    );
     expect(url.searchParams.getAll("env")).toEqual(["PERF_PULSE_TESTID=skaha-spot"]);
     expect(createRequest?.options).toMatchObject({
       headers: {
@@ -515,6 +537,22 @@ describe("PerfPulse k6 runtime dispatch", () => {
         testid: "skaha-spot",
       }),
       value: 1,
+    });
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.jobsCompleted,
+      tags: expect.objectContaining({
+        surface: "skaha",
+        testid: "skaha-spot",
+      }),
+      value: 1,
+    });
+    expect(metricRecords).toContainEqual({
+      metric: METRIC_NAMES.completionLatencyMs,
+      tags: expect.objectContaining({
+        surface: "skaha",
+        testid: "skaha-spot",
+      }),
+      value: expect.any(Number),
     });
     expect(metricRecords).not.toContainEqual(
       expect.objectContaining({

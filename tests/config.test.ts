@@ -41,7 +41,15 @@ describe("resolveRunConfig", () => {
     expect(config.workload.durationSeconds).toBe(10);
     expect(config.workload.image).toBe(DEFAULT_WORKLOAD_IMAGE);
     expect(config.workload.command).toEqual(["stress-ng"]);
-    expect(config.workload.args).toEqual(["--cpu", "1", "--timeout", "10s", "--metrics-brief"]);
+    expect(config.workload.args).toEqual([
+      "--cpu",
+      "1",
+      "--temp-path",
+      "/tmp",
+      "--timeout",
+      "10s",
+      "--metrics-brief",
+    ]);
   });
 
   test("resolves explicit benchmark campaigns without changing the default client mode", () => {
@@ -207,7 +215,15 @@ describe("resolveRunConfig", () => {
     });
     expect(config.workload.image).toBe(DEFAULT_SKAHA_WORKLOAD_IMAGE);
     expect(config.workload.command).toEqual(["stress-ng"]);
-    expect(config.workload.args).toEqual(["--cpu", "1", "--timeout", "10s", "--metrics-brief"]);
+    expect(config.workload.args).toEqual([
+      "--cpu",
+      "1",
+      "--temp-path",
+      "/tmp",
+      "--timeout",
+      "10s",
+      "--metrics-brief",
+    ]);
   });
 
   test("uses the Skaha-allowed stress-ng image and command for all default workload surfaces", () => {
