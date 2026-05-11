@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.12](https://github.com/opencadc/perfpulse/compare/v0.1.11...v0.1.12) (2026-05-11)
+
+
+### Bug Fixes
+
+* **perfpulse:** dashboards and metrics ([d9277ca](https://github.com/opencadc/perfpulse/commit/d9277ca98342d27a21038d78af085784cfe15dc6))
+
 ## [0.1.11](https://github.com/opencadc/perfpulse/compare/v0.1.10...v0.1.11) (2026-05-11)
 
 
