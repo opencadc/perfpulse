@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.9](https://github.com/opencadc/perfpulse/compare/v0.1.8...v0.1.9) (2026-05-11)
+
+
+### Features
+
+* **helm:** deployment for campaigns and cronjob ([5c0df37](https://github.com/opencadc/perfpulse/commit/5c0df3748a408d1a3684582f2c599fe25694a00a))
+
+
+### Bug Fixes
+
+* **testrun:** imporvement to metrics generated ([cab03c2](https://github.com/opencadc/perfpulse/commit/cab03c2566e46451d1a0ebead8f48aa6e4adb407))
+
 ## [0.1.8](https://github.com/opencadc/perfpulse/compare/v0.1.7...v0.1.8) (2026-05-07)
 
 
