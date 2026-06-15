@@ -2,14 +2,13 @@ import { check, fail, sleep } from "k6";
 import { b64encode } from "k6/encoding";
 import * as exec from "k6/execution";
 import http from "k6/http";
-import { Counter, Gauge, Trend } from "k6/metrics";
 import { deriveRunConfigForJob, type RunConfig, resolveRunConfig } from "./config";
-import { createKubernetesClient, type KubernetesClient, pollUntil } from "./kubernetes/api";
+import { createKubernetesClient, pollUntil } from "./kubernetes/api";
 import { runDirectKubernetesSurface } from "./kubernetes/direct";
 import { runKueueKubernetesSurface } from "./kubernetes/kueue";
-import type { JobLike, JobListLike } from "./kubernetes/status";
-import { KUBERNETES_LABEL_KEYS } from "./labels";
-import { METRIC_NAMES, type MetricTags, metricTags } from "./metrics-contract";
+import { createCleanupAdapter } from "./cleanup";
+import { createLifecycleRecorder, type LifecycleRecorder } from "./metrics";
+import { metricTags } from "./metrics-contract";
 import { createOptions } from "./options";
 import { createSkahaClient, runSkahaSurface } from "./skaha";
 
@@ -34,22 +33,6 @@ const skahaCredentials =
 
 export const options = createOptions(config);
 
-const jobsSubmitted = new Counter(METRIC_NAMES.jobsSubmitted);
-const jobsSubmissionFailed = new Counter(METRIC_NAMES.jobsSubmissionFailed);
-const jobsExpected = new Gauge(METRIC_NAMES.jobsExpected);
-const jobsVisible = new Counter(METRIC_NAMES.jobsVisible);
-const jobsVisibilityFailed = new Counter(METRIC_NAMES.jobsVisibilityFailed);
-const jobsCompleted = new Counter(METRIC_NAMES.jobsCompleted);
-const jobsCompletionFailed = new Counter(METRIC_NAMES.jobsCompletionFailed);
-const cleanupDeleted = new Counter(METRIC_NAMES.cleanupDeleted);
-const cleanupFailed = new Counter(METRIC_NAMES.cleanupFailed);
-const kueueWorkloadsAdmitted = new Counter(METRIC_NAMES.kueueWorkloadsAdmitted);
-const kueueWorkloadsAdmissionFailed = new Counter(METRIC_NAMES.kueueWorkloadsAdmissionFailed);
-const submissionDuration = new Trend(METRIC_NAMES.submissionDurationMs);
-const visibilityLatency = new Trend(METRIC_NAMES.visibilityLatencyMs);
-const completionLatency = new Trend(METRIC_NAMES.completionLatencyMs);
-const kueueAdmissionLatency = new Trend(METRIC_NAMES.kueueAdmissionLatencyMs);
-
 export function setup(): RuntimeData {
   console.log(
     `PerfPulse ${config.profile}: mode=${config.clientMode} surface=${config.surface} testid=${config.testid}`,
@@ -57,6 +40,10 @@ export function setup(): RuntimeData {
   console.log(
     "Executor rationale: closed model for cron acceptance checks; campaigns select explicit workload shape.",
   );
+  const setupConfig = resolveRunConfig(__ENV);
+  if (isCampaignRun(setupConfig)) {
+    createLifecycleRecorder(setupConfig).recordExpected(setupConfig.totalJobs);
+  }
   if (config.clientMode === "kubernetes" && config.surface === "skaha") {
     return {
       config,
@@ -70,82 +57,40 @@ export function setup(): RuntimeData {
 export default function (data: RunConfig | RuntimeData): void {
   const runtimeData = normalizeRuntimeData(data);
   const runConfig = deriveRuntimeConfig(runtimeData.config);
-  const tags = metricTags(runConfig);
-  seedFailureCounters(tags);
-  jobsExpected.add(runConfig.totalJobs, tags);
+  const recorder = createLifecycleRecorder(runConfig);
+  if (!isCampaignRun(runConfig)) {
+    recorder.recordExpected(runConfig.totalJobs);
+  }
 
   if (runConfig.clientMode === "noop") {
-    runNoop(runConfig, tags);
+    runNoop(runConfig, recorder);
     return;
   }
 
-  runKubernetesSurface(runtimeData, runConfig, tags);
+  runKubernetesSurface(runtimeData, runConfig, recorder);
 }
 
 export function teardown(data: RunConfig | RuntimeData): void {
   const runtimeData = normalizeRuntimeData(data);
   const runConfig = runtimeData.config;
-  const tags = metricTags(runConfig);
+  const recorder = createLifecycleRecorder(runConfig);
   if (!runConfig.cleanup || runConfig.clientMode !== "kubernetes") {
-    cleanupFailed.add(0, tags);
     return;
   }
 
   if (runConfig.surface === "skaha") {
-    cleanupFailed.add(0, tags);
     return;
   }
 
   const client = createKubernetesClient(runConfig, serviceAccountToken);
-  let jobs: JobListLike;
-  try {
-    jobs = client.listJobsByTestId();
-  } catch (error) {
-    cleanupDeleted.add(0, tags);
-    cleanupFailed.add(1, tags);
-    fail(
-      `Cleanup failed while listing Kubernetes Jobs for testid ${runConfig.testid} surface ${runConfig.surface}: ${boundedMessage(error)}`,
-    );
-    return;
-  }
-  const failures: string[] = [];
-  let deletedCount = 0;
-
-  for (const job of (jobs.items ?? []).filter((job) => isCurrentSurfaceJob(job, runConfig))) {
-    const jobName = job.metadata?.name;
-    if (jobName === undefined) {
-      continue;
-    }
-
-    const response = client.deleteJob(jobName);
-    const cleanupOk = isKubernetesCleanupOk(response.status);
-    check(response, {
-      "cleanup delete accepted or already gone": () => cleanupOk,
-    });
-
-    if (response.status === 200 || response.status === 202) {
-      deletedCount += 1;
-    }
-    if (!cleanupOk) {
-      failures.push(`${jobName} HTTP ${response.status}`);
-    }
-  }
-
-  cleanupDeleted.add(deletedCount, tags);
-  if (failures.length > 0) {
-    cleanupFailed.add(1, tags);
-    fail(`Cleanup failed for ${failures.length} Kubernetes Job(s): ${failures.join(", ")}`);
-  }
+  createCleanupAdapter(runConfig, recorder, { kubernetes: client }).cleanupKubernetesJobsBulk();
 }
 
-function runNoop(data: RunConfig, tags: MetricTags): void {
-  jobsSubmitted.add(1, tags);
-  submissionDuration.add(1, tags);
-  jobsVisible.add(1, tags);
-  visibilityLatency.add(1, tags);
-  jobsCompleted.add(1, tags);
-  completionLatency.add(1, tags);
-  cleanupDeleted.add(0, tags);
+function runNoop(data: RunConfig, recorder: LifecycleRecorder): void {
+  recorder.recordSubmitted(1);
+  recorder.recordVisible(1);
+  recorder.recordCompleted(1);
+  recorder.recordCleanup(0);
   check(true, {
     "noop workload submitted": (ok) => ok,
     "noop workload visible": (ok) => ok,
@@ -154,124 +99,68 @@ function runNoop(data: RunConfig, tags: MetricTags): void {
   sleep(data.noopSleepSeconds);
 }
 
-function runKubernetesSurface(runtimeData: RuntimeData, data: RunConfig, tags: MetricTags): void {
+function runKubernetesSurface(
+  runtimeData: RuntimeData,
+  data: RunConfig,
+  recorder: LifecycleRecorder,
+): void {
   applySubmissionJitter(data);
   switch (data.surface) {
     case "k8s-direct":
-      runDirectKubernetes(data, tags);
+      runDirectKubernetes(data, recorder);
       return;
     case "k8s-kueue":
-      runKueueKubernetes(data, tags);
+      runKueueKubernetes(data, recorder);
       return;
     case "skaha":
-      runSkaha(runtimeData, data, tags);
+      runSkaha(runtimeData, data, recorder);
   }
 }
 
-function runDirectKubernetes(data: RunConfig, tags: MetricTags): void {
+function runDirectKubernetes(data: RunConfig, recorder: LifecycleRecorder): void {
   const client = createKubernetesClient(data, serviceAccountToken);
-  const result = runDirectKubernetesSurface(data, client, pollUntil);
-  submissionDuration.add(result.submissionDurationMs, tags);
-
-  if (result.failure?.stage === "submission") {
-    jobsSubmissionFailed.add(1, tags);
-    fail(result.failure.message);
-  }
-
-  jobsSubmitted.add(1, tags);
+  const cleanup = createCleanupAdapter(data, recorder, { kubernetes: client });
+  const result = runDirectKubernetesSurface(data, client, pollUntil, Date.now, recorder);
   check(result.createResponse, {
     "kubernetes job create returned 201": (response) => response.status === 201,
   });
 
-  if (result.failure?.stage === "visibility") {
-    jobsVisibilityFailed.add(1, tags);
-    cleanupKubernetesJob(data, tags, client, data.jobName);
+  if (result.failure !== undefined) {
+    if (result.failure.stage !== "submission") {
+      cleanup.cleanupKubernetesJob(data.jobName);
+    }
     fail(result.failure.message);
   }
 
-  jobsVisible.add(1, tags);
-  if (result.visibilityLatencyMs !== undefined) {
-    visibilityLatency.add(result.visibilityLatencyMs, tags);
-  }
-
-  if (result.failure?.stage === "completion") {
-    jobsCompletionFailed.add(1, tags);
-    cleanupKubernetesJob(data, tags, client, data.jobName);
-    fail(result.failure.message);
-  }
-
-  if (result.completed) {
-    jobsCompleted.add(1, tags);
-  }
-  if (result.completed && result.completionLatencyMs !== undefined) {
-    completionLatency.add(result.completionLatencyMs, tags);
-  }
-  cleanupKubernetesJob(data, tags, client, data.jobName);
+  cleanup.cleanupKubernetesJob(data.jobName);
 }
 
-function runKueueKubernetes(data: RunConfig, tags: MetricTags): void {
+function runKueueKubernetes(data: RunConfig, recorder: LifecycleRecorder): void {
   const client = createKubernetesClient(data, serviceAccountToken);
+  const cleanup = createCleanupAdapter(data, recorder, { kubernetes: client });
   const result = runKueueKubernetesSurface(
     data,
     { ...data.kueue, userBucketIndex: data.userBucketIndex },
     client,
     pollUntil,
+    Date.now,
+    recorder,
   );
-  submissionDuration.add(result.submissionDurationMs, tags);
-
-  if (result.failure?.stage === "submission") {
-    jobsSubmissionFailed.add(1, tags);
-    fail(result.failure.message);
-  }
-
-  jobsSubmitted.add(1, tags);
   check(result.createResponse, {
     "kueue job create returned 201": (response) => response.status === 201,
   });
 
-  if (
-    result.failure?.stage === "job-visibility" ||
-    result.failure?.stage === "workload-visibility"
-  ) {
-    jobsVisibilityFailed.add(1, tags);
-    cleanupKubernetesJob(data, tags, client, data.jobName);
+  if (result.failure !== undefined) {
+    if (result.failure.stage !== "submission") {
+      cleanup.cleanupKubernetesJob(data.jobName);
+    }
     fail(result.failure.message);
   }
 
-  jobsVisible.add(1, tags);
-  if (result.visibilityLatencyMs !== undefined) {
-    visibilityLatency.add(result.visibilityLatencyMs, tags);
-  }
-
-  if (result.failure?.stage === "admission") {
-    kueueWorkloadsAdmissionFailed.add(1, tags);
-    cleanupKubernetesJob(data, tags, client, data.jobName);
-    fail(result.failure.message);
-  }
-
-  if (result.admitted) {
-    kueueWorkloadsAdmitted.add(1, tags);
-  }
-  if (result.admitted && result.admissionLatencyMs !== undefined) {
-    kueueAdmissionLatency.add(result.admissionLatencyMs, tags);
-  }
-
-  if (result.failure?.stage === "completion") {
-    jobsCompletionFailed.add(1, tags);
-    cleanupKubernetesJob(data, tags, client, data.jobName);
-    fail(result.failure.message);
-  }
-
-  if (result.completed) {
-    jobsCompleted.add(1, tags);
-  }
-  if (result.completed && result.completionLatencyMs !== undefined) {
-    completionLatency.add(result.completionLatencyMs, tags);
-  }
-  cleanupKubernetesJob(data, tags, client, data.jobName);
+  cleanup.cleanupKubernetesJob(data.jobName);
 }
 
-function runSkaha(runtimeData: RuntimeData, data: RunConfig, tags: MetricTags): void {
+function runSkaha(runtimeData: RuntimeData, data: RunConfig, recorder: LifecycleRecorder): void {
   const client = createSkahaClient({
     apiUrl: data.skaha.apiUrl,
     http,
@@ -279,6 +168,7 @@ function runSkaha(runtimeData: RuntimeData, data: RunConfig, tags: MetricTags): 
     runConfig: data,
     token: resolveSkahaBearerToken(runtimeData, data),
   });
+  const cleanup = createCleanupAdapter(data, recorder, { skaha: client });
   const result = runSkahaSurface(
     {
       completionTimeoutSeconds: data.completionTimeoutSeconds,
@@ -296,141 +186,19 @@ function runSkaha(runtimeData: RuntimeData, data: RunConfig, tags: MetricTags): 
     },
     client,
     pollUntil,
+    Date.now,
+    recorder,
   );
-  submissionDuration.add(result.submissionDurationMs, tags);
-
-  if (result.failure?.stage === "submission") {
-    jobsSubmissionFailed.add(1, tags);
-    cleanupSkahaSession(runtimeData, data, tags, result.createResponse.sessionId);
+  if (result.failure !== undefined) {
+    cleanup.cleanupSkahaSession(result.createResponse.sessionId);
     fail(result.failure.message);
   }
 
-  jobsSubmitted.add(1, tags);
-
-  if (result.failure?.stage === "visibility") {
-    jobsVisibilityFailed.add(1, tags);
-    cleanupSkahaSession(runtimeData, data, tags, result.createResponse.sessionId);
-    fail(result.failure.message);
-  }
-
-  jobsVisible.add(1, tags);
-  if (result.visibilityLatencyMs !== undefined) {
-    visibilityLatency.add(result.visibilityLatencyMs, tags);
-  }
-
-  if (result.failure?.stage === "completion") {
-    jobsCompletionFailed.add(1, tags);
-    cleanupSkahaSession(runtimeData, data, tags, result.createResponse.sessionId);
-    fail(result.failure.message);
-  }
-
-  if (result.completed) {
-    jobsCompleted.add(1, tags);
-  }
-  if (result.completed && result.completionLatencyMs !== undefined) {
-    completionLatency.add(result.completionLatencyMs, tags);
-  }
-  cleanupSkahaSession(runtimeData, data, tags, result.createResponse.sessionId);
+  cleanup.cleanupSkahaSession(result.createResponse.sessionId);
 }
 
-function cleanupSkahaSession(
-  runtimeData: RuntimeData,
-  data: RunConfig,
-  tags: MetricTags,
-  sessionId: string | undefined,
-): void {
-  if (!data.cleanup) {
-    cleanupDeleted.add(0, tags);
-    cleanupFailed.add(0, tags);
-    return;
-  }
-  if (sessionId === undefined) {
-    cleanupFailed.add(1, tags);
-    return;
-  }
-
-  const client = createSkahaClient({
-    apiUrl: data.skaha.apiUrl,
-    http,
-    registryAuthHeader: runtimeData.skahaRegistryAuthHeader,
-    runConfig: data,
-    token: resolveSkahaBearerToken(runtimeData, data),
-  });
-  const result = client.deleteSession(sessionId);
-  const cleanupSucceeded =
-    result.cleanupSucceeded || isSkahaSessionVerifiedGone(client.getSession(sessionId));
-  check(result, {
-    "skaha cleanup delete accepted or already gone": () => cleanupSucceeded,
-  });
-
-  if (result.deleted) {
-    cleanupDeleted.add(1, tags);
-  }
-  if (!cleanupSucceeded) {
-    cleanupFailed.add(1, tags);
-    fail(`Skaha cleanup failed with HTTP ${result.statusCode}`);
-  }
-  if (!result.cleanupSucceeded) {
-    cleanupFailed.add(0, tags);
-  }
-}
-
-function isSkahaSessionVerifiedGone(result: { found: boolean; statusCode: number }): boolean {
-  return !result.found && result.statusCode === 404;
-}
-
-function cleanupKubernetesJob(
-  data: RunConfig,
-  tags: MetricTags,
-  client: KubernetesClient,
-  jobName: string | undefined,
-): void {
-  if (!data.cleanup) {
-    cleanupDeleted.add(0, tags);
-    cleanupFailed.add(0, tags);
-    return;
-  }
-  if (jobName === undefined) {
-    cleanupFailed.add(1, tags);
-    fail("Kubernetes cleanup failed without a Job name");
-    return;
-  }
-
-  const response = client.deleteJob(jobName);
-  const cleanupOk = isKubernetesCleanupOk(response.status);
-  check(response, {
-    "cleanup delete accepted or already gone": () => cleanupOk,
-  });
-
-  if (response.status === 200 || response.status === 202) {
-    cleanupDeleted.add(1, tags);
-  }
-  if (!cleanupOk) {
-    cleanupFailed.add(1, tags);
-    fail(`Cleanup failed for Kubernetes Job ${jobName} with HTTP ${response.status}`);
-  }
-  cleanupFailed.add(0, tags);
-}
-
-function seedFailureCounters(tags: MetricTags): void {
-  jobsSubmissionFailed.add(0, tags);
-  jobsVisibilityFailed.add(0, tags);
-  jobsCompletionFailed.add(0, tags);
-  kueueWorkloadsAdmissionFailed.add(0, tags);
-  cleanupFailed.add(0, tags);
-}
-
-function isKubernetesCleanupOk(status: number): boolean {
-  return status === 200 || status === 202 || status === 404;
-}
-
-function isCurrentSurfaceJob(job: JobLike, data: RunConfig): boolean {
-  return job.metadata?.labels?.[KUBERNETES_LABEL_KEYS.surface] === data.surface;
-}
-
-function boundedMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.slice(0, 300);
+function isCampaignRun(config: RunConfig): boolean {
+  return config.profile === "campaign" || config.runClass === "campaign";
 }
 
 function normalizeRuntimeData(data: RunConfig | RuntimeData): RuntimeData {

@@ -41,6 +41,7 @@ describe("PerfPulse Helm charts", () => {
     ).toBe(2);
     expect(count(manifest, 'WORKLOAD_IMAGE: "images.canfar.net/skaha/stress-ng:latest"')).toBe(1);
     expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "600"');
+    expect(manifest).toContain("K6_OTEL_EXPORT_INTERVAL: 5s");
     expect(manifest).not.toContain("OBSERVE_SECONDS");
     expect(manifest).toContain("kind: TestRun");
     expect(manifest).toContain("secretName: perfpulse-skaha-auth");

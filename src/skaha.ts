@@ -1,4 +1,5 @@
 import type { RunConfig } from "./config";
+import type { LifecycleRecorder } from "./metrics";
 import { type MetricTags, metricTags } from "./metrics-contract";
 
 export interface SkahaHttpResponseLike {
@@ -113,6 +114,11 @@ export interface SkahaSurfaceResult {
   visibilityLatencyMs?: number;
 }
 
+type SkahaLifecycleRecorder = Pick<
+  LifecycleRecorder,
+  "recordCompleted" | "recordFailure" | "recordSubmitted" | "recordVisible"
+>;
+
 export function createSkahaClient(config: SkahaClientConfig): SkahaClient {
   const sessionUrl = `${config.apiUrl.replace(/\/+$/u, "")}/session`;
   const tags = metricTags(config.runConfig);
@@ -207,6 +213,7 @@ export function runSkahaSurface(
   client: SkahaSurfaceClient,
   pollUntil: SkahaPollUntil,
   now: () => number = Date.now,
+  recorder?: SkahaLifecycleRecorder,
 ): SkahaSurfaceResult {
   const createStartedAt = now();
   const createResponse = client.createSession(config.session);
@@ -214,6 +221,7 @@ export function runSkahaSurface(
   const submissionDurationMs = submittedAt - createStartedAt;
 
   if (!createResponse.accepted || createResponse.sessionId === undefined) {
+    recorder?.recordFailure("submission");
     return {
       completed: false,
       createResponse,
@@ -226,6 +234,8 @@ export function runSkahaSurface(
     };
   }
 
+  recorder?.recordSubmitted(submissionDurationMs);
+
   const visibleSession = pollUntil(
     config.visibilityGateSeconds,
     config.pollIntervalSeconds,
@@ -234,6 +244,7 @@ export function runSkahaSurface(
     config.pollJitterMaxMs,
   );
   if (visibleSession === undefined || !visibleSession.found) {
+    recorder?.recordFailure("visibility");
     return {
       completed: false,
       createResponse,
@@ -247,6 +258,7 @@ export function runSkahaSurface(
   }
 
   const visibilityLatencyMs = now() - submittedAt;
+  recorder?.recordVisible(visibilityLatencyMs);
   if (config.requireCompletion === false) {
     return {
       completed: false,
@@ -267,11 +279,15 @@ export function runSkahaSurface(
   );
 
   if (!isSuccessfulCompletionStatus(completedSession?.status)) {
+    recorder?.recordFailure("completion");
+    const failureMessage = isTerminalFailureStatus(completedSession?.status)
+      ? `Skaha session ${createResponse.sessionId} reached terminal status ${completedSession?.status}`
+      : `Skaha session ${createResponse.sessionId} did not reach Succeeded or Completed within ${config.completionTimeoutSeconds}s`;
     return {
       completed: false,
       createResponse,
       failure: {
-        message: `Skaha session ${createResponse.sessionId} did not reach Succeeded or Completed within ${config.completionTimeoutSeconds}s`,
+        message: failureMessage,
         stage: "completion",
       },
       submissionDurationMs,
@@ -280,9 +296,12 @@ export function runSkahaSurface(
     };
   }
 
+  const completionLatencyMs = now() - submittedAt;
+  recorder?.recordCompleted(completionLatencyMs);
+
   return {
     completed: true,
-    completionLatencyMs: now() - submittedAt,
+    completionLatencyMs,
     createResponse,
     submissionDurationMs,
     visible: true,
