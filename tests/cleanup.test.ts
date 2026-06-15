@@ -38,31 +38,44 @@ function createMetricSpy() {
   };
 }
 
+type MetricSpy = ReturnType<typeof createMetricSpy>;
+
+function metricSpy(metricsByName: Record<string, MetricSpy>, name: string): MetricSpy {
+  const metric = metricsByName[name];
+  if (metric === undefined) {
+    throw new Error(`Missing metric spy for ${name}`);
+  }
+  return metric;
+}
+
 function createMetrics(): {
   metrics: LifecycleMetrics;
   callsByName: Record<string, MetricCall[]>;
 } {
   const entries = Object.values(METRIC_NAMES).map((name) => [name, createMetricSpy()] as const);
-  const metricsByName = Object.fromEntries(entries);
+  const metricsByName = Object.fromEntries(entries) as Record<string, MetricSpy>;
 
   return {
     callsByName: Object.fromEntries(entries.map(([name, metric]) => [name, metric.calls])),
     metrics: {
-      cleanupDeleted: metricsByName[METRIC_NAMES.cleanupDeleted],
-      cleanupFailed: metricsByName[METRIC_NAMES.cleanupFailed],
-      completionLatencyMs: metricsByName[METRIC_NAMES.completionLatencyMs],
-      jobsCompleted: metricsByName[METRIC_NAMES.jobsCompleted],
-      jobsCompletionFailed: metricsByName[METRIC_NAMES.jobsCompletionFailed],
-      jobsExpected: metricsByName[METRIC_NAMES.jobsExpected],
-      jobsSubmissionFailed: metricsByName[METRIC_NAMES.jobsSubmissionFailed],
-      jobsSubmitted: metricsByName[METRIC_NAMES.jobsSubmitted],
-      jobsVisibilityFailed: metricsByName[METRIC_NAMES.jobsVisibilityFailed],
-      jobsVisible: metricsByName[METRIC_NAMES.jobsVisible],
-      kueueAdmissionLatencyMs: metricsByName[METRIC_NAMES.kueueAdmissionLatencyMs],
-      kueueWorkloadsAdmissionFailed: metricsByName[METRIC_NAMES.kueueWorkloadsAdmissionFailed],
-      kueueWorkloadsAdmitted: metricsByName[METRIC_NAMES.kueueWorkloadsAdmitted],
-      submissionDurationMs: metricsByName[METRIC_NAMES.submissionDurationMs],
-      visibilityLatencyMs: metricsByName[METRIC_NAMES.visibilityLatencyMs],
+      cleanupDeleted: metricSpy(metricsByName, METRIC_NAMES.cleanupDeleted),
+      cleanupFailed: metricSpy(metricsByName, METRIC_NAMES.cleanupFailed),
+      completionLatencyMs: metricSpy(metricsByName, METRIC_NAMES.completionLatencyMs),
+      jobsCompleted: metricSpy(metricsByName, METRIC_NAMES.jobsCompleted),
+      jobsCompletionFailed: metricSpy(metricsByName, METRIC_NAMES.jobsCompletionFailed),
+      jobsExpected: metricSpy(metricsByName, METRIC_NAMES.jobsExpected),
+      jobsSubmissionFailed: metricSpy(metricsByName, METRIC_NAMES.jobsSubmissionFailed),
+      jobsSubmitted: metricSpy(metricsByName, METRIC_NAMES.jobsSubmitted),
+      jobsVisibilityFailed: metricSpy(metricsByName, METRIC_NAMES.jobsVisibilityFailed),
+      jobsVisible: metricSpy(metricsByName, METRIC_NAMES.jobsVisible),
+      kueueAdmissionLatencyMs: metricSpy(metricsByName, METRIC_NAMES.kueueAdmissionLatencyMs),
+      kueueWorkloadsAdmissionFailed: metricSpy(
+        metricsByName,
+        METRIC_NAMES.kueueWorkloadsAdmissionFailed,
+      ),
+      kueueWorkloadsAdmitted: metricSpy(metricsByName, METRIC_NAMES.kueueWorkloadsAdmitted),
+      submissionDurationMs: metricSpy(metricsByName, METRIC_NAMES.submissionDurationMs),
+      visibilityLatencyMs: metricSpy(metricsByName, METRIC_NAMES.visibilityLatencyMs),
     },
   };
 }
