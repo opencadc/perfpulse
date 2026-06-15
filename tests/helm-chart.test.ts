@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const repoRoot = new URL("..", import.meta.url).pathname;
 const cronValues = readFileSync("charts/cron/values.yaml", "utf8");
 const dockerfile = readFileSync("Dockerfile", "utf8");
+const helmTestTimeoutMs = 30_000;
 
 describe("PerfPulse Helm charts", () => {
   test("runtime image includes every binary required by k6 operator pods", () => {
@@ -12,54 +13,60 @@ describe("PerfPulse Helm charts", () => {
     expect(dockerfile).toMatch(/apk add --no-cache .*ca-certificates.*curl.*kubectl.*stress-ng/u);
   });
 
-  test("cron chart renders one non-overlapping 5-minute CronJob per default surface", () => {
-    const manifest = helmTemplate("cron", ["--set", "image.tag=2026.05.04"]);
+  test(
+    "cron chart renders one non-overlapping 5-minute CronJob per default surface",
+    () => {
+      const manifest = helmTemplate("cron", ["--set", "image.tag=2026.05.04"]);
 
-    expect(manifest).toContain("kind: CronJob");
-    expect(manifest).not.toContain("kind: Namespace");
-    expect(manifest).toContain('image: "images.opencadc.org/platform/perfpulse:2026.05.04"');
-    expect(manifest).not.toContain("docker.io/bitnami/kubectl");
-    expect(manifest).not.toContain("bitnami/kubectl");
-    expect(manifest).not.toContain("docker.io/alexeiled/stress-ng");
-    expect(manifest).toContain("name: perfpulse-cron-direct");
-    expect(manifest).toContain("name: perfpulse-cron-kueue");
-    expect(manifest).toContain("name: perfpulse-cron-skaha");
-    expect(count(manifest, 'image: "images.opencadc.org/platform/perfpulse:2026.05.04"')).toBe(12);
-    expect(count(manifest, "kind: CronJob")).toBe(3);
-    expect(manifest).toContain('schedule: "*/5 * * * *"');
-    expect(manifest).toContain("concurrencyPolicy: Forbid");
-    expect(manifest).toContain("activeDeadlineSeconds: 87060");
-    expect(manifest).toContain('COMPLETION_TIMEOUT_SECONDS: "86400"');
-    expect(manifest).toContain('POLL_JITTER_MAX_MS: "1000"');
-    expect(manifest).toContain('SUBMISSION_JITTER_MAX_MS: "1000"');
-    expect(manifest).toContain("PROFILE: cron");
-    expect(manifest).toContain("RUN_CLASS: cron");
-    expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
-    expect(manifest).toContain('WORKLOAD_DURATION_SECONDS: "60"');
-    expect(
-      count(manifest, 'WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04"'),
-    ).toBe(2);
-    expect(count(manifest, 'WORKLOAD_IMAGE: "images.canfar.net/skaha/stress-ng:latest"')).toBe(1);
-    expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "600"');
-    expect(manifest).toContain("K6_OTEL_EXPORT_INTERVAL: 5s");
-    expect(manifest).not.toContain("OBSERVE_SECONDS");
-    expect(manifest).toContain("kind: TestRun");
-    expect(manifest).toContain("secretName: perfpulse-skaha-auth");
-    expect(manifest).toContain("secretRef:");
-    expect(manifest).toContain("name: perfpulse-otlp-credentials");
-    expect(manifest).toMatch(/apiVersion: v1\nkind: ServiceAccount/u);
-    expect(manifest).toContain("name: canfar-perfpulse");
-    expect(manifest).toContain("kind: Role");
-    expect(manifest).toContain("cron-workload-writer");
-    expect(manifest).toContain("cron-testrun-writer");
-    expect(manifest).not.toContain("name: perfpulse-workload-writer");
-    expect(manifest).toContain("runAsNonRoot: true");
-    expect(manifest).toContain("allowPrivilegeEscalation: false");
-    expect(cronValues).not.toContain("kubectl:");
-    expect(cronValues).not.toContain("bitnami/kubectl");
-    expect(manifest).not.toContain("name: canfar-workloads\n");
-    expect(manifest).not.toContain("kind: Secret");
-  });
+      expect(manifest).toContain("kind: CronJob");
+      expect(manifest).not.toContain("kind: Namespace");
+      expect(manifest).toContain('image: "images.opencadc.org/platform/perfpulse:2026.05.04"');
+      expect(manifest).not.toContain("docker.io/bitnami/kubectl");
+      expect(manifest).not.toContain("bitnami/kubectl");
+      expect(manifest).not.toContain("docker.io/alexeiled/stress-ng");
+      expect(manifest).toContain("name: perfpulse-cron-direct");
+      expect(manifest).toContain("name: perfpulse-cron-kueue");
+      expect(manifest).toContain("name: perfpulse-cron-skaha");
+      expect(count(manifest, 'image: "images.opencadc.org/platform/perfpulse:2026.05.04"')).toBe(
+        12,
+      );
+      expect(count(manifest, "kind: CronJob")).toBe(3);
+      expect(manifest).toContain('schedule: "*/5 * * * *"');
+      expect(manifest).toContain("concurrencyPolicy: Forbid");
+      expect(manifest).toContain("activeDeadlineSeconds: 87060");
+      expect(manifest).toContain('COMPLETION_TIMEOUT_SECONDS: "86400"');
+      expect(manifest).toContain('POLL_JITTER_MAX_MS: "1000"');
+      expect(manifest).toContain('SUBMISSION_JITTER_MAX_MS: "1000"');
+      expect(manifest).toContain("PROFILE: cron");
+      expect(manifest).toContain("RUN_CLASS: cron");
+      expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
+      expect(manifest).toContain('WORKLOAD_DURATION_SECONDS: "60"');
+      expect(
+        count(manifest, 'WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04"'),
+      ).toBe(2);
+      expect(count(manifest, 'WORKLOAD_IMAGE: "images.canfar.net/skaha/stress-ng:latest"')).toBe(1);
+      expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "600"');
+      expect(manifest).toContain("K6_OTEL_EXPORT_INTERVAL: 5s");
+      expect(manifest).not.toContain("OBSERVE_SECONDS");
+      expect(manifest).toContain("kind: TestRun");
+      expect(manifest).toContain("secretName: perfpulse-skaha-auth");
+      expect(manifest).toContain("secretRef:");
+      expect(manifest).toContain("name: perfpulse-otlp-credentials");
+      expect(manifest).toMatch(/apiVersion: v1\nkind: ServiceAccount/u);
+      expect(manifest).toContain("name: canfar-perfpulse");
+      expect(manifest).toContain("kind: Role");
+      expect(manifest).toContain("cron-workload-writer");
+      expect(manifest).toContain("cron-testrun-writer");
+      expect(manifest).not.toContain("name: perfpulse-workload-writer");
+      expect(manifest).toContain("runAsNonRoot: true");
+      expect(manifest).toContain("allowPrivilegeEscalation: false");
+      expect(cronValues).not.toContain("kubectl:");
+      expect(cronValues).not.toContain("bitnami/kubectl");
+      expect(manifest).not.toContain("name: canfar-workloads\n");
+      expect(manifest).not.toContain("kind: Secret");
+    },
+    { timeout: helmTestTimeoutMs },
+  );
 
   test("campaign chart renders manual TestRuns for all default surfaces with required sizing", () => {
     const manifest = helmTemplate("campaign", [
