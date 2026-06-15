@@ -413,7 +413,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
     expect(url.searchParams.get("type")).toBe("headless");
     expect(url.searchParams.get("cmd")).toBe("stress-ng");
     expect(url.searchParams.get("args")).toBe(
-      "--cpu 1 --temp-path /tmp --timeout 10s --metrics-brief",
+      "--stressors cpu --cpu 1 --temp-path /tmp --timeout 10s --metrics-brief",
     );
     expect(url.searchParams.getAll("env")).toEqual(["PERF_PULSE_TESTID=skaha-spot"]);
     expect(createRequest?.options).toMatchObject({

@@ -38,7 +38,7 @@ data:
   TOTAL_JOBS: {{ $.Values.campaign.totalJobs | quote }}
   VISIBILITY_GATE_SECONDS: {{ $.Values.campaign.visibilityGateSeconds | quote }}
   WORKLOAD_COMMAND: '["stress-ng"]'
-  WORKLOAD_ARGS: '["--cpu","1","--temp-path","/tmp","--timeout","{{ $.Values.workload.durationSeconds }}s","--metrics-brief"]'
+  WORKLOAD_ARGS: '["--stressors","cpu","--cpu","1","--temp-path","/tmp","--timeout","{{ $.Values.workload.durationSeconds }}s","--metrics-brief"]'
   WORKLOAD_DURATION_SECONDS: {{ $.Values.workload.durationSeconds | quote }}
   {{- if eq $surface "skaha" }}
   WORKLOAD_IMAGE: {{ $.Values.workload.image | quote }}
@@ -57,7 +57,7 @@ data:
   SKAHA_API_URL: {{ $.Values.skaha.apiUrl | quote }}
   SKAHA_LOGIN_URL: {{ $.Values.skaha.loginUrl | quote }}
   SKAHA_PASSWORD_PATH: /var/run/secrets/perfpulse/skaha-auth/password
-  SKAHA_REQUEST_TIMEOUT_SECONDS: "120"
+  SKAHA_REQUEST_TIMEOUT_SECONDS: {{ $.Values.skaha.requestTimeoutSeconds | quote }}
   SKAHA_USERNAME_PATH: /var/run/secrets/perfpulse/skaha-auth/username
   {{- end }}
 {{- end }}

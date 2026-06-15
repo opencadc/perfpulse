@@ -58,6 +58,7 @@ spec:
                       localFile: /test/perfpulse.js
                     initializer:
                       image: {{ include "perfpulse.image" $ | quote }}
+                      imagePullPolicy: {{ $.Values.image.pullPolicy }}
                       serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
                       securityContext:
                         runAsGroup: 1000
@@ -77,6 +78,7 @@ spec:
                           type: RuntimeDefault
                     runner:
                       image: {{ include "perfpulse.image" $ | quote }}
+                      imagePullPolicy: {{ $.Values.image.pullPolicy }}
                       serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
                       securityContext:
                         runAsGroup: 1000
@@ -115,6 +117,7 @@ spec:
                       {{- end }}
                     starter:
                       image: {{ include "perfpulse.image" $ | quote }}
+                      imagePullPolicy: {{ $.Values.image.pullPolicy }}
                       serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
                       securityContext:
                         runAsGroup: 1000

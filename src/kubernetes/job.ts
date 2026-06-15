@@ -122,12 +122,12 @@ function buildJobManifest(
       limits: {
         cpu: "100m",
         "ephemeral-storage": "1Gi",
-        memory: "256Mi",
+        memory: "1Gi",
       },
       requests: {
         cpu: "100m",
         "ephemeral-storage": "1Gi",
-        memory: "256Mi",
+        memory: "1Gi",
       },
     },
     securityContext: RESTRICTED_CONTAINER_SECURITY_CONTEXT,

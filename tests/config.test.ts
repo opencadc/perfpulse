@@ -43,6 +43,8 @@ describe("resolveRunConfig", () => {
     expect(config.workload.image).toBe(DEFAULT_WORKLOAD_IMAGE);
     expect(config.workload.command).toEqual(["stress-ng"]);
     expect(config.workload.args).toEqual([
+      "--stressors",
+      "cpu",
       "--cpu",
       "1",
       "--temp-path",
@@ -212,12 +214,14 @@ describe("resolveRunConfig", () => {
       apiUrl: EXPECTED_DEFAULT_SKAHA_API_URL,
       loginUrl: "https://ws-cadc.canfar.net/ac/login",
       passwordPath: "/var/run/secrets/perfpulse/skaha-auth/password",
-      requestTimeoutSeconds: 30,
+      requestTimeoutSeconds: 600,
       usernamePath: "/var/run/secrets/perfpulse/skaha-auth/username",
     });
     expect(config.workload.image).toBe(DEFAULT_SKAHA_WORKLOAD_IMAGE);
     expect(config.workload.command).toEqual(["stress-ng"]);
     expect(config.workload.args).toEqual([
+      "--stressors",
+      "cpu",
       "--cpu",
       "1",
       "--temp-path",

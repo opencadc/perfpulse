@@ -1,6 +1,7 @@
 import type { Options } from "k6/options";
 import type { RunConfig } from "./config";
 import { METRIC_NAMES, metricTags } from "./metrics-contract";
+import { computeScenarioMaxDurationSeconds } from "./scenario-max-duration";
 
 export type ReadTextFile = (path: string) => string;
 
@@ -23,7 +24,7 @@ function createScenarios(config: RunConfig): NonNullable<Options["scenarios"]> {
       executor: "shared-iterations",
       gracefulStop: "30s",
       iterations: config.totalJobs,
-      maxDuration: `${config.completionTimeoutSeconds + config.visibilityGateSeconds + 60}s`,
+      maxDuration: `${computeScenarioMaxDurationSeconds(config)}s`,
       vus: config.logicalUsers,
     },
   };

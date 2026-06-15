@@ -8,7 +8,7 @@ describe("Grafana dashboard contracts", () => {
     expect(dashboard.tags).toEqual(["perfpulse", "overview"]);
     expect(dashboard.schemaVersion).toBe(39);
     expect(dashboard.title).toBe("PerfPulse Overview");
-    expect(dashboard.uid).toBe("perfpulse");
+    expect(dashboard.uid).toBe("perfpulse-dashboard");
     expect(dashboard.editable).toBe(false);
   });
 
@@ -17,7 +17,7 @@ describe("Grafana dashboard contracts", () => {
     const dashboard = JSON.parse(dashboardJson) as Dashboard;
     const templatedPrometheusUid = "$" + "{DS_PROMETHEUS}";
 
-    expect(dashboard.uid).toBe("perfpulse");
+    expect(dashboard.uid).toBe("perfpulse-dashboard");
     expect(dashboard.title).toBe("PerfPulse Overview");
     expect(dashboardJson).not.toContain(templatedPrometheusUid);
     expect(dashboardJson).not.toContain("perfpulse_surface_expected");
@@ -59,9 +59,16 @@ describe("Grafana dashboard contracts", () => {
 
     expect(dashboard.panels.map((panel) => [panel.title, panel.type])).toEqual(
       expect.arrayContaining([
+        ["Operator Health", "row"],
+        ["Cron Direct OK", "stat"],
+        ["Recent Cron Runs", "table"],
         ["Diagnosis Matrix", "table"],
         ["Expected Jobs", "stat"],
-        ["Run Outcome Trend", "timeseries"],
+        ["Jobs Completed", "stat"],
+        ["Target State OK", "stat"],
+        ["Completion Failures", "stat"],
+        ["Surface Lifecycle Trend", "timeseries"],
+        ["Cron Health Trend", "timeseries"],
         ["No Data Warning", "stat"],
         ["k6 Runtime", "row"],
         ["HTTP Analytics", "row"],
@@ -83,16 +90,27 @@ describe("Grafana dashboard contracts", () => {
     const dashboardFilters =
       'testid=~"$testid",run_class=~"$runClass",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",cohort=~"$cohort",job_profile=~"$job_profile",namespace=~"$namespace",campaign_type=~"$campaignType"';
 
-    expect(statExpressions).toMatchObject({
+    const filteredStatExpressions = Object.fromEntries(
+      Object.entries(statExpressions).filter(
+        ([title]) => !["Cron Direct OK", "Cron Kueue OK", "Cron Skaha OK"].includes(title),
+      ),
+    );
+
+    expect(statExpressions["Cron Direct OK"]).toContain("last_over_time(");
+    expect(statExpressions["Cron Direct OK"]).toContain("count(sum by (testid)");
+    expect(filteredStatExpressions).toMatchObject({
       "Cleanup Failures": `sum(last_over_time(k6_perfpulse_cleanup_failed_total{${dashboardFilters}}[$__range]))`,
+      "Completion Failures": `sum(last_over_time(k6_perfpulse_jobs_completion_failed_total{${dashboardFilters}}[$__range]))`,
       "Expected Jobs": `sum(last_over_time(k6_perfpulse_jobs_expected{${dashboardFilters}}[$__range]))`,
+      "Jobs Completed": `sum(last_over_time(k6_perfpulse_jobs_completed_total{${dashboardFilters}}[$__range]))`,
       "Jobs Submitted": `sum(last_over_time(k6_perfpulse_jobs_submitted_total{${dashboardFilters}}[$__range]))`,
       "Jobs Visible": `sum(last_over_time(k6_perfpulse_jobs_visible_total{${dashboardFilters}}[$__range]))`,
+      "Target State OK": `100 * sum(last_over_time(k6_perfpulse_jobs_completed_total{${dashboardFilters}}[$__range])) / clamp_min(sum(last_over_time(k6_perfpulse_jobs_expected{${dashboardFilters}}[$__range])), 1)`,
     });
     expect(statExpressions["Expected Jobs"]).not.toContain("or vector(0)");
-    expect(Object.values(statExpressions).join("\n")).toContain('testid=~"$testid"');
-    expect(Object.values(statExpressions).join("\n")).toContain("last_over_time(");
-    expect(Object.values(statExpressions).join("\n")).not.toContain("increase(");
+    expect(Object.values(filteredStatExpressions).join("\n")).toContain('testid=~"$testid"');
+    expect(Object.values(filteredStatExpressions).join("\n")).toContain("last_over_time(");
+    expect(Object.values(filteredStatExpressions).join("\n")).not.toContain("increase(");
   });
 
   test("uses sparse completed-run histogram buckets for latency panels", async () => {
@@ -126,6 +144,14 @@ describe("Grafana dashboard contracts", () => {
     expect(allLatencyExpressions).toContain('testid=~"$testid"');
     expect(allLatencyExpressions).toContain('surface=~"$surface"');
     expect(allLatencyExpressions).not.toMatch(/_p(?:50|95|99)\b/);
+
+    const completionLatencyExpressions =
+      latencyExpressions["Completion Latency When Observed"] ?? [];
+    expect(completionLatencyExpressions.join("\n")).toContain("rate(");
+    expect(completionLatencyExpressions.join("\n")).toContain(
+      "k6_perfpulse_completion_latency_ms_sum",
+    );
+    expect(completionLatencyExpressions.join("\n")).not.toContain("last_over_time(");
   });
 
   test("uses regex matchers for multi-value template variables", async () => {
@@ -184,8 +210,8 @@ describe("Grafana dashboard contracts", () => {
     );
 
     expect(dashboard.description?.trim()).not.toBe("");
-    expect(dashboard.description).toContain("Submission latency is create request duration");
-    expect(dashboard.description).toContain("start after the accepted create response");
+    expect(dashboard.description).toContain("Operator Health");
+    expect(dashboard.description).toContain("Recent Cron Runs");
     expect(panelDescriptions["Diagnosis Matrix"]).toContain("shown as one table");
     expect(panelDescriptions["Diagnosis Matrix"]).toContain("accepted create response");
     expect(panelDescriptions["Submission Latency"]).toContain(
@@ -196,9 +222,11 @@ describe("Grafana dashboard contracts", () => {
     );
     expect(panelDescriptions["Visibility Latency"]).toContain("excludes submission duration");
     expect(panelDescriptions["Completion Latency When Observed"]).toContain(
-      "measured from accepted create response",
+      "Post-submit completion latency",
     );
-    expect(panelDescriptions["Completion Latency When Observed"]).toContain("wait for completion");
+    expect(panelDescriptions["Completion Latency When Observed"]).toContain(
+      "terminal success",
+    );
     expect(panelDescriptions["Kueue Admission Latency"]).toContain(
       "measured from accepted create response",
     );
@@ -278,13 +306,14 @@ describe("Grafana dashboard contracts", () => {
     ]);
   });
 
-  test("keeps diagnosis first and target-state logic surface aware", async () => {
+  test("keeps operator health first and target-state logic surface aware", async () => {
     const dashboard = await loadDashboard();
     const firstPanel = dashboard.panels[0];
-    if (firstPanel === undefined) {
-      throw new Error("Dashboard has no panels");
+    const diagnosisPanel = dashboard.panels.find((panel) => panel.title === "Diagnosis Matrix");
+    if (firstPanel === undefined || diagnosisPanel === undefined) {
+      throw new Error("Dashboard missing operator health or diagnosis panels");
     }
-    const diagnosisExpressions = targetExpressions(firstPanel).join("\n");
+    const diagnosisExpressions = targetExpressions(diagnosisPanel).join("\n");
     const targetStatePanel = dashboard.panels.find(
       (panel) => panel.title === "Target State Reached",
     );
@@ -294,10 +323,11 @@ describe("Grafana dashboard contracts", () => {
       : "";
     const cleanupExpressions = cleanupPanel ? targetExpressions(cleanupPanel).join("\n") : "";
 
-    expect(firstPanel.title).toBe("Diagnosis Matrix");
-    expect(firstPanel.type).toBe("table");
-    expect(firstPanel.transformations).toEqual([{ id: "merge", options: {} }]);
-    expect(displayNameOverrides(firstPanel)).toEqual([
+    expect(firstPanel.title).toBe("Operator Health");
+    expect(firstPanel.type).toBe("row");
+    expect(diagnosisPanel.type).toBe("table");
+    expect(diagnosisPanel.transformations).toEqual([{ id: "merge", options: {} }]);
+    expect(displayNameOverrides(diagnosisPanel)).toEqual([
       "Expected",
       "Submitted",
       "Visible",
@@ -382,7 +412,12 @@ describe("Grafana dashboard contracts", () => {
       dashboard.panels.map((panel) => [panel.title, targetExpressions(panel).join("\n")]),
     );
 
-    expect(expressionsByTitle["Run Outcome Trend"]).toContain("sum by (testid, surface)");
+    expect(expressionsByTitle["Surface Lifecycle Trend"]).toContain("sum by (surface)");
+    expect(expressionsByTitle["Surface Lifecycle Trend"]).toContain("k6_perfpulse_jobs_submitted_total");
+    expect(expressionsByTitle["Surface Lifecycle Trend"]).toContain("k6_perfpulse_jobs_completed_total");
+    expect(expressionsByTitle["Cron Health Trend"]).toContain('profile="cron"');
+    expect(expressionsByTitle["Cron Health Trend"]).toContain("last_over_time(");
+    expect(expressionsByTitle["Cron Health Trend"]).not.toContain("increase(");
     expect(expressionsByTitle["Dropped Iterations"]).toContain("k6_dropped_iterations_total");
     expect(expressionsByTitle.Iterations).toContain("k6_iterations_total");
     expect(expressionsByTitle["Virtual Users"]).toContain("k6_vus");

@@ -225,6 +225,8 @@ export function jobProfileDurationSeconds(jobProfile: JobProfile): number {
 
 export function defaultStressNgArgs(durationSeconds: number): string[] {
   return [
+    "--stressors",
+    "cpu",
     "--cpu",
     "1",
     "--temp-path",

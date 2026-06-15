@@ -100,6 +100,7 @@ export interface RunConfig {
 
 export const SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 export const DEFAULT_SKAHA_PASSWORD_PATH = "/var/run/secrets/perfpulse/skaha-auth/password";
+export const DEFAULT_SKAHA_REQUEST_TIMEOUT_SECONDS = 600;
 export const DEFAULT_SKAHA_USERNAME_PATH = "/var/run/secrets/perfpulse/skaha-auth/username";
 export const DEFAULT_CAMPAIGN_COMPLETION_TIMEOUT_SECONDS = 259_200;
 export const DEFAULT_CRON_COMPLETION_TIMEOUT_SECONDS = 86_400;

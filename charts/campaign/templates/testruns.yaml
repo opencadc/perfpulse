@@ -20,6 +20,7 @@ spec:
     localFile: /test/perfpulse.js
   initializer:
     image: {{ include "perfpulse.image" $ | quote }}
+    imagePullPolicy: {{ $.Values.image.pullPolicy }}
     serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
     securityContext:
 {{ include "perfpulse.podSecurityContext" $ | indent 6 }}
@@ -27,6 +28,7 @@ spec:
 {{ include "perfpulse.containerSecurityContext" $ | indent 6 }}
   runner:
     image: {{ include "perfpulse.image" $ | quote }}
+    imagePullPolicy: {{ $.Values.image.pullPolicy }}
     serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
     securityContext:
 {{ include "perfpulse.podSecurityContext" $ | indent 6 }}
@@ -53,6 +55,7 @@ spec:
     {{- end }}
   starter:
     image: {{ include "perfpulse.image" $ | quote }}
+    imagePullPolicy: {{ $.Values.image.pullPolicy }}
     serviceAccountName: {{ include "perfpulse.serviceAccountName" $ }}
     securityContext:
 {{ include "perfpulse.podSecurityContext" $ | indent 6 }}

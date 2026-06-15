@@ -16,7 +16,7 @@ describe("k6 options contract", () => {
       executor: "shared-iterations",
       gracefulStop: "30s",
       iterations: 1,
-      maxDuration: "240s",
+      maxDuration: "600s",
       vus: 1,
     });
   });
@@ -64,6 +64,8 @@ describe("k6 options contract", () => {
         LOGICAL_USERS: "100",
         PROFILE: "campaign",
         TOTAL_JOBS: "10000",
+        VISIBILITY_GATE_SECONDS: "120",
+        WORKLOAD_DURATION_SECONDS: "30",
       }),
     );
     const scenario = options.scenarios?.campaign;
@@ -71,7 +73,7 @@ describe("k6 options contract", () => {
     expect(scenario).toMatchObject({
       executor: "shared-iterations",
       iterations: 10000,
-      maxDuration: "259320s",
+      maxDuration: "39300s",
       vus: 100,
     });
   });

@@ -22,6 +22,459 @@
   "links": [],
   "panels": [
     {
+      "collapsed": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 34,
+      "panels": [],
+      "title": "Operator Health",
+      "type": "row",
+      "description": "Steady-state cron acceptance without selecting a testid. Each surface should reach 100% target state for the latest cron check in the dashboard time range."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Target-state percentage for k8s-direct cron checks observed in the last 15 minutes.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "id": 35,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "100 * count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",surface=\"k8s-direct\"}[15m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",surface=\"k8s-direct\"}[15m])) >= 1), 1)",
+          "legendFormat": "Cron Direct OK",
+          "refId": "A"
+        }
+      ],
+      "title": "Cron Direct OK",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Target-state percentage for k8s-kueue cron checks observed in the last 15 minutes.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
+      "id": 36,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "100 * count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",surface=\"k8s-kueue\"}[15m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",surface=\"k8s-kueue\"}[15m])) >= 1), 1)",
+          "legendFormat": "Cron Kueue OK",
+          "refId": "A"
+        }
+      ],
+      "title": "Cron Kueue OK",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Target-state percentage for skaha cron checks observed in the last 15 minutes.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "id": 37,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "100 * count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",surface=\"skaha\"}[15m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",surface=\"skaha\"}[15m])) >= 1), 1)",
+          "legendFormat": "Cron Skaha OK",
+          "refId": "A"
+        }
+      ],
+      "title": "Cron Skaha OK",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Recent cron checks grouped by testid and surface. Use this to pick a failing testid for drilldown without guessing from the variable list.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Expected"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Completed"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Completion failed"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #D"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Cleanup failed"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 38,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "testid"
+          }
+        ]
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "max by (testid, surface) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",testid=~\"cron-.*\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "max by (testid, surface) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",testid=~\"cron-.*\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "expr": "max by (testid, surface) (last_over_time(k6_perfpulse_jobs_completion_failed_total{profile=\"cron\",testid=~\"cron-.*\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "refId": "C"
+        },
+        {
+          "expr": "max by (testid, surface) (last_over_time(k6_perfpulse_cleanup_failed_total{profile=\"cron\",testid=~\"cron-.*\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Recent Cron Runs",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Rolling cron target-state percentage by surface using 15-minute windows. Values below 100% mean recent cron checks did not fully complete.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "custom": {
+            "axisLabel": "Cron target state %",
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 44,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",surface=\"k8s-direct\"}[5m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",surface=\"k8s-direct\"}[5m])) >= 1), 1)",
+          "legendFormat": "k8s-direct",
+          "refId": "A"
+        },
+        {
+          "expr": "count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",surface=\"k8s-kueue\"}[5m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",surface=\"k8s-kueue\"}[5m])) >= 1), 1)",
+          "legendFormat": "k8s-kueue",
+          "refId": "B"
+        },
+        {
+          "expr": "count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",surface=\"skaha\"}[5m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",surface=\"skaha\"}[5m])) >= 1), 1)",
+          "legendFormat": "skaha",
+          "refId": "C"
+        }
+      ],
+      "title": "Cron Health Trend",
+      "type": "timeseries"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -146,7 +599,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 20
       },
       "id": 1,
       "options": {
@@ -276,7 +729,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 7
+        "y": 27
       },
       "id": 2,
       "options": {
@@ -333,9 +786,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
+        "w": 4,
         "x": 0,
-        "y": 10
+        "y": 30
       },
       "id": 3,
       "options": {
@@ -392,9 +845,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 10
+        "w": 4,
+        "x": 4,
+        "y": 30
       },
       "id": 4,
       "options": {
@@ -451,9 +904,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 10
+        "w": 4,
+        "x": 8,
+        "y": 30
       },
       "id": 5,
       "options": {
@@ -510,9 +963,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 10
+        "w": 4,
+        "x": 0,
+        "y": 34
       },
       "id": 6,
       "options": {
@@ -579,7 +1032,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 38
       },
       "id": 7,
       "options": {
@@ -599,14 +1052,24 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "sum by (testid, surface) (k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"})",
-          "legendFormat": "{{testid}} {{surface}} visible",
+          "expr": "sum by (surface) (k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"})",
+          "legendFormat": "{{surface}} submitted",
           "refId": "A"
+        },
+        {
+          "expr": "sum by (surface) (k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"})",
+          "legendFormat": "{{surface}} visible",
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (surface) (k6_perfpulse_jobs_completed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"})",
+          "legendFormat": "{{surface}} completed",
+          "refId": "C"
         }
       ],
-      "title": "Run Outcome Trend",
+      "title": "Surface Lifecycle Trend",
       "type": "timeseries",
-      "description": "Accepted and visible work by test and surface over time. Completion is part of the per-job lifecycle; Kueue admission remains a separate diagnostic signal."
+      "description": "Lifecycle counts aggregated by surface for the selected filters. Prefer this over per-testid trends when testid is All."
     },
     {
       "datasource": {
@@ -644,7 +1107,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 22
+        "y": 46
       },
       "id": 8,
       "options": {
@@ -667,11 +1130,16 @@
           "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_completed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])) / clamp_min(sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])), 1)",
           "legendFormat": "{{surface}} completed / expected",
           "refId": "A"
+        },
+        {
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_completion_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])) / clamp_min(sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])), 1)",
+          "legendFormat": "{{surface}} completion failed / expected",
+          "refId": "B"
         }
       ],
       "title": "Target State Reached",
       "type": "timeseries",
-      "description": "Target-state percentage by surface: terminal completions divided by expected jobs for the selected run."
+      "description": "Terminal completion percentage by surface. Empty when no jobs reached a successful terminal state for the selected filters."
     },
     {
       "datasource": {
@@ -709,7 +1177,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 22
+        "y": 46
       },
       "id": 9,
       "options": {
@@ -784,7 +1252,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 29
+        "y": 53
       },
       "id": 10,
       "options": {
@@ -859,7 +1327,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 29
+        "y": 53
       },
       "id": 11,
       "options": {
@@ -934,7 +1402,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 37
+        "y": 61
       },
       "id": 12,
       "options": {
@@ -954,24 +1422,29 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
+          "expr": "histogram_quantile(0.50, sum by (le, surface) (rate(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__rate_interval])))",
           "legendFormat": "p50 {{surface}}",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (rate(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__rate_interval])))",
           "legendFormat": "p95 {{surface}}",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le, surface) (last_over_time(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])))",
+          "expr": "histogram_quantile(0.99, sum by (le, surface) (rate(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__rate_interval])))",
           "legendFormat": "p99 {{surface}}",
           "refId": "C"
+        },
+        {
+          "expr": "sum by (surface) (rate(k6_perfpulse_completion_latency_ms_sum{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__rate_interval])) / clamp_min(sum by (surface) (rate(k6_perfpulse_completion_latency_ms_count{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "avg {{surface}}",
+          "refId": "D"
         }
       ],
       "title": "Completion Latency When Observed",
       "type": "timeseries",
-      "description": "Post-submit completion latency, measured from accepted create response until terminal completion. Campaign and cron runs now wait for completion before each lifecycle iteration finishes."
+      "description": "Post-submit completion latency for jobs that reached terminal success. Uses rate-based histogram queries so long campaigns populate the panel as completions arrive. Empty when no successful completions exist for the selected filters."
     },
     {
       "datasource": {
@@ -1009,7 +1482,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 37
+        "y": 61
       },
       "id": 13,
       "options": {
@@ -1084,7 +1557,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 45
+        "y": 69
       },
       "id": 14,
       "options": {
@@ -1128,7 +1601,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 52
+        "y": 76
       },
       "id": 15,
       "panels": [],
@@ -1172,7 +1645,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 53
+        "y": 77
       },
       "id": 16,
       "options": {
@@ -1237,7 +1710,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 53
+        "y": 77
       },
       "id": 17,
       "options": {
@@ -1302,7 +1775,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 53
+        "y": 77
       },
       "id": 18,
       "options": {
@@ -1367,7 +1840,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 59
+        "y": 83
       },
       "id": 19,
       "options": {
@@ -1437,7 +1910,7 @@
         "h": 6,
         "w": 16,
         "x": 8,
-        "y": 59
+        "y": 83
       },
       "id": 20,
       "options": {
@@ -1481,7 +1954,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 65
+        "y": 89
       },
       "id": 21,
       "panels": [],
@@ -1525,7 +1998,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 66
+        "y": 90
       },
       "id": 22,
       "options": {
@@ -1590,7 +2063,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 66
+        "y": 90
       },
       "id": 23,
       "options": {
@@ -1655,7 +2128,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 66
+        "y": 90
       },
       "id": 24,
       "options": {
@@ -1712,7 +2185,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 72
+        "y": 96
       },
       "id": 25,
       "options": {
@@ -1765,7 +2238,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 80
+        "y": 104
       },
       "id": 26,
       "panels": [],
@@ -1809,7 +2282,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 81
+        "y": 105
       },
       "id": 27,
       "options": {
@@ -1874,7 +2347,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 81
+        "y": 105
       },
       "id": 28,
       "options": {
@@ -1939,7 +2412,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 81
+        "y": 105
       },
       "id": 29,
       "options": {
@@ -1978,7 +2451,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 87
+        "y": 111
       },
       "id": 30,
       "panels": [],
@@ -2022,7 +2495,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 88
+        "y": 112
       },
       "id": 31,
       "options": {
@@ -2087,7 +2560,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 88
+        "y": 112
       },
       "id": 32,
       "options": {
@@ -2152,7 +2625,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 88
+        "y": 112
       },
       "id": 33,
       "options": {
@@ -2180,9 +2653,335 @@
       "title": "Workload Pods Running",
       "type": "timeseries",
       "description": "Running workload pods by selected namespace."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Terminal completions recorded for the selected filters.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "w": 4,
+        "x": 12,
+        "y": 30
+      },
+      "id": 39,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_completed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
+          "legendFormat": "Jobs Completed",
+          "refId": "A"
+        }
+      ],
+      "title": "Jobs Completed",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Jobs that reached a terminal failure state for the selected filters.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "w": 4,
+        "x": 16,
+        "y": 30
+      },
+      "id": 40,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_completion_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
+          "legendFormat": "Completion Failures",
+          "refId": "A"
+        }
+      ],
+      "title": "Completion Failures",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Percentage of expected jobs that reached terminal success for the selected filters.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "w": 4,
+        "x": 20,
+        "y": 30
+      },
+      "id": 41,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "100 * sum(last_over_time(k6_perfpulse_jobs_completed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])) / clamp_min(sum(last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range])), 1)",
+          "legendFormat": "Target State OK",
+          "refId": "A"
+        }
+      ],
+      "title": "Target State OK",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Jobs that were submitted but never became visible for the selected filters.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "w": 4,
+        "x": 4,
+        "y": 34
+      },
+      "id": 42,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_visibility_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
+          "legendFormat": "Visibility Failures",
+          "refId": "A"
+        }
+      ],
+      "title": "Visibility Failures",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Explicit submission failures recorded for the selected filters.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "w": 4,
+        "x": 8,
+        "y": 34
+      },
+      "id": 43,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_submission_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",profile=~\"$profile\",surface=~\"$surface\",scenario=~\"$scenario\",cohort=~\"$cohort\",job_profile=~\"$job_profile\",namespace=~\"$namespace\",campaign_type=~\"$campaignType\"}[$__range]))",
+          "legendFormat": "Submission Failures",
+          "refId": "A"
+        }
+      ],
+      "title": "Submission Failures",
+      "type": "stat"
     }
   ],
-  "refresh": "5m",
+  "refresh": "1m",
   "schemaVersion": 39,
   "tags": [
     "perfpulse",
@@ -2252,8 +3051,8 @@
         "allValue": ".*",
         "current": {
           "selected": true,
-          "text": "All",
-          "value": "$__all"
+          "text": "cron",
+          "value": "cron"
         },
         "datasource": {
           "type": "prometheus",
@@ -2489,8 +3288,8 @@
   "timepicker": {},
   "timezone": "browser",
   "title": "PerfPulse Overview",
-  "uid": "perfpulse",
+  "uid": "perfpulse-dashboard",
   "version": 1,
   "weekStart": "",
-  "description": "Operator overview for PerfPulse run health, workload progress, k6 runtime behavior, HTTP behavior, and cluster signals. Submission latency is create request duration; visibility, optional completion, and Kueue admission latency start after the accepted create response. Percent panels use expected jobs as the denominator."
+  "description": "Operator overview for PerfPulse run health. Start with Operator Health for cron acceptance without picking a testid; use Recent Cron Runs to choose a failing testid. When testid is All, top stat totals aggregate every run in the time range. Filtered panels below follow the selected variables."
 }

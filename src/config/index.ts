@@ -28,6 +28,7 @@ import {
   DEFAULT_SKAHA_API_URL,
   DEFAULT_SKAHA_LOGIN_URL,
   DEFAULT_SKAHA_PASSWORD_PATH,
+  DEFAULT_SKAHA_REQUEST_TIMEOUT_SECONDS,
   DEFAULT_SKAHA_USERNAME_PATH,
   DEFAULT_SKAHA_WORKLOAD_IMAGE,
   DEFAULT_SURFACE,
@@ -128,7 +129,7 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     passwordPath: env.SKAHA_PASSWORD_PATH ?? DEFAULT_SKAHA_PASSWORD_PATH,
     requestTimeoutSeconds: parsePositiveInteger(
       env.SKAHA_REQUEST_TIMEOUT_SECONDS,
-      30,
+      DEFAULT_SKAHA_REQUEST_TIMEOUT_SECONDS,
       "SKAHA_REQUEST_TIMEOUT_SECONDS",
     ),
     usernamePath: env.SKAHA_USERNAME_PATH ?? DEFAULT_SKAHA_USERNAME_PATH,
@@ -163,7 +164,7 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   const workload: RunConfig["workload"] = {
     activeDeadlineSeconds: parsePositiveInteger(
       env.WORKLOAD_ACTIVE_DEADLINE_SECONDS,
-      180,
+      Math.max(180, workloadDurationSeconds + 90),
       "WORKLOAD_ACTIVE_DEADLINE_SECONDS",
     ),
     args: parseStringArray(env.WORKLOAD_ARGS, defaultWorkloadArgs, "WORKLOAD_ARGS"),
