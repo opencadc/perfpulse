@@ -60,12 +60,15 @@ export interface SkahaConfig {
   usernamePath: string;
 }
 
+export type ExpectedJobsEmission = "per-iteration" | "setup-once";
+
 export interface RunConfig {
   campaignType?: CampaignType;
   cleanup: boolean;
   clientMode: ClientMode;
   cohort: "baseline";
   completionTimeoutSeconds: number;
+  expectedJobsEmission: ExpectedJobsEmission;
   jobIndex: number;
   jobName: string;
   jobProfile: JobProfile;

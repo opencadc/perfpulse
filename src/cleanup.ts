@@ -61,7 +61,6 @@ function cleanupKubernetesJobInline(
   jobName: string | undefined,
 ): void {
   if (!config.cleanup) {
-    recorder.recordCleanup(0);
     return;
   }
   if (jobName === undefined) {
@@ -97,7 +96,6 @@ function cleanupSkahaSessionInline(
   sessionId: string | undefined,
 ): void {
   if (!config.cleanup) {
-    recorder.recordCleanup(0);
     return;
   }
   if (sessionId === undefined) {
@@ -141,7 +139,6 @@ function cleanupKubernetesJobsBulk(
   try {
     jobs = client.listJobsByTestId();
   } catch (error) {
-    recorder.recordCleanup(0);
     recorder.recordFailure("cleanup");
     fail(
       `Cleanup failed while listing Kubernetes Jobs for testid ${config.testid} surface ${config.surface}: ${boundedMessage(error)}`,

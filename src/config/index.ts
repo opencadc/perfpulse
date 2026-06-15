@@ -193,6 +193,7 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     clientMode,
     cohort: "baseline",
     completionTimeoutSeconds,
+    expectedJobsEmission: profile === "campaign" ? "setup-once" : "per-iteration",
     jobIndex: 0,
     jobName: makeJobName(testid, surface, 0),
     jobProfile,

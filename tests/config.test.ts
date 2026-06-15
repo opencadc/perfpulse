@@ -25,6 +25,7 @@ describe("resolveRunConfig", () => {
     expect(config.surface).toBe("k8s-direct");
     expect(config.testid).toBe("local-noop");
     expect(config.jobName).toBe("perfpulse-local-noop-direct-0");
+    expect(config.expectedJobsEmission).toBe("per-iteration");
   });
 
   test("resolves the M0.5 kind Kubernetes path", () => {
@@ -70,6 +71,7 @@ describe("resolveRunConfig", () => {
     expect(config.jobProfile).toBe("small");
     expect(config.jobsPerSurface).toBe(100);
     expect(config.totalJobs).toBe(100);
+    expect(config.expectedJobsEmission).toBe("setup-once");
     expect(config.logicalUsers).toBe(1);
     expect(config.userShape).toBe("1x100");
     expect(config.workload.durationSeconds).toBe(30);

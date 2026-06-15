@@ -4,6 +4,7 @@ import * as exec from "k6/execution";
 import http from "k6/http";
 import { createCleanupAdapter } from "./cleanup";
 import { deriveRunConfigForJob, type RunConfig, resolveRunConfig } from "./config";
+import { finishSurfaceRun } from "./finish-surface-run";
 import { createKubernetesClient, pollUntil } from "./kubernetes/api";
 import { runDirectKubernetesSurface } from "./kubernetes/direct";
 import { runKueueKubernetesSurface } from "./kubernetes/kueue";
@@ -41,7 +42,7 @@ export function setup(): RuntimeData {
     "Executor rationale: closed model for cron acceptance checks; campaigns select explicit workload shape.",
   );
   const setupConfig = resolveRunConfig(__ENV);
-  if (isCampaignRun(setupConfig)) {
+  if (setupConfig.expectedJobsEmission === "setup-once") {
     createLifecycleRecorder(setupConfig).recordExpected(setupConfig.totalJobs);
   }
   if (config.clientMode === "kubernetes" && config.surface === "skaha") {
@@ -58,7 +59,7 @@ export default function (data: RunConfig | RuntimeData): void {
   const runtimeData = normalizeRuntimeData(data);
   const runConfig = deriveRuntimeConfig(runtimeData.config);
   const recorder = createLifecycleRecorder(runConfig);
-  if (!isCampaignRun(runConfig)) {
+  if (runConfig.expectedJobsEmission === "per-iteration") {
     recorder.recordExpected(runConfig.totalJobs);
   }
 
@@ -90,7 +91,6 @@ function runNoop(data: RunConfig, recorder: LifecycleRecorder): void {
   recorder.recordSubmitted(1);
   recorder.recordVisible(1);
   recorder.recordCompleted(1);
-  recorder.recordCleanup(0);
   check(true, {
     "noop workload submitted": (ok) => ok,
     "noop workload visible": (ok) => ok,
@@ -121,18 +121,13 @@ function runDirectKubernetes(data: RunConfig, recorder: LifecycleRecorder): void
   const client = createKubernetesClient(data, serviceAccountToken);
   const cleanup = createCleanupAdapter(data, recorder, { kubernetes: client });
   const result = runDirectKubernetesSurface(data, client, pollUntil, Date.now, recorder);
-  check(result.createResponse, {
-    "kubernetes job create returned 201": (response) => response.status === 201,
-  });
-
-  if (result.failure !== undefined) {
-    if (result.failure.stage !== "submission") {
-      cleanup.cleanupKubernetesJob(data.jobName);
-    }
-    fail(result.failure.message);
-  }
-
-  cleanup.cleanupKubernetesJob(data.jobName);
+  finishSurfaceRun(
+    data,
+    cleanup,
+    result,
+    { "kubernetes job create returned 201": (response) => response.status === 201 },
+    (adapter) => adapter.cleanupKubernetesJob(data.jobName),
+  );
 }
 
 function runKueueKubernetes(data: RunConfig, recorder: LifecycleRecorder): void {
@@ -146,18 +141,13 @@ function runKueueKubernetes(data: RunConfig, recorder: LifecycleRecorder): void 
     Date.now,
     recorder,
   );
-  check(result.createResponse, {
-    "kueue job create returned 201": (response) => response.status === 201,
-  });
-
-  if (result.failure !== undefined) {
-    if (result.failure.stage !== "submission") {
-      cleanup.cleanupKubernetesJob(data.jobName);
-    }
-    fail(result.failure.message);
-  }
-
-  cleanup.cleanupKubernetesJob(data.jobName);
+  finishSurfaceRun(
+    data,
+    cleanup,
+    result,
+    { "kueue job create returned 201": (response) => response.status === 201 },
+    (adapter) => adapter.cleanupKubernetesJob(data.jobName),
+  );
 }
 
 function runSkaha(runtimeData: RuntimeData, data: RunConfig, recorder: LifecycleRecorder): void {
@@ -189,16 +179,9 @@ function runSkaha(runtimeData: RuntimeData, data: RunConfig, recorder: Lifecycle
     Date.now,
     recorder,
   );
-  if (result.failure !== undefined) {
-    cleanup.cleanupSkahaSession(result.createResponse.sessionId);
-    fail(result.failure.message);
-  }
-
-  cleanup.cleanupSkahaSession(result.createResponse.sessionId);
-}
-
-function isCampaignRun(config: RunConfig): boolean {
-  return config.profile === "campaign" || config.runClass === "campaign";
+  finishSurfaceRun(data, cleanup, result, undefined, (adapter) =>
+    adapter.cleanupSkahaSession(result.createResponse.sessionId),
+  );
 }
 
 function normalizeRuntimeData(data: RunConfig | RuntimeData): RuntimeData {
