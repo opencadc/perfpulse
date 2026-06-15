@@ -232,9 +232,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
     Reflect.set(globalThis, "__ENV", campaignEnv);
     runtime.setup();
 
-    expect(
-      metricRecords.filter((record) => record.metric === METRIC_NAMES.jobsExpected),
-    ).toEqual([
+    expect(metricRecords.filter((record) => record.metric === METRIC_NAMES.jobsExpected)).toEqual([
       {
         metric: METRIC_NAMES.jobsExpected,
         tags: expect.objectContaining({ surface: "k8s-direct", testid: "campaign-expected" }),
@@ -249,9 +247,9 @@ describe("PerfPulse k6 runtime dispatch", () => {
       runtime.default(config);
     }
 
-    expect(
-      metricRecords.filter((record) => record.metric === METRIC_NAMES.jobsExpected),
-    ).toEqual([]);
+    expect(metricRecords.filter((record) => record.metric === METRIC_NAMES.jobsExpected)).toEqual(
+      [],
+    );
 
     Reflect.set(globalThis, "__ENV", savedEnv);
   });
@@ -489,7 +487,10 @@ describe("PerfPulse k6 runtime dispatch", () => {
 
     expect(
       metricRecords
-        .filter((record) => record.tags?.surface === "k8s-direct" && record.tags?.testid === "direct-ordered")
+        .filter(
+          (record) =>
+            record.tags?.surface === "k8s-direct" && record.tags?.testid === "direct-ordered",
+        )
         .map((record) => record.metric),
     ).toEqual([
       METRIC_NAMES.jobsExpected,

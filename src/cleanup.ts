@@ -1,7 +1,7 @@
 import { check, fail } from "k6";
 import type { RunConfig } from "./config";
-import { KUBERNETES_LABEL_KEYS } from "./labels";
 import type { JobLike, JobListLike } from "./kubernetes/status";
+import { KUBERNETES_LABEL_KEYS } from "./labels";
 import type { LifecycleRecorder } from "./metrics";
 
 export interface KubernetesJobDeleter {

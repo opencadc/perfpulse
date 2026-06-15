@@ -23,26 +23,20 @@ describe("direct Kubernetes Test surface", () => {
       return list;
     };
 
-    runDirectKubernetesSurface(
-      config,
-      createClient(),
-      poller,
-      () => timestamps.shift() ?? 600,
-      {
-        recordCompleted(completionLatencyMs) {
-          lifecycleEvents.push(["completed", completionLatencyMs]);
-        },
-        recordFailure(stage) {
-          lifecycleEvents.push(["failure", stage]);
-        },
-        recordSubmitted(submissionDurationMs) {
-          lifecycleEvents.push(["submitted", submissionDurationMs]);
-        },
-        recordVisible(visibilityLatencyMs) {
-          lifecycleEvents.push(["visible", visibilityLatencyMs]);
-        },
+    runDirectKubernetesSurface(config, createClient(), poller, () => timestamps.shift() ?? 600, {
+      recordCompleted(completionLatencyMs) {
+        lifecycleEvents.push(["completed", completionLatencyMs]);
       },
-    );
+      recordFailure(stage) {
+        lifecycleEvents.push(["failure", stage]);
+      },
+      recordSubmitted(submissionDurationMs) {
+        lifecycleEvents.push(["submitted", submissionDurationMs]);
+      },
+      recordVisible(visibilityLatencyMs) {
+        lifecycleEvents.push(["visible", visibilityLatencyMs]);
+      },
+    });
 
     expect(lifecycleEvents).toEqual([
       ["submitted", 100],
@@ -147,26 +141,20 @@ describe("direct Kubernetes Test surface", () => {
     const lifecycleEvents: Array<[string, number | string | undefined]> = [];
     const poller: PollUntil = () => undefined;
 
-    const result = runDirectKubernetesSurface(
-      config,
-      createClient(),
-      poller,
-      () => 10,
-      {
-        recordCompleted(completionLatencyMs) {
-          lifecycleEvents.push(["completed", completionLatencyMs]);
-        },
-        recordFailure(stage) {
-          lifecycleEvents.push(["failure", stage]);
-        },
-        recordSubmitted(submissionDurationMs) {
-          lifecycleEvents.push(["submitted", submissionDurationMs]);
-        },
-        recordVisible(visibilityLatencyMs) {
-          lifecycleEvents.push(["visible", visibilityLatencyMs]);
-        },
+    const result = runDirectKubernetesSurface(config, createClient(), poller, () => 10, {
+      recordCompleted(completionLatencyMs) {
+        lifecycleEvents.push(["completed", completionLatencyMs]);
       },
-    );
+      recordFailure(stage) {
+        lifecycleEvents.push(["failure", stage]);
+      },
+      recordSubmitted(submissionDurationMs) {
+        lifecycleEvents.push(["submitted", submissionDurationMs]);
+      },
+      recordVisible(visibilityLatencyMs) {
+        lifecycleEvents.push(["visible", visibilityLatencyMs]);
+      },
+    });
 
     expect(result.failure?.stage).toBe("visibility");
     expect(lifecycleEvents).toEqual([

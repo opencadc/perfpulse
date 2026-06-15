@@ -9,16 +9,13 @@ import {
 } from "../profiles";
 import {
   CAMPAIGN_TYPES,
-  DEFAULT_JOB_PROFILE,
-  DEFAULT_PROFILE,
-  DEFAULT_SCENARIO,
-  DEFAULT_SURFACE,
-  PROFILES,
-  RUN_CLASSES,
   type CampaignType,
   type ClientMode,
+  DEFAULT_SURFACE,
   type EnvSource,
+  PROFILES,
   type Profile,
+  RUN_CLASSES,
   type RunClass,
   type WorkloadConfig,
 } from "./profile-defaults";
@@ -91,7 +88,10 @@ export function parseOptionalScenario(value: string | undefined, fallback: Scena
   throw new Error(`SCENARIO has unsupported value "${value}"`);
 }
 
-export function parseOptionalJobProfile(value: string | undefined, fallback: JobProfile): JobProfile {
+export function parseOptionalJobProfile(
+  value: string | undefined,
+  fallback: JobProfile,
+): JobProfile {
   if (value === undefined || value === "") {
     return fallback;
   }
@@ -128,7 +128,11 @@ export function resolveSurfaces(env: EnvSource, profile: Profile): Surface[] {
   return uniqueSurfaces as Surface[];
 }
 
-export function parsePositiveInteger(value: string | undefined, fallback: number, name: string): number {
+export function parsePositiveInteger(
+  value: string | undefined,
+  fallback: number,
+  name: string,
+): number {
   if (value === undefined || value === "") {
     return fallback;
   }
@@ -184,7 +188,10 @@ export function defaultWorkloadCommand(image: string): string[] | undefined {
     : undefined;
 }
 
-export function parseOptionalStringArray(value: string | undefined, name: string): string[] | undefined {
+export function parseOptionalStringArray(
+  value: string | undefined,
+  name: string,
+): string[] | undefined {
   if (value === undefined || value === "") {
     return undefined;
   }

@@ -1,8 +1,8 @@
 import { describe, expect, mock, test } from "bun:test";
 import { resolveRunConfig } from "../src/config";
 import { KUBERNETES_LABEL_KEYS } from "../src/labels";
-import { METRIC_NAMES, metricTags } from "../src/metrics-contract";
 import type { LifecycleMetrics } from "../src/metrics";
+import { METRIC_NAMES, metricTags } from "../src/metrics-contract";
 
 interface MetricCall {
   tags?: Record<string, string> | undefined;
@@ -18,15 +18,12 @@ mock.module("k6", () => ({
 
 mock.module("k6/metrics", () => ({
   Counter: class Counter {
-    constructor(_name: string) {}
     add(): void {}
   },
   Gauge: class Gauge {
-    constructor(_name: string) {}
     add(): void {}
   },
   Trend: class Trend {
-    constructor(_name: string) {}
     add(): void {}
   },
 }));
@@ -62,8 +59,7 @@ function createMetrics(): {
       jobsVisibilityFailed: metricsByName[METRIC_NAMES.jobsVisibilityFailed],
       jobsVisible: metricsByName[METRIC_NAMES.jobsVisible],
       kueueAdmissionLatencyMs: metricsByName[METRIC_NAMES.kueueAdmissionLatencyMs],
-      kueueWorkloadsAdmissionFailed:
-        metricsByName[METRIC_NAMES.kueueWorkloadsAdmissionFailed],
+      kueueWorkloadsAdmissionFailed: metricsByName[METRIC_NAMES.kueueWorkloadsAdmissionFailed],
       kueueWorkloadsAdmitted: metricsByName[METRIC_NAMES.kueueWorkloadsAdmitted],
       submissionDurationMs: metricsByName[METRIC_NAMES.submissionDurationMs],
       visibilityLatencyMs: metricsByName[METRIC_NAMES.visibilityLatencyMs],
@@ -381,10 +377,7 @@ describe("CleanupAdapter", () => {
 
     adapter.cleanupKubernetesJobsBulk();
 
-    expect(deletedNames).toEqual([
-      "perfpulse-bulk-many-direct-0",
-      "perfpulse-bulk-many-direct-1",
-    ]);
+    expect(deletedNames).toEqual(["perfpulse-bulk-many-direct-0", "perfpulse-bulk-many-direct-1"]);
     expect(callsByName[METRIC_NAMES.cleanupDeleted]).toEqual([
       { tags: metricTags(config), value: 2 },
     ]);

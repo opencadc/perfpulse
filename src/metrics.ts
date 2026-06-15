@@ -1,6 +1,6 @@
 import { Counter, Gauge, Trend } from "k6/metrics";
 import type { RunConfig } from "./config";
-import { METRIC_NAMES, metricTags, type MetricTags } from "./metrics-contract";
+import { METRIC_NAMES, type MetricTags, metricTags } from "./metrics-contract";
 
 export type LifecycleFailureStage =
   | "submission"

@@ -456,8 +456,7 @@ describe("Skaha user-facing surface client", () => {
 
     expect(result.completed).toBe(false);
     expect(result.failure).toEqual({
-      message:
-        "Skaha session session-abc did not reach Succeeded or Completed within 120s",
+      message: "Skaha session session-abc did not reach Succeeded or Completed within 120s",
       stage: "completion",
     });
   });

@@ -1,10 +1,4 @@
-import type {
-  JobProfile,
-  MetricProfile,
-  Scenario,
-  Surface,
-  TestRunGrouping,
-} from "../profiles";
+import type { JobProfile, MetricProfile, Scenario, Surface, TestRunGrouping } from "../profiles";
 
 export type { JobProfile, Scenario, Surface } from "../profiles";
 
