@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.13](https://github.com/opencadc/perfpulse/compare/v0.1.12...v0.1.13) (2026-06-15)
+
+
+### Bug Fixes
+
+* **perfpulse:** lifecycle evidence and OTLP reliability (#CADC-15790) ([cf7a98b](https://github.com/opencadc/perfpulse/commit/cf7a98b3622325f2b696ba63efe4f9359f87243a))
+* **perfpulse:** lifecycle evidence and OTLP reliability (#CADC-15790) ([e48e504](https://github.com/opencadc/perfpulse/commit/e48e5044ae408a7d147f58a4ae7246dda63d1eb5))
+* **test:** include sleep in cleanup k6 mock for Bun 1.2.12 ([7752451](https://github.com/opencadc/perfpulse/commit/7752451af8647fa6f125540107f85223799cf37d))
+* **test:** raise helm cron template test timeout for CI ([6e26916](https://github.com/opencadc/perfpulse/commit/6e269161a88a08394455dc9f68284917e7eb2f6d))
+* **test:** satisfy LifecycleMetrics typecheck in metric spies ([580537f](https://github.com/opencadc/perfpulse/commit/580537fc61512a2a264cca7613ab63a5a7e750d7))
+* **test:** stop k6/metrics mock leaking into runtime tests ([f6e7717](https://github.com/opencadc/perfpulse/commit/f6e7717933ae0e93a59b78cf8716ed4604a8fa5b))
+
 ## [0.1.12](https://github.com/opencadc/perfpulse/compare/v0.1.11...v0.1.12) (2026-05-11)
 
 
