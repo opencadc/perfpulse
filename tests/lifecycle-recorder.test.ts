@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { resolveRunConfig } from "../src/config";
 import type { LifecycleMetrics } from "../src/metrics";
 import { METRIC_NAMES, metricTags } from "../src/metrics-contract";
@@ -7,18 +7,6 @@ interface MetricCall {
   tags?: Record<string, string> | undefined;
   value: number;
 }
-
-mock.module("k6/metrics", () => ({
-  Counter: class Counter {
-    add(): void {}
-  },
-  Gauge: class Gauge {
-    add(): void {}
-  },
-  Trend: class Trend {
-    add(): void {}
-  },
-}));
 
 function createMetricSpy() {
   const calls: MetricCall[] = [];

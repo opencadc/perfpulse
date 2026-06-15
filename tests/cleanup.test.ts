@@ -16,18 +16,6 @@ mock.module("k6", () => ({
   },
 }));
 
-mock.module("k6/metrics", () => ({
-  Counter: class Counter {
-    add(): void {}
-  },
-  Gauge: class Gauge {
-    add(): void {}
-  },
-  Trend: class Trend {
-    add(): void {}
-  },
-}));
-
 function createMetricSpy() {
   const calls: MetricCall[] = [];
   return {
