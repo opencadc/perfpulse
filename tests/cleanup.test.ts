@@ -15,6 +15,7 @@ mock.module("k6", () => ({
   fail: (message: string) => {
     throw new Error(message);
   },
+  sleep: () => {},
 }));
 
 function createMetricSpy() {
