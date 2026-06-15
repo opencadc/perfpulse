@@ -1,217 +1,85 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { resolveRunConfig } from "../src/config";
 import { KUBERNETES_LABEL_KEYS } from "../src/labels";
 import { METRIC_NAMES, metricTags } from "../src/metrics-contract";
-
-interface MetricRecord {
-  metric: string;
-  tags?: Record<string, string> | undefined;
-  value: number;
-}
-
-interface HttpRequest {
-  body?: string | null;
-  method: string;
-  options?:
-    | {
-        headers?: Record<string, string>;
-        tags?: {
-          name?: string;
-        } & Record<string, string>;
-      }
-    | undefined;
-  url: string;
-}
-
-const metricRecords: MetricRecord[] = [];
-const httpRequests: HttpRequest[] = [];
-const createdJobs: Array<{ labels?: Record<string, string>; name: string }> = [];
-const runtimeEvents: string[] = [];
-const sleepCalls: number[] = [];
-const deleteStatuses: number[] = [];
-const sessionGetStatuses: number[] = [];
-let listJobsStatus: number | undefined;
-let iterationInTest = 0;
-let vuIdInTest = 1;
-let workloadAdmitted = true;
-let jobConditionType: "Complete" | "Failed" | undefined = "Complete";
-let sessionStatus = "Completed";
-
-Reflect.set(globalThis, "__ENV", {
-  PERF_PULSE_CLIENT_MODE: "kubernetes",
-  PROFILE: "cron",
-  SKAHA_API_URL: "https://ws.example/skaha/v1",
-  SKAHA_PASSWORD_PATH: "/var/run/secrets/perfpulse/skaha-auth/password",
-  SKAHA_USERNAME_PATH: "/var/run/secrets/perfpulse/skaha-auth/username",
-  SURFACE: "skaha",
-  TESTID: "skaha-spot",
-});
-Reflect.set(globalThis, "open", (path: string) => {
-  if (path.endsWith("/username")) {
-    return "runtime-user\n";
-  }
-  if (path.endsWith("/password")) {
-    return " runtime-password ";
-  }
-  return "service-account-token\n";
-});
-
-mock.module("k6", () => ({
-  check: () => true,
-  fail: (message: string) => {
-    throw new Error(message);
-  },
-  sleep: (seconds: number) => {
-    sleepCalls.push(seconds);
-    runtimeEvents.push("sleep");
-  },
-}));
-
-mock.module("k6/metrics", () => ({
-  Counter: class Counter {
-    readonly name: string;
-
-    constructor(name: string) {
-      this.name = name;
-    }
-
-    add(value: number, tags?: Record<string, string>): void {
-      metricRecords.push({ metric: this.name, tags, value });
-    }
-  },
-  Gauge: class Gauge {
-    readonly name: string;
-
-    constructor(name: string) {
-      this.name = name;
-    }
-
-    add(value: number, tags?: Record<string, string>): void {
-      metricRecords.push({ metric: this.name, tags, value });
-    }
-  },
-  Trend: class Trend {
-    readonly name: string;
-
-    constructor(name: string) {
-      this.name = name;
-    }
-
-    add(value: number, tags?: Record<string, string>): void {
-      metricRecords.push({ metric: this.name, tags, value });
-    }
-  },
-}));
-
-mock.module("k6/http", () => ({
-  default: {
-    del(url: string, body: string | null, options?: HttpRequest["options"]) {
-      httpRequests.push({ body, method: "DELETE", options, url });
-      return { body: "", status: deleteStatuses.shift() ?? 202 };
-    },
-    get(url: string, options?: HttpRequest["options"]) {
-      httpRequests.push({ method: "GET", options, url });
-      if (url.includes("/session/")) {
-        const status = sessionGetStatuses.shift() ?? 200;
-        return {
-          body:
-            status === 200 ? JSON.stringify({ id: "session-runtime", status: sessionStatus }) : "",
-          status,
-        };
-      }
-      if (url.includes("/apis/kueue.x-k8s.io/")) {
-        const jobName = createdJobs.at(-1)?.name ?? "perfpulse-kueue-spot-kueue-0";
-        return {
-          body: JSON.stringify({
-            items: [
-              {
-                metadata: {
-                  ownerReferences: [{ kind: "Job", name: jobName }],
-                },
-                status: {
-                  conditions: [{ status: workloadAdmitted ? "True" : "False", type: "Admitted" }],
-                },
-              },
-            ],
-          }),
-          status: 200,
-        };
-      }
-      if (listJobsStatus !== undefined) {
-        return { body: "list refused", status: listJobsStatus };
-      }
-      const jobs =
-        createdJobs.length > 0
-          ? createdJobs
-          : [
-              {
-                labels: { [KUBERNETES_LABEL_KEYS.surface]: "k8s-kueue" },
-                name: "perfpulse-kueue-spot-kueue-0",
-              },
-            ];
-      return {
-        body: JSON.stringify({
-          items: jobs.map((job) => ({
-            metadata: { labels: job.labels, name: job.name },
-            status: {
-              conditions:
-                jobConditionType === undefined ? [] : [{ status: "True", type: jobConditionType }],
-            },
-          })),
-        }),
-        status: 200,
-      };
-    },
-    post(url: string, body: string, options?: HttpRequest["options"]) {
-      httpRequests.push({ body, method: "POST", options, url });
-      if (url === "https://ws-cadc.canfar.net/ac/login") {
-        return { body: JSON.stringify("runtime-token"), status: 200 };
-      }
-      if (url.includes("/session")) {
-        runtimeEvents.push("skaha_create_session");
-        return { body: "session-runtime", status: 200 };
-      }
-      const manifest = JSON.parse(body);
-      createdJobs.push({ labels: manifest.metadata.labels, name: manifest.metadata.name });
-      return { body: "created", status: 201 };
-    },
-  },
-}));
-
-mock.module("k6/execution", () => ({
-  scenario: {
-    get iterationInTest() {
-      return iterationInTest;
-    },
-  },
-  vu: {
-    get idInTest() {
-      return vuIdInTest;
-    },
-  },
-}));
-
-mock.module("k6/encoding", () => ({
-  b64encode(input: string) {
-    return Buffer.from(input, "utf8").toString("base64");
-  },
-}));
+import {
+  createdJobs,
+  httpRequests,
+  metricRecords,
+  resetK6RuntimeHarness,
+  runtimeEvents,
+  runtimeHarness,
+  sleepCalls,
+} from "./helpers/k6-runtime-harness";
 
 describe("PerfPulse k6 runtime dispatch", () => {
   beforeEach(() => {
-    httpRequests.length = 0;
+    resetK6RuntimeHarness();
+  });
+
+  test("records campaign jobsExpected once in setup, not per iteration", async () => {
+    const campaignEnv = {
+      CAMPAIGN_TYPE: "benchmark",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "2",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "campaign",
+      SURFACE: "k8s-direct",
+      TESTID: "campaign-expected",
+      TOTAL_JOBS: "100",
+    };
+    const config = resolveRunConfig(campaignEnv);
+    const runtime = await import("../src/perfpulse");
+    const savedEnv = { ...Reflect.get(globalThis, "__ENV") };
+
+    Reflect.set(globalThis, "__ENV", campaignEnv);
+    runtime.setup();
+
+    expect(metricRecords.filter((record) => record.metric === METRIC_NAMES.jobsExpected)).toEqual([
+      {
+        metric: METRIC_NAMES.jobsExpected,
+        tags: expect.objectContaining({ surface: "k8s-direct", testid: "campaign-expected" }),
+        value: 100,
+      },
+    ]);
+
     metricRecords.length = 0;
-    createdJobs.length = 0;
-    runtimeEvents.length = 0;
-    sleepCalls.length = 0;
-    deleteStatuses.length = 0;
-    sessionGetStatuses.length = 0;
-    listJobsStatus = undefined;
-    iterationInTest = 0;
-    vuIdInTest = 1;
-    workloadAdmitted = true;
-    jobConditionType = "Complete";
-    sessionStatus = "Completed";
+
+    for (const iteration of [0, 1, 2]) {
+      runtimeHarness.iterationInTest = iteration;
+      runtime.default(config);
+    }
+
+    expect(metricRecords.filter((record) => record.metric === METRIC_NAMES.jobsExpected)).toEqual(
+      [],
+    );
+
+    Reflect.set(globalThis, "__ENV", savedEnv);
+  });
+
+  test("records cron jobsExpected per iteration in default, not in setup", async () => {
+    const config = resolveRunConfig({
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "cron",
+      SURFACE: "k8s-kueue",
+      TESTID: "cron-expected",
+    });
+    const runtime = await import("../src/perfpulse");
+
+    runtime.setup();
+    runtimeHarness.iterationInTest = 0;
+    runtime.default(config);
+
+    const expectedRecords = metricRecords.filter(
+      (record) => record.metric === METRIC_NAMES.jobsExpected,
+    );
+    expect(expectedRecords).toEqual([
+      {
+        metric: METRIC_NAMES.jobsExpected,
+        tags: expect.objectContaining({ surface: "k8s-kueue", testid: "cron-expected" }),
+        value: 1,
+      },
+    ]);
   });
 
   test("runs the Kueue Kubernetes surface when runtime config selects k8s-kueue", async () => {
@@ -296,7 +164,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
   });
 
   test("records stress Kueue visibility without hard-failing non-admission", async () => {
-    workloadAdmitted = false;
+    runtimeHarness.workloadAdmitted = false;
     const config = resolveRunConfig({
       CONFIRM_STRESS: "true",
       KUEUE_ADMISSION_GATE_SECONDS: "1",
@@ -333,8 +201,8 @@ describe("PerfPulse k6 runtime dispatch", () => {
   });
 
   test("uses the k6 global iteration index for direct Kubernetes Job identity", async () => {
-    iterationInTest = 75;
-    vuIdInTest = 2;
+    runtimeHarness.iterationInTest = 75;
+    runtimeHarness.vuIdInTest = 2;
     const config = resolveRunConfig({
       LOGICAL_USERS: "2",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
@@ -348,11 +216,6 @@ describe("PerfPulse k6 runtime dispatch", () => {
 
     runtime.default(config);
 
-    expect(metricRecords).toContainEqual({
-      metric: METRIC_NAMES.jobsExpected,
-      tags: expect.objectContaining({ surface: "k8s-direct", testid: "direct-benchmark" }),
-      value: 100,
-    });
     expect(metricRecords).toContainEqual({
       metric: METRIC_NAMES.jobsCompleted,
       tags: expect.objectContaining({ surface: "k8s-direct", testid: "direct-benchmark" }),
@@ -377,7 +240,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
   });
 
   test("records stress direct completion failures", async () => {
-    jobConditionType = "Failed";
+    runtimeHarness.jobConditionType = "Failed";
     const config = resolveRunConfig({
       COMPLETION_TIMEOUT_SECONDS: "1",
       CONFIRM_STRESS: "true",
@@ -414,9 +277,39 @@ describe("PerfPulse k6 runtime dispatch", () => {
     });
   });
 
+  test("emits direct lifecycle metrics in stage order through the runtime recorder", async () => {
+    const config = resolveRunConfig({
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "cron",
+      SURFACE: "k8s-direct",
+      TESTID: "direct-ordered",
+    });
+    const runtime = await import("../src/perfpulse");
+
+    runtime.default(config);
+
+    expect(
+      metricRecords
+        .filter(
+          (record) =>
+            record.tags?.surface === "k8s-direct" && record.tags?.testid === "direct-ordered",
+        )
+        .map((record) => record.metric),
+    ).toEqual([
+      METRIC_NAMES.jobsExpected,
+      METRIC_NAMES.jobsSubmitted,
+      METRIC_NAMES.submissionDurationMs,
+      METRIC_NAMES.jobsVisible,
+      METRIC_NAMES.visibilityLatencyMs,
+      METRIC_NAMES.jobsCompleted,
+      METRIC_NAMES.completionLatencyMs,
+      METRIC_NAMES.cleanupDeleted,
+    ]);
+  });
+
   test("passes the derived user bucket into Kueue Job identity", async () => {
-    iterationInTest = 75;
-    vuIdInTest = 2;
+    runtimeHarness.iterationInTest = 75;
+    runtimeHarness.vuIdInTest = 2;
     const config = resolveRunConfig({
       LOGICAL_USERS: "2",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
@@ -453,8 +346,8 @@ describe("PerfPulse k6 runtime dispatch", () => {
   });
 
   test("creates distinct direct and Kueue Job names for the same benchmark testid", async () => {
-    iterationInTest = 75;
-    vuIdInTest = 2;
+    runtimeHarness.iterationInTest = 75;
+    runtimeHarness.vuIdInTest = 2;
     const directConfig = resolveRunConfig({
       LOGICAL_USERS: "2",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
@@ -584,7 +477,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
   });
 
   test("uses the k6 global iteration index for Skaha session identity", async () => {
-    iterationInTest = 75;
+    runtimeHarness.iterationInTest = 75;
     const config = resolveRunConfig({
       LOGICAL_USERS: "2",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
@@ -609,7 +502,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
   });
 
   test("records stress Skaha completion failures for failed sessions", async () => {
-    sessionStatus = "Failed";
+    runtimeHarness.sessionStatus = "Failed";
     const config = resolveRunConfig({
       COMPLETION_TIMEOUT_SECONDS: "1",
       CONFIRM_STRESS: "true",
@@ -627,7 +520,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
     const runtime = await import("../src/perfpulse");
 
     expect(() => runtime.default({ config, skahaBearerToken: "runtime-token" })).toThrow(
-      "Skaha session session-runtime did not reach Succeeded or Completed within 1s",
+      "Skaha session session-runtime reached terminal status Failed",
     );
 
     expect(metricRecords).toContainEqual({
@@ -648,7 +541,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
   });
 
   test("applies submission jitter before session create", async () => {
-    iterationInTest = 3;
+    runtimeHarness.iterationInTest = 3;
     const originalRandom = Math.random;
     Math.random = () => 0.5;
     const config = resolveRunConfig({
@@ -681,7 +574,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
   });
 
   test("applies submission jitter on direct and Kueue runtime paths", async () => {
-    iterationInTest = 3;
+    runtimeHarness.iterationInTest = 3;
     const originalRandom = Math.random;
     Math.random = () => 0.5;
     const directConfig = resolveRunConfig({
@@ -763,8 +656,8 @@ describe("PerfPulse k6 runtime dispatch", () => {
       SURFACE: "skaha",
       TESTID: "skaha-spot",
     });
-    deleteStatuses.push(0);
-    sessionGetStatuses.push(200, 200, 404);
+    runtimeHarness.deleteStatuses.push(0);
+    runtimeHarness.sessionGetStatuses.push(200, 200, 404);
     const runtime = await import("../src/perfpulse");
 
     runtime.default({ config, skahaBearerToken: "runtime-token" });
@@ -780,15 +673,10 @@ describe("PerfPulse k6 runtime dispatch", () => {
       "skaha_delete_session",
       "skaha_get_session",
     ]);
-    expect(metricRecords).toContainEqual({
-      metric: METRIC_NAMES.cleanupFailed,
-      tags: expect.objectContaining({ surface: "skaha", testid: "skaha-spot" }),
-      value: 0,
-    });
     expect(metricRecords).not.toContainEqual(
       expect.objectContaining({
         metric: METRIC_NAMES.cleanupFailed,
-        value: 1,
+        tags: expect.objectContaining({ surface: "skaha", testid: "skaha-spot" }),
       }),
     );
   });
@@ -801,8 +689,8 @@ describe("PerfPulse k6 runtime dispatch", () => {
       SURFACE: "skaha",
       TESTID: "skaha-spot",
     });
-    deleteStatuses.push(0);
-    sessionGetStatuses.push(200, 200, 200);
+    runtimeHarness.deleteStatuses.push(0);
+    runtimeHarness.sessionGetStatuses.push(200, 200, 200);
     const runtime = await import("../src/perfpulse");
 
     expect(() => runtime.default({ config, skahaBearerToken: "runtime-token" })).toThrow(
@@ -872,7 +760,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
         name: "perfpulse-cleanup-many-direct-1",
       },
     );
-    deleteStatuses.push(200, 202);
+    runtimeHarness.deleteStatuses.push(200, 202);
     const runtime = await import("../src/perfpulse");
 
     runtime.teardown(config);
@@ -921,7 +809,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
         name: "perfpulse-cleanup-failure-kueue-1",
       },
     );
-    deleteStatuses.push(202, 500);
+    runtimeHarness.deleteStatuses.push(202, 500);
     const runtime = await import("../src/perfpulse");
 
     expect(() => runtime.teardown(config)).toThrow(
@@ -945,7 +833,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
       TESTID: "cleanup-list-failure",
       TOTAL_JOBS: "100",
     });
-    listJobsStatus = 503;
+    runtimeHarness.listJobsStatus = 503;
     const runtime = await import("../src/perfpulse");
 
     expect(() => runtime.teardown(config)).toThrow(

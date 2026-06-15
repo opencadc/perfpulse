@@ -1,4 +1,5 @@
 import type { RunConfig } from "../config";
+import type { LifecycleRecorder } from "../metrics";
 import { buildKueueJobManifest, type KubernetesJobManifest, type KueueJobOptions } from "./job";
 import {
   findJobByName,
@@ -85,12 +86,18 @@ export interface KueueSurfaceResult {
   workloadVisibilityLatencyMs?: number;
 }
 
+type KueueLifecycleRecorder = Pick<
+  LifecycleRecorder,
+  "recordAdmission" | "recordCompleted" | "recordFailure" | "recordSubmitted" | "recordVisible"
+>;
+
 export function runKueueKubernetesSurface(
   config: RunConfig,
   options: KueueSurfaceOptions,
   client: KueueKubernetesClient,
   pollUntil: PollUntil,
   now: () => number = Date.now,
+  recorder?: KueueLifecycleRecorder,
 ): KueueSurfaceResult {
   const manifest = buildKueueJobManifest(config, options);
   const createStartedAt = now();
@@ -99,6 +106,7 @@ export function runKueueKubernetesSurface(
   const submissionDurationMs = submittedAt - createStartedAt;
 
   if (createResponse.status !== 201) {
+    recorder?.recordFailure("submission");
     return {
       admitted: false,
       createResponse,
@@ -114,6 +122,8 @@ export function runKueueKubernetesSurface(
     };
   }
 
+  recorder?.recordSubmitted(submissionDurationMs);
+
   const jobVisibleList = pollUntil(
     config.visibilityGateSeconds,
     config.kubernetes.pollIntervalSeconds,
@@ -122,6 +132,7 @@ export function runKueueKubernetesSurface(
     config.pollJitterMaxMs,
   );
   if (jobVisibleList === undefined) {
+    recorder?.recordFailure("visibility");
     return {
       admitted: false,
       createResponse,
@@ -138,6 +149,7 @@ export function runKueueKubernetesSurface(
   }
 
   const visibilityLatencyMs = now() - submittedAt;
+  recorder?.recordVisible(visibilityLatencyMs);
   const workloadVisibleList = pollUntil(
     config.visibilityGateSeconds,
     config.kubernetes.pollIntervalSeconds,
@@ -146,6 +158,7 @@ export function runKueueKubernetesSurface(
     config.pollJitterMaxMs,
   );
   if (workloadVisibleList === undefined) {
+    recorder?.recordFailure("visibility");
     return {
       admitted: false,
       createResponse,
@@ -177,6 +190,7 @@ export function runKueueKubernetesSurface(
         isWorkloadAdmitted(findWorkloadForJob(state.workloads, config.jobName))
       ) {
         admissionLatencyMs = now() - submittedAt;
+        recorder?.recordAdmission(admissionLatencyMs);
       }
       return isTerminalJob(findJobByName(state.jobs, config.jobName));
     },
@@ -188,6 +202,7 @@ export function runKueueKubernetesSurface(
     isWorkloadAdmitted(findWorkloadForJob(terminalState?.workloads ?? {}, config.jobName));
 
   if (terminalJob === undefined) {
+    recorder?.recordFailure("completion");
     return {
       admitted,
       ...(admissionLatencyMs !== undefined ? { admissionLatencyMs } : {}),
@@ -207,6 +222,7 @@ export function runKueueKubernetesSurface(
   }
 
   if (isJobFailed(terminalJob)) {
+    recorder?.recordFailure("completion");
     return {
       admitted,
       ...(admissionLatencyMs !== undefined ? { admissionLatencyMs } : {}),
@@ -225,11 +241,14 @@ export function runKueueKubernetesSurface(
     };
   }
 
+  const completionLatencyMs = now() - submittedAt;
+  recorder?.recordCompleted(completionLatencyMs);
+
   return {
     admitted,
     ...(admissionLatencyMs !== undefined ? { admissionLatencyMs } : {}),
     completed: true,
-    completionLatencyMs: now() - submittedAt,
+    completionLatencyMs,
     createResponse,
     jobVisible: true,
     submissionDurationMs,

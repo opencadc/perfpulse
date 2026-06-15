@@ -250,6 +250,217 @@ describe("Skaha user-facing surface client", () => {
     expect(result.failure).toBeUndefined();
   });
 
+  test("emits lifecycle stage callbacks through Skaha completion", () => {
+    const config = skahaSurfaceConfig();
+    config.requireCompletion = true;
+    const lifecycleEvents: Array<[string, number | string | undefined]> = [];
+    const statuses: Array<"Pending" | "Succeeded"> = ["Pending", "Succeeded"];
+    const client: SkahaSurfaceClient = {
+      createSession() {
+        return { accepted: true, sessionId: "session-abc", statusCode: 200 };
+      },
+      deleteSession() {
+        throw new Error("cleanup is not part of runSkahaSurface");
+      },
+      getSession() {
+        const status = statuses.shift() ?? "Succeeded";
+        return {
+          found: true,
+          session: { id: "session-abc", status },
+          status,
+          statusCode: 200,
+        };
+      },
+    };
+    const timestamps = [0, 100, 250, 600];
+
+    runSkahaSurface(
+      config,
+      client,
+      (_timeout, _interval, read) => read(),
+      () => timestamps.shift() ?? 600,
+      {
+        recordCompleted(completionLatencyMs) {
+          lifecycleEvents.push(["completed", completionLatencyMs]);
+        },
+        recordFailure(stage) {
+          lifecycleEvents.push(["failure", stage]);
+        },
+        recordSubmitted(submissionDurationMs) {
+          lifecycleEvents.push(["submitted", submissionDurationMs]);
+        },
+        recordVisible(visibilityLatencyMs) {
+          lifecycleEvents.push(["visible", visibilityLatencyMs]);
+        },
+      },
+    );
+
+    expect(lifecycleEvents).toEqual([
+      ["submitted", 100],
+      ["visible", 150],
+      ["completed", 500],
+    ]);
+  });
+
+  test("reports terminal session status when completion poll exits on Failed", () => {
+    const config = skahaSurfaceConfig();
+    config.requireCompletion = true;
+    const client: SkahaSurfaceClient = {
+      createSession() {
+        return { accepted: true, sessionId: "session-abc", statusCode: 200 };
+      },
+      deleteSession() {
+        throw new Error("cleanup is not part of runSkahaSurface");
+      },
+      getSession() {
+        return {
+          found: true,
+          session: { id: "session-abc", status: "Failed" },
+          status: "Failed",
+          statusCode: 200,
+        };
+      },
+    };
+
+    const result = runSkahaSurface(
+      config,
+      client,
+      (_timeout, _interval, read) => read(),
+      () => 10,
+    );
+
+    expect(result.completed).toBe(false);
+    expect(result.failure).toEqual({
+      message: "Skaha session session-abc reached terminal status Failed",
+      stage: "completion",
+    });
+  });
+
+  test("emits a completion failure callback when Skaha reaches Failed", () => {
+    const config = skahaSurfaceConfig();
+    config.requireCompletion = true;
+    const lifecycleEvents: Array<[string, number | string | undefined]> = [];
+    const client: SkahaSurfaceClient = {
+      createSession() {
+        return { accepted: true, sessionId: "session-abc", statusCode: 200 };
+      },
+      deleteSession() {
+        throw new Error("cleanup is not part of runSkahaSurface");
+      },
+      getSession() {
+        return {
+          found: true,
+          session: { id: "session-abc", status: "Failed" },
+          status: "Failed",
+          statusCode: 200,
+        };
+      },
+    };
+
+    const result = runSkahaSurface(
+      config,
+      client,
+      (_timeout, _interval, read) => read(),
+      () => 10,
+      {
+        recordCompleted(completionLatencyMs) {
+          lifecycleEvents.push(["completed", completionLatencyMs]);
+        },
+        recordFailure(stage) {
+          lifecycleEvents.push(["failure", stage]);
+        },
+        recordSubmitted(submissionDurationMs) {
+          lifecycleEvents.push(["submitted", submissionDurationMs]);
+        },
+        recordVisible(visibilityLatencyMs) {
+          lifecycleEvents.push(["visible", visibilityLatencyMs]);
+        },
+      },
+    );
+
+    expect(result.failure?.stage).toBe("completion");
+    expect(lifecycleEvents).toEqual([
+      ["submitted", 0],
+      ["visible", 0],
+      ["failure", "completion"],
+    ]);
+  });
+
+  test("reports terminal session status when completion poll exits on Error", () => {
+    const config = skahaSurfaceConfig();
+    config.requireCompletion = true;
+    const client: SkahaSurfaceClient = {
+      createSession() {
+        return { accepted: true, sessionId: "session-abc", statusCode: 200 };
+      },
+      deleteSession() {
+        throw new Error("cleanup is not part of runSkahaSurface");
+      },
+      getSession() {
+        return {
+          found: true,
+          session: { id: "session-abc", status: "Error" },
+          status: "Error",
+          statusCode: 200,
+        };
+      },
+    };
+
+    const result = runSkahaSurface(
+      config,
+      client,
+      (_timeout, _interval, read) => read(),
+      () => 10,
+    );
+
+    expect(result.completed).toBe(false);
+    expect(result.failure).toEqual({
+      message: "Skaha session session-abc reached terminal status Error",
+      stage: "completion",
+    });
+  });
+
+  test("reports completion timeout when pollUntil returns undefined", () => {
+    const config = skahaSurfaceConfig();
+    config.requireCompletion = true;
+    let pollCalls = 0;
+    const client: SkahaSurfaceClient = {
+      createSession() {
+        return { accepted: true, sessionId: "session-abc", statusCode: 200 };
+      },
+      deleteSession() {
+        throw new Error("cleanup is not part of runSkahaSurface");
+      },
+      getSession() {
+        return {
+          found: true,
+          session: { id: "session-abc", status: "Running" },
+          status: "Running",
+          statusCode: 200,
+        };
+      },
+    };
+
+    const result = runSkahaSurface(
+      config,
+      client,
+      (_timeout, _interval, read) => {
+        pollCalls += 1;
+        if (pollCalls === 1) {
+          return read();
+        }
+        return undefined;
+      },
+      () => 10,
+    );
+
+    expect(result.completed).toBe(false);
+    expect(result.failure).toEqual({
+      message: "Skaha session session-abc did not reach Succeeded or Completed within 120s",
+      stage: "completion",
+    });
+  });
+
   test("succeeds when a visible session reaches Succeeded within the completion timeout", () => {
     const config = skahaSurfaceConfig();
     config.requireCompletion = true;

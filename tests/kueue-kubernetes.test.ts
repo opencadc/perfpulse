@@ -11,6 +11,53 @@ import {
 import type { JobListLike } from "../src/kubernetes/status";
 
 describe("direct Kubernetes Kueue surface", () => {
+  test("emits lifecycle stage callbacks through admission and completion", () => {
+    const config = resolveRunConfig({
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      SURFACE: "k8s-kueue",
+      TESTID: "kueue-spot",
+    });
+    const lifecycleEvents: Array<[string, number | string | undefined]> = [];
+    const timestamps = [0, 100, 250, 400, 700];
+    const poller: PollUntil = (_timeout, _interval, read, done) => {
+      const value = read();
+      expect(done(value)).toBe(true);
+      return value;
+    };
+
+    runKueueKubernetesSurface(
+      config,
+      { admissionGateSeconds: 120, priorityClass: "low", queueName: "cadc-default" },
+      createClient(),
+      poller,
+      () => timestamps.shift() ?? 700,
+      {
+        recordAdmission(admissionLatencyMs) {
+          lifecycleEvents.push(["admission", admissionLatencyMs]);
+        },
+        recordCompleted(completionLatencyMs) {
+          lifecycleEvents.push(["completed", completionLatencyMs]);
+        },
+        recordFailure(stage) {
+          lifecycleEvents.push(["failure", stage]);
+        },
+        recordSubmitted(submissionDurationMs) {
+          lifecycleEvents.push(["submitted", submissionDurationMs]);
+        },
+        recordVisible(visibilityLatencyMs) {
+          lifecycleEvents.push(["visible", visibilityLatencyMs]);
+        },
+      },
+    );
+
+    expect(lifecycleEvents).toEqual([
+      ["submitted", 100],
+      ["visible", 150],
+      ["admission", 600],
+      ["completed", 600],
+    ]);
+  });
+
   test("submits a suspended Kueue Job and reports Workload admission", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
@@ -98,6 +145,47 @@ describe("direct Kubernetes Kueue surface", () => {
     expect(result.admitted).toBe(false);
     expect(result.completed).toBe(true);
     expect(pollCount).toBe(3);
+  });
+
+  test("emits a visibility failure callback when the Job never appears", () => {
+    const config = resolveRunConfig({
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      SURFACE: "k8s-kueue",
+      TESTID: "kueue-spot",
+    });
+    const lifecycleEvents: Array<[string, number | string | undefined]> = [];
+    const poller: PollUntil = () => undefined;
+
+    const result = runKueueKubernetesSurface(
+      config,
+      { admissionGateSeconds: 120, priorityClass: "low", queueName: "cadc-default" },
+      createClient(),
+      poller,
+      () => 10,
+      {
+        recordAdmission(admissionLatencyMs) {
+          lifecycleEvents.push(["admission", admissionLatencyMs]);
+        },
+        recordCompleted(completionLatencyMs) {
+          lifecycleEvents.push(["completed", completionLatencyMs]);
+        },
+        recordFailure(stage) {
+          lifecycleEvents.push(["failure", stage]);
+        },
+        recordSubmitted(submissionDurationMs) {
+          lifecycleEvents.push(["submitted", submissionDurationMs]);
+        },
+        recordVisible(visibilityLatencyMs) {
+          lifecycleEvents.push(["visible", visibilityLatencyMs]);
+        },
+      },
+    );
+
+    expect(result.failure?.stage).toBe("job-visibility");
+    expect(lifecycleEvents).toEqual([
+      ["submitted", 0],
+      ["failure", "visibility"],
+    ]);
   });
 });
 

@@ -1,4 +1,5 @@
 import type { RunConfig } from "../config";
+import type { LifecycleRecorder } from "../metrics";
 import { buildDirectJobManifest, type KubernetesJobManifest } from "./job";
 import {
   findJobByName,
@@ -43,11 +44,17 @@ export interface DirectKubernetesRunResult {
   visibilityLatencyMs?: number;
 }
 
+type DirectLifecycleRecorder = Pick<
+  LifecycleRecorder,
+  "recordCompleted" | "recordFailure" | "recordSubmitted" | "recordVisible"
+>;
+
 export function runDirectKubernetesSurface(
   config: RunConfig,
   client: DirectKubernetesClient,
   pollUntil: PollUntil,
   now: () => number = Date.now,
+  recorder?: DirectLifecycleRecorder,
 ): DirectKubernetesRunResult {
   const manifest = buildDirectJobManifest(config);
   const createStartedAt = now();
@@ -56,6 +63,7 @@ export function runDirectKubernetesSurface(
   const submissionDurationMs = submittedAt - createStartedAt;
 
   if (createResponse.status !== 201) {
+    recorder?.recordFailure("submission");
     return {
       completed: false,
       createResponse,
@@ -70,6 +78,8 @@ export function runDirectKubernetesSurface(
     };
   }
 
+  recorder?.recordSubmitted(submissionDurationMs);
+
   const visibleList = pollUntil(
     config.visibilityGateSeconds,
     config.kubernetes.pollIntervalSeconds,
@@ -78,6 +88,7 @@ export function runDirectKubernetesSurface(
     config.pollJitterMaxMs,
   );
   if (visibleList === undefined) {
+    recorder?.recordFailure("visibility");
     return {
       completed: false,
       createResponse,
@@ -91,6 +102,7 @@ export function runDirectKubernetesSurface(
   }
 
   const visibilityLatencyMs = now() - submittedAt;
+  recorder?.recordVisible(visibilityLatencyMs);
   const visibleJob = findJobByName(visibleList, config.jobName);
   const terminalJob = isTerminalJob(visibleJob)
     ? visibleJob
@@ -106,6 +118,7 @@ export function runDirectKubernetesSurface(
       );
 
   if (terminalJob === undefined) {
+    recorder?.recordFailure("completion");
     return {
       completed: false,
       createResponse,
@@ -120,6 +133,7 @@ export function runDirectKubernetesSurface(
   }
 
   if (isJobFailed(terminalJob)) {
+    recorder?.recordFailure("completion");
     return {
       completed: false,
       createResponse,
@@ -132,6 +146,8 @@ export function runDirectKubernetesSurface(
       visibilityLatencyMs,
     };
   }
+
+  recorder?.recordCompleted(now() - submittedAt);
 
   return {
     completed: true,

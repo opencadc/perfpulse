@@ -18,7 +18,7 @@ data:
   K6_OTEL_HTTP_EXPORTER_URL_PATH: {{ $.Values.otlp.urlPath | quote }}
   K6_OTEL_METRIC_PREFIX: k6_
   K6_OTEL_SERVICE_NAME: perfpulse
-  K6_OTEL_EXPORT_INTERVAL: 1s
+  K6_OTEL_EXPORT_INTERVAL: 5s
   PERF_PULSE_CLIENT_MODE: kubernetes
   POLL_JITTER_MAX_MS: {{ $.Values.pollJitterMaxMs | quote }}
   PROFILE: cron
