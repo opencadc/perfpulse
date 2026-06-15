@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { resolveRunConfig } from "../src/config";
-import type { LifecycleMetrics } from "../src/metrics";
+import type { LifecycleMetrics } from "../src/lifecycle-recorder";
+import { createLifecycleRecorder } from "../src/lifecycle-recorder";
 import { METRIC_NAMES, metricTags } from "../src/metrics-contract";
 
 interface MetricCall {
@@ -61,8 +62,7 @@ function createMetrics(): {
 }
 
 describe("LifecycleRecorder", () => {
-  test("records lifecycle stage metrics with contract names and tags", async () => {
-    const { createLifecycleRecorder } = await import("../src/metrics");
+  test("records lifecycle stage metrics with contract names and tags", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-kueue",
@@ -91,8 +91,7 @@ describe("LifecycleRecorder", () => {
     expect(callsByName[METRIC_NAMES.cleanupDeleted]).toEqual([{ tags, value: 2 }]);
   });
 
-  test("maps failure stages to the matching failure counters", async () => {
-    const { createLifecycleRecorder } = await import("../src/metrics");
+  test("maps failure stages to the matching failure counters", () => {
     const config = resolveRunConfig({ TESTID: "failure-spot" });
     const { callsByName, metrics } = createMetrics();
     const recorder = createLifecycleRecorder(config, metrics);

@@ -1,7 +1,8 @@
 import { describe, expect, mock, test } from "bun:test";
 import { resolveRunConfig } from "../src/config";
 import { KUBERNETES_LABEL_KEYS } from "../src/labels";
-import type { LifecycleMetrics } from "../src/metrics";
+import type { LifecycleMetrics } from "../src/lifecycle-recorder";
+import { createLifecycleRecorder } from "../src/lifecycle-recorder";
 import { METRIC_NAMES, metricTags } from "../src/metrics-contract";
 
 interface MetricCall {
@@ -71,7 +72,6 @@ function createMetrics(): {
 describe("CleanupAdapter", () => {
   test("records zero cleanup when cleanup is disabled for inline Kubernetes Job delete", async () => {
     const { createCleanupAdapter } = await import("../src/cleanup");
-    const { createLifecycleRecorder } = await import("../src/metrics");
     const config = resolveRunConfig({
       CLEANUP: "false",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
@@ -104,7 +104,6 @@ describe("CleanupAdapter", () => {
 
   test("records deleted count and accepts 200/202 for inline Kubernetes Job cleanup", async () => {
     const { createCleanupAdapter } = await import("../src/cleanup");
-    const { createLifecycleRecorder } = await import("../src/metrics");
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-direct",
@@ -134,7 +133,6 @@ describe("CleanupAdapter", () => {
 
   test("accepts 404 for inline Kubernetes Job cleanup without incrementing deleted count", async () => {
     const { createCleanupAdapter } = await import("../src/cleanup");
-    const { createLifecycleRecorder } = await import("../src/metrics");
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-kueue",
@@ -161,7 +159,6 @@ describe("CleanupAdapter", () => {
 
   test("fails inline Kubernetes Job cleanup on unexpected delete status", async () => {
     const { createCleanupAdapter } = await import("../src/cleanup");
-    const { createLifecycleRecorder } = await import("../src/metrics");
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-direct",
@@ -190,7 +187,6 @@ describe("CleanupAdapter", () => {
 
   test("records cleanup failure when inline Kubernetes Job name is missing", async () => {
     const { createCleanupAdapter } = await import("../src/cleanup");
-    const { createLifecycleRecorder } = await import("../src/metrics");
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-direct",
@@ -219,7 +215,6 @@ describe("CleanupAdapter", () => {
 
   test("records deleted count for inline Skaha session cleanup", async () => {
     const { createCleanupAdapter } = await import("../src/cleanup");
-    const { createLifecycleRecorder } = await import("../src/metrics");
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "skaha",
@@ -248,7 +243,6 @@ describe("CleanupAdapter", () => {
 
   test("treats failed Skaha delete as cleaned up when follow-up get returns not found", async () => {
     const { createCleanupAdapter } = await import("../src/cleanup");
-    const { createLifecycleRecorder } = await import("../src/metrics");
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "skaha",
@@ -275,7 +269,6 @@ describe("CleanupAdapter", () => {
 
   test("fails Skaha cleanup when failed delete verification still finds the session", async () => {
     const { createCleanupAdapter } = await import("../src/cleanup");
-    const { createLifecycleRecorder } = await import("../src/metrics");
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "skaha",
@@ -304,7 +297,6 @@ describe("CleanupAdapter", () => {
 
   test("records cleanup failure without throwing when Skaha session id is missing", async () => {
     const { createCleanupAdapter } = await import("../src/cleanup");
-    const { createLifecycleRecorder } = await import("../src/metrics");
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "skaha",
@@ -333,7 +325,6 @@ describe("CleanupAdapter", () => {
 
   test("bulk cleanup deletes only current-surface jobs and records deleted count", async () => {
     const { createCleanupAdapter } = await import("../src/cleanup");
-    const { createLifecycleRecorder } = await import("../src/metrics");
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-direct",
@@ -387,7 +378,6 @@ describe("CleanupAdapter", () => {
 
   test("bulk cleanup fails when any listed job delete returns an unexpected status", async () => {
     const { createCleanupAdapter } = await import("../src/cleanup");
-    const { createLifecycleRecorder } = await import("../src/metrics");
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-kueue",
@@ -434,7 +424,6 @@ describe("CleanupAdapter", () => {
 
   test("bulk cleanup records failure when job listing fails", async () => {
     const { createCleanupAdapter } = await import("../src/cleanup");
-    const { createLifecycleRecorder } = await import("../src/metrics");
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-direct",
