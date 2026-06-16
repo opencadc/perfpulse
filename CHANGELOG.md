@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.14](https://github.com/opencadc/perfpulse/compare/v0.1.13...v0.1.14) (2026-06-16)
+
+
+### Features
+
+* Phase 2 simplification — unified lifecycle, Grafana split, fixed footprint ([#19](https://github.com/opencadc/perfpulse/issues/19)) ([23dc113](https://github.com/opencadc/perfpulse/commit/23dc113d7fa6b6710812cf7839cb27ad57be9e6c))
+
+
+### Bug Fixes
+
+* workload OOM, cron Grafana queries, and campaign scaling ([0fda475](https://github.com/opencadc/perfpulse/commit/0fda4753fb610c5a0f681858cff6447eba6b9141))
+
 ## [0.1.13](https://github.com/opencadc/perfpulse/compare/v0.1.12...v0.1.13) (2026-06-15)
 
 
