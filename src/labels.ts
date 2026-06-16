@@ -3,8 +3,6 @@ import type { RunConfig } from "./config";
 export const KUBERNETES_LABEL_KEYS = {
   appName: "app.kubernetes.io/name",
   campaignType: "perfpulse.opencadc.org/campaign-type",
-  cohort: "perfpulse.opencadc.org/cohort",
-  jobProfile: "perfpulse.opencadc.org/job-profile",
   managedBy: "app.kubernetes.io/managed-by",
   profile: "perfpulse.opencadc.org/profile",
   runClass: "perfpulse.opencadc.org/run-class",
@@ -29,8 +27,6 @@ export function workloadLabels(
     [KUBERNETES_LABEL_KEYS.runClass]: config.runClass,
     [KUBERNETES_LABEL_KEYS.surface]: config.surface,
     [KUBERNETES_LABEL_KEYS.scenario]: config.scenario,
-    [KUBERNETES_LABEL_KEYS.cohort]: config.cohort,
-    [KUBERNETES_LABEL_KEYS.jobProfile]: config.jobProfile,
     [KUBERNETES_LABEL_KEYS.userBucket]: userBucket,
   };
 }

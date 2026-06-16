@@ -102,11 +102,175 @@ describe("direct Kubernetes Kueue surface", () => {
     expect(createdManifests[0]?.metadata.labels["kueue.x-k8s.io/queue-name"]).toBe("cadc-default");
   });
 
+  test("succeeds after workload visibility for stress without require completion", () => {
+    const config = resolveRunConfig({
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_HIGH_USERS: "true",
+      CONFIRM_STRESS: "true",
+      LOGICAL_USERS: "100",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "campaign",
+      SURFACE: "k8s-kueue",
+      TOTAL_JOBS: "10000",
+      TESTID: "stress-kueue",
+    });
+    const lifecycleEvents: string[] = [];
+    const client = createClient({
+      listJobsByTestId() {
+        return {
+          items: [
+            {
+              metadata: { name: config.jobName },
+              status: { conditions: [{ status: "True", type: "Failed" }] },
+            },
+          ],
+        };
+      },
+      listWorkloadsByTestId() {
+        return {
+          items: [
+            {
+              metadata: {
+                ownerReferences: [{ kind: "Job", name: config.jobName }],
+              },
+              status: {
+                conditions: [{ status: "False", type: "Admitted" }],
+              },
+            },
+          ],
+        };
+      },
+    });
+    const poller: PollUntil = (_timeout, _interval, read) => read();
+
+    const result = runKueueKubernetesSurface(
+      config,
+      { admissionGateSeconds: 120, priorityClass: "low", queueName: "cadc-default" },
+      client,
+      poller,
+      () => 10,
+      {
+        recordAdmission() {
+          lifecycleEvents.push("admission");
+        },
+        recordCompleted() {
+          lifecycleEvents.push("completed");
+        },
+        recordFailure(stage) {
+          lifecycleEvents.push(`failure:${stage}`);
+        },
+        recordSubmitted() {
+          lifecycleEvents.push("submitted");
+        },
+        recordVisible() {
+          lifecycleEvents.push("visible");
+        },
+      },
+    );
+
+    expect(result.failure).toBeUndefined();
+    expect(result.jobVisible).toBe(true);
+    expect(result.workloadVisible).toBe(true);
+    expect(result.admitted).toBe(false);
+    expect(result.completed).toBe(false);
+    expect(lifecycleEvents).toEqual(["submitted", "visible"]);
+  });
+
+  test("hard-fails cron checks when workload is never admitted within the admission gate", () => {
+    const config = resolveRunConfig({
+      KUEUE_ADMISSION_GATE_SECONDS: "5",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "cron",
+      SURFACE: "k8s-kueue",
+      TESTID: "cron-kueue",
+    });
+    const lifecycleEvents: string[] = [];
+    const client = createClient({
+      listJobsByTestId() {
+        return {
+          items: [
+            {
+              metadata: { name: config.jobName },
+              status: { conditions: [] },
+            },
+          ],
+        };
+      },
+      listWorkloadsByTestId() {
+        return {
+          items: [
+            {
+              metadata: {
+                ownerReferences: [{ kind: "Job", name: config.jobName }],
+              },
+              status: {
+                conditions: [{ status: "False", type: "Admitted" }],
+              },
+            },
+          ],
+        };
+      },
+    });
+    let pollCount = 0;
+    const poller: PollUntil = (_timeout, _interval, read, done) => {
+      pollCount += 1;
+      const value = read();
+      if (pollCount <= 2) {
+        return done(value) ? value : undefined;
+      }
+      return undefined;
+    };
+
+    const result = runKueueKubernetesSurface(
+      config,
+      {
+        admissionGateSeconds: config.kueue.admissionGateSeconds,
+        priorityClass: "low",
+        queueName: "cadc-default",
+      },
+      client,
+      poller,
+      () => 10,
+      {
+        recordAdmission() {
+          lifecycleEvents.push("admission");
+        },
+        recordCompleted() {
+          lifecycleEvents.push("completed");
+        },
+        recordFailure(stage) {
+          lifecycleEvents.push(`failure:${stage}`);
+        },
+        recordSubmitted() {
+          lifecycleEvents.push("submitted");
+        },
+        recordVisible() {
+          lifecycleEvents.push("visible");
+        },
+      },
+    );
+
+    expect(result.failure).toEqual({
+      category: "kueue-admission",
+      message: `Kueue Workload for Job ${config.jobName} was not admitted within ${config.kueue.admissionGateSeconds}s`,
+      stage: "admission",
+    });
+    expect(result.jobVisible).toBe(true);
+    expect(result.workloadVisible).toBe(true);
+    expect(result.admitted).toBe(false);
+    expect(result.completed).toBe(false);
+    expect(lifecycleEvents).toEqual(["submitted", "visible", "failure:admission"]);
+  });
+
   test("accepts visible Workloads without requiring admission", () => {
     const config = resolveRunConfig({
+      CAMPAIGN_TYPE: "benchmark",
+      LOGICAL_USERS: "1",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "campaign",
       SURFACE: "k8s-kueue",
       TESTID: "kueue-spot",
+      TOTAL_JOBS: "100",
     });
     let pollCount = 0;
     const client = createClient({

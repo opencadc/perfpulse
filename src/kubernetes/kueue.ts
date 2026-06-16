@@ -1,5 +1,6 @@
 import type { RunConfig } from "../config";
 import type { LifecycleRecorder } from "../metrics";
+import { type LifecycleGroupFn, runWorkLifecycle } from "../work-lifecycle";
 import { buildKueueJobManifest, type KubernetesJobManifest, type KueueJobOptions } from "./job";
 import {
   findJobByName,
@@ -98,163 +99,170 @@ export function runKueueKubernetesSurface(
   pollUntil: PollUntil,
   now: () => number = Date.now,
   recorder?: KueueLifecycleRecorder,
+  group?: LifecycleGroupFn,
 ): KueueSurfaceResult {
-  const manifest = buildKueueJobManifest(config, options);
-  const createStartedAt = now();
-  const createResponse = client.createJob(manifest);
-  const submittedAt = now();
-  const submissionDurationMs = submittedAt - createStartedAt;
+  let latestJobList: JobListLike = {};
+  let latestWorkloadList: WorkloadListLike = {};
 
-  if (createResponse.status !== 201) {
-    recorder?.recordFailure("submission");
-    return {
-      admitted: false,
-      createResponse,
-      failure: {
+  const lifecycle = runWorkLifecycle(
+    {
+      admissionGateSeconds: options.admissionGateSeconds,
+      completionTimeoutSeconds: config.completionTimeoutSeconds,
+      enforceAdmission: config.runClass === "cron",
+      pollIntervalSeconds: config.kubernetes.pollIntervalSeconds,
+      pollJitterMaxMs: config.pollJitterMaxMs,
+      requireCompletion: config.requireCompletion,
+      visibilityGateSeconds: config.visibilityGateSeconds,
+    },
+    {
+      pollVisibility() {
+        latestJobList = client.listJobsByTestId();
+        return findJobByName(latestJobList, config.jobName) !== undefined;
+      },
+      pollWorkloadVisibility() {
+        latestWorkloadList = client.listWorkloadsByTestId();
+        return findWorkloadForJob(latestWorkloadList, config.jobName) !== undefined;
+      },
+      readAdmitted() {
+        const workload =
+          findWorkloadForJob(latestWorkloadList, config.jobName) ??
+          findWorkloadForJob(client.listWorkloadsByTestId(), config.jobName);
+        return isWorkloadAdmitted(workload);
+      },
+      readTerminalState() {
+        const job =
+          findJobByName(latestJobList, config.jobName) ??
+          findJobByName(client.listJobsByTestId(), config.jobName);
+        return readJobTerminalState(job);
+      },
+      submit() {
+        const createResponse = client.createJob(buildKueueJobManifest(config, options));
+        if (createResponse.status !== 201) {
+          return {
+            accepted: false,
+            failureMessage: `Kueue Job create failed with HTTP ${createResponse.status}`,
+            response: createResponse,
+          };
+        }
+        return { accepted: true, response: createResponse };
+      },
+    },
+    pollUntil,
+    {
+      recordAdmission(admissionLatencyMs) {
+        recorder?.recordAdmission(admissionLatencyMs);
+      },
+      recordCompleted(completionLatencyMs) {
+        recorder?.recordCompleted(completionLatencyMs);
+      },
+      recordFailure(stage) {
+        recorder?.recordFailure(mapRecorderFailureStage(stage));
+      },
+      recordSubmitted(submissionDurationMs) {
+        recorder?.recordSubmitted(submissionDurationMs);
+      },
+      recordVisible(visibilityLatencyMs) {
+        recorder?.recordVisible(visibilityLatencyMs);
+      },
+    },
+    now,
+    group,
+  );
+
+  return mapKueueSurfaceResult(config, lifecycle);
+}
+
+function mapRecorderFailureStage(
+  stage: "submission" | "visibility" | "workload-visibility" | "admission" | "completion",
+): "admission" | "completion" | "submission" | "visibility" {
+  if (stage === "workload-visibility") {
+    return "visibility";
+  }
+  return stage;
+}
+
+function mapKueueSurfaceResult(
+  config: RunConfig,
+  lifecycle: ReturnType<typeof runWorkLifecycle<KueueResponseLike>>,
+): KueueSurfaceResult {
+  const base = {
+    admitted: lifecycle.admitted ?? false,
+    ...(lifecycle.admissionLatencyMs !== undefined
+      ? { admissionLatencyMs: lifecycle.admissionLatencyMs }
+      : {}),
+    completed: lifecycle.completed,
+    ...(lifecycle.completionLatencyMs !== undefined
+      ? { completionLatencyMs: lifecycle.completionLatencyMs }
+      : {}),
+    createResponse: lifecycle.submitResponse,
+    jobVisible: lifecycle.visible,
+    submissionDurationMs: lifecycle.submissionDurationMs,
+    ...(lifecycle.visibilityLatencyMs !== undefined
+      ? { visibilityLatencyMs: lifecycle.visibilityLatencyMs }
+      : {}),
+    workloadVisible: lifecycle.workloadVisible ?? false,
+    ...(lifecycle.workloadVisibilityLatencyMs !== undefined
+      ? { workloadVisibilityLatencyMs: lifecycle.workloadVisibilityLatencyMs }
+      : {}),
+  };
+
+  if (lifecycle.failure === undefined) {
+    return base;
+  }
+
+  return {
+    ...base,
+    failure: mapKueueFailure(config, lifecycle.failure),
+  };
+}
+
+function mapKueueFailure(
+  config: RunConfig,
+  failure: { message: string; stage: string },
+): KueueSurfaceFailure {
+  switch (failure.stage) {
+    case "submission":
+      return {
         category: "kubernetes-api",
-        message: `Kueue Job create failed with HTTP ${createResponse.status}`,
+        message: failure.message,
         stage: "submission",
-      },
-      jobVisible: false,
-      submissionDurationMs,
-      workloadVisible: false,
-      completed: false,
-    };
-  }
-
-  recorder?.recordSubmitted(submissionDurationMs);
-
-  const jobVisibleList = pollUntil(
-    config.visibilityGateSeconds,
-    config.kubernetes.pollIntervalSeconds,
-    () => client.listJobsByTestId(),
-    (list) => findJobByName(list, config.jobName) !== undefined,
-    config.pollJitterMaxMs,
-  );
-  if (jobVisibleList === undefined) {
-    recorder?.recordFailure("visibility");
-    return {
-      admitted: false,
-      createResponse,
-      failure: {
+      };
+    case "visibility":
+      return {
         category: "visibility",
-        message: `Kueue Job was not visible within ${config.visibilityGateSeconds}s`,
+        message: `Kueue Job ${config.jobName} was not visible within ${config.visibilityGateSeconds}s`,
         stage: "job-visibility",
-      },
-      jobVisible: false,
-      submissionDurationMs,
-      workloadVisible: false,
-      completed: false,
-    };
-  }
-
-  const visibilityLatencyMs = now() - submittedAt;
-  recorder?.recordVisible(visibilityLatencyMs);
-  const workloadVisibleList = pollUntil(
-    config.visibilityGateSeconds,
-    config.kubernetes.pollIntervalSeconds,
-    () => client.listWorkloadsByTestId(),
-    (list) => findWorkloadForJob(list, config.jobName) !== undefined,
-    config.pollJitterMaxMs,
-  );
-  if (workloadVisibleList === undefined) {
-    recorder?.recordFailure("visibility");
-    return {
-      admitted: false,
-      createResponse,
-      failure: {
+      };
+    case "workload-visibility":
+      return {
         category: "visibility",
         message: `Kueue Workload was not visible within ${config.visibilityGateSeconds}s`,
         stage: "workload-visibility",
-      },
-      jobVisible: true,
-      submissionDurationMs,
-      visibilityLatencyMs,
-      workloadVisible: false,
-      completed: false,
-    };
-  }
-
-  const workloadVisibilityLatencyMs = now() - submittedAt;
-  let admissionLatencyMs: number | undefined;
-  const terminalState = pollUntil(
-    config.completionTimeoutSeconds,
-    config.kubernetes.pollIntervalSeconds,
-    () => ({
-      jobs: client.listJobsByTestId(),
-      workloads: client.listWorkloadsByTestId(),
-    }),
-    (state) => {
-      if (
-        admissionLatencyMs === undefined &&
-        isWorkloadAdmitted(findWorkloadForJob(state.workloads, config.jobName))
-      ) {
-        admissionLatencyMs = now() - submittedAt;
-        recorder?.recordAdmission(admissionLatencyMs);
+      };
+    case "admission":
+      return {
+        category: "kueue-admission",
+        message: `Kueue Workload for Job ${config.jobName} was not admitted within ${config.kueue.admissionGateSeconds}s`,
+        stage: "admission",
+      };
+    case "completion":
+      if (failure.message === "work reached a failed terminal state") {
+        return {
+          category: "completion",
+          message: `Kueue Job ${config.jobName} reached Failed`,
+          stage: "completion",
+        };
       }
-      return isTerminalJob(findJobByName(state.jobs, config.jobName));
-    },
-    config.pollJitterMaxMs,
-  );
-  const terminalJob = findJobByName(terminalState?.jobs ?? {}, config.jobName);
-  const admitted =
-    admissionLatencyMs !== undefined ||
-    isWorkloadAdmitted(findWorkloadForJob(terminalState?.workloads ?? {}, config.jobName));
-
-  if (terminalJob === undefined) {
-    recorder?.recordFailure("completion");
-    return {
-      admitted,
-      ...(admissionLatencyMs !== undefined ? { admissionLatencyMs } : {}),
-      completed: false,
-      createResponse,
-      failure: {
+      return {
         category: "completion",
         message: `Kueue Job ${config.jobName} did not complete within ${config.completionTimeoutSeconds}s`,
         stage: "completion",
-      },
-      jobVisible: true,
-      submissionDurationMs,
-      visibilityLatencyMs,
-      workloadVisible: true,
-      workloadVisibilityLatencyMs,
-    };
+      };
   }
-
-  if (isJobFailed(terminalJob)) {
-    recorder?.recordFailure("completion");
-    return {
-      admitted,
-      ...(admissionLatencyMs !== undefined ? { admissionLatencyMs } : {}),
-      completed: false,
-      createResponse,
-      failure: {
-        category: "completion",
-        message: `Kueue Job ${config.jobName} reached Failed`,
-        stage: "completion",
-      },
-      jobVisible: true,
-      submissionDurationMs,
-      visibilityLatencyMs,
-      workloadVisible: true,
-      workloadVisibilityLatencyMs,
-    };
-  }
-
-  const completionLatencyMs = now() - submittedAt;
-  recorder?.recordCompleted(completionLatencyMs);
-
   return {
-    admitted,
-    ...(admissionLatencyMs !== undefined ? { admissionLatencyMs } : {}),
-    completed: true,
-    completionLatencyMs,
-    createResponse,
-    jobVisible: true,
-    submissionDurationMs,
-    visibilityLatencyMs,
-    workloadVisible: true,
-    workloadVisibilityLatencyMs,
+    category: "completion",
+    message: failure.message,
+    stage: "completion",
   };
 }
 
@@ -277,6 +285,15 @@ export function isWorkloadAdmitted(workload: WorkloadLike | undefined): boolean 
   );
 }
 
-function isTerminalJob(job: JobLike | undefined): boolean {
-  return job !== undefined && (isJobComplete(job) || isJobFailed(job));
+function readJobTerminalState(job: JobLike | undefined): "failed" | "succeeded" | undefined {
+  if (job === undefined) {
+    return undefined;
+  }
+  if (isJobComplete(job)) {
+    return "succeeded";
+  }
+  if (isJobFailed(job)) {
+    return "failed";
+  }
+  return undefined;
 }

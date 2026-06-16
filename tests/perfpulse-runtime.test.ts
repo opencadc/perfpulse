@@ -164,6 +164,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
   });
 
   test("records stress Kueue visibility without hard-failing non-admission", async () => {
+    runtimeHarness.jobConditionType = "Failed";
     runtimeHarness.workloadAdmitted = false;
     const config = resolveRunConfig({
       CONFIRM_STRESS: "true",
@@ -195,6 +196,13 @@ describe("PerfPulse k6 runtime dispatch", () => {
     expect(metricRecords).not.toContainEqual(
       expect.objectContaining({
         metric: METRIC_NAMES.kueueWorkloadsAdmissionFailed,
+        value: 1,
+      }),
+    );
+    expect(metricRecords).not.toContainEqual(
+      expect.objectContaining({
+        metric: METRIC_NAMES.jobsCompletionFailed,
+        tags: expect.objectContaining({ surface: "k8s-kueue", testid: "stress-kueue" }),
         value: 1,
       }),
     );
@@ -239,7 +247,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
     expect(sleepCalls.length).toBeGreaterThanOrEqual(1);
   });
 
-  test("records stress direct completion failures", async () => {
+  test("succeeds after direct visibility for stress without require completion", async () => {
     runtimeHarness.jobConditionType = "Failed";
     const config = resolveRunConfig({
       COMPLETION_TIMEOUT_SECONDS: "1",
@@ -256,9 +264,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
     });
     const runtime = await import("../src/perfpulse");
 
-    expect(() => runtime.default(config)).toThrow(
-      "Kubernetes Job perfpulse-stress-direct-direct-0 reached Failed",
-    );
+    expect(() => runtime.default(config)).not.toThrow();
 
     expect(metricRecords).toContainEqual({
       metric: METRIC_NAMES.jobsSubmitted,
@@ -270,7 +276,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
       tags: expect.objectContaining({ surface: "k8s-direct", testid: "stress-direct" }),
       value: 1,
     });
-    expect(metricRecords).toContainEqual({
+    expect(metricRecords).not.toContainEqual({
       metric: METRIC_NAMES.jobsCompletionFailed,
       tags: expect.objectContaining({ surface: "k8s-direct", testid: "stress-direct" }),
       value: 1,
@@ -413,7 +419,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
     expect(url.searchParams.get("type")).toBe("headless");
     expect(url.searchParams.get("cmd")).toBe("stress-ng");
     expect(url.searchParams.get("args")).toBe(
-      "--stressors cpu --cpu 1 --temp-path /tmp --timeout 10s --metrics-brief",
+      "--stressors cpu --cpu 1 --temp-path /tmp --timeout 60s --metrics-brief",
     );
     expect(url.searchParams.getAll("env")).toEqual(["PERF_PULSE_TESTID=skaha-spot"]);
     expect(createRequest?.options).toMatchObject({
@@ -453,6 +459,24 @@ describe("PerfPulse k6 runtime dispatch", () => {
         value: 1,
       }),
     );
+    expect(runtimeHarness.checkCalls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          checks: expect.objectContaining({
+            "skaha login returned 2xx": true,
+          }),
+        }),
+        expect.objectContaining({
+          checks: expect.objectContaining({
+            "skaha session create returned 2xx": true,
+          }),
+        }),
+      ]),
+    );
+    expect(runtimeHarness.groupCalls).toEqual(
+      expect.arrayContaining(["work_lifecycle", "work_submit", "work_visible"]),
+    );
+    expect(runtimeHarness.groupCalls).not.toContain("work_complete");
   });
 
   test("derives Skaha registry auth from mounted credentials without surfacing the secret", async () => {
@@ -501,7 +525,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
     expect(JSON.stringify(metricRecords)).not.toContain("perfpulse-skaha-benchmark-skaha-75");
   });
 
-  test("records stress Skaha completion failures for failed sessions", async () => {
+  test("succeeds after Skaha visibility for stress without require completion", async () => {
     runtimeHarness.sessionStatus = "Failed";
     const config = resolveRunConfig({
       COMPLETION_TIMEOUT_SECONDS: "1",
@@ -519,9 +543,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
     });
     const runtime = await import("../src/perfpulse");
 
-    expect(() => runtime.default({ config, skahaBearerToken: "runtime-token" })).toThrow(
-      "Skaha session session-runtime reached terminal status Failed",
-    );
+    expect(() => runtime.default({ config, skahaBearerToken: "runtime-token" })).not.toThrow();
 
     expect(metricRecords).toContainEqual({
       metric: METRIC_NAMES.jobsSubmitted,
@@ -533,7 +555,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
       tags: expect.objectContaining({ surface: "skaha", testid: "stress-skaha" }),
       value: 1,
     });
-    expect(metricRecords).toContainEqual({
+    expect(metricRecords).not.toContainEqual({
       metric: METRIC_NAMES.jobsCompletionFailed,
       tags: expect.objectContaining({ surface: "skaha", testid: "stress-skaha" }),
       value: 1,
@@ -786,6 +808,26 @@ describe("PerfPulse k6 runtime dispatch", () => {
       tags: expect.objectContaining({ surface: "k8s-direct", testid: "cleanup-many" }),
       value: 2,
     });
+  });
+
+  test("preserves failed direct workloads when preserve on failure is enabled", async () => {
+    runtimeHarness.listJobsReturnEmpty = true;
+    const config = resolveRunConfig({
+      PRESERVE_ON_FAILURE: "true",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      POLL_INTERVAL_SECONDS: "1",
+      POLL_JITTER_MAX_MS: "0",
+      PROFILE: "cron",
+      SURFACE: "k8s-direct",
+      TESTID: "preserve-direct",
+      VISIBILITY_GATE_SECONDS: "1",
+    });
+    const runtime = await import("../src/perfpulse");
+
+    expect(() => runtime.default(config)).toThrow(
+      "Kubernetes Job perfpulse-preserve-direct-direct-0 was not visible within 1s",
+    );
+    expect(httpRequests.some((request) => request.method === "DELETE")).toBe(false);
   });
 
   test("fails Kubernetes cleanup when any listed Job delete returns an unexpected status", async () => {

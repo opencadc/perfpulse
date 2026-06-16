@@ -30,24 +30,29 @@ function createScenarios(config: RunConfig): NonNullable<Options["scenarios"]> {
   };
 }
 
-function createThresholds(config: RunConfig): NonNullable<Options["thresholds"]> {
-  if (config.campaignType === "stress") {
-    return {
-      [METRIC_NAMES.cleanupFailed]: ["count==0"],
-      [METRIC_NAMES.jobsCompletionFailed]: ["count==0"],
-      [METRIC_NAMES.jobsSubmissionFailed]: ["count==0"],
-      [METRIC_NAMES.jobsVisibilityFailed]: ["count==0"],
-    };
-  }
+export const CRON_HTTP_REQ_DURATION_P95_MS = 500;
 
-  const thresholds: NonNullable<Options["thresholds"]> = {
-    checks: ["rate>0.99"],
-    http_req_failed: ["rate<0.01"],
+function createThresholds(config: RunConfig): NonNullable<Options["thresholds"]> {
+  const lifecycleThresholds = {
     [METRIC_NAMES.cleanupFailed]: ["count==0"],
     [METRIC_NAMES.jobsCompletionFailed]: ["count==0"],
     [METRIC_NAMES.jobsSubmissionFailed]: ["count==0"],
     [METRIC_NAMES.jobsVisibilityFailed]: ["count==0"],
   };
 
-  return thresholds;
+  if (config.campaignType === "stress") {
+    return {
+      ...lifecycleThresholds,
+      http_req_failed: ["rate==0"],
+    };
+  }
+
+  return {
+    checks: config.runClass === "cron" ? ["rate==1"] : ["rate>0.99"],
+    http_req_failed: config.runClass === "cron" ? ["rate==0"] : ["rate<0.01"],
+    ...(config.runClass === "cron"
+      ? { http_req_duration: [`p(95)<${CRON_HTTP_REQ_DURATION_P95_MS}`] }
+      : {}),
+    ...lifecycleThresholds,
+  };
 }

@@ -1,6 +1,11 @@
 import type { RunConfig } from "./config";
 import type { LifecycleRecorder } from "./metrics";
 import { type MetricTags, metricTags } from "./metrics-contract";
+import {
+  isCoreWorkLifecycleFailureStage,
+  type LifecycleGroupFn,
+  runWorkLifecycle,
+} from "./work-lifecycle";
 
 export interface SkahaHttpResponseLike {
   body?: unknown;
@@ -214,99 +219,135 @@ export function runSkahaSurface(
   pollUntil: SkahaPollUntil,
   now: () => number = Date.now,
   recorder?: SkahaLifecycleRecorder,
+  group?: LifecycleGroupFn,
 ): SkahaSurfaceResult {
-  const createStartedAt = now();
-  const createResponse = client.createSession(config.session);
-  const submittedAt = now();
-  const submissionDurationMs = submittedAt - createStartedAt;
+  let sessionId: string | undefined;
+  let latestStatus: SkahaSessionStatus | undefined;
 
-  if (!createResponse.accepted || createResponse.sessionId === undefined) {
-    recorder?.recordFailure("submission");
-    return {
-      completed: false,
-      createResponse,
-      failure: {
-        message: `Skaha session create failed with HTTP ${createResponse.statusCode}`,
-        stage: "submission",
+  const lifecycle = runWorkLifecycle(
+    {
+      completionTimeoutSeconds: config.completionTimeoutSeconds,
+      pollIntervalSeconds: config.pollIntervalSeconds,
+      pollJitterMaxMs: config.pollJitterMaxMs,
+      requireCompletion: config.requireCompletion !== false,
+      visibilityGateSeconds: config.visibilityGateSeconds,
+    },
+    {
+      pollVisibility() {
+        if (sessionId === undefined) {
+          return false;
+        }
+        const result = client.getSession(sessionId);
+        if (result.status !== undefined) {
+          latestStatus = result.status;
+        }
+        return result.found && result.status !== undefined;
       },
-      submissionDurationMs,
-      visible: false,
-    };
-  }
-
-  recorder?.recordSubmitted(submissionDurationMs);
-
-  const visibleSession = pollUntil(
-    config.visibilityGateSeconds,
-    config.pollIntervalSeconds,
-    () => client.getSession(createResponse.sessionId as string),
-    (result) => result.found && result.status !== undefined,
-    config.pollJitterMaxMs,
+      readTerminalState() {
+        if (sessionId === undefined) {
+          return undefined;
+        }
+        const result = client.getSession(sessionId);
+        if (result.status !== undefined) {
+          latestStatus = result.status;
+        }
+        return skahaTerminalState(result.status);
+      },
+      submit() {
+        const createResponse = client.createSession(config.session);
+        if (!createResponse.accepted || createResponse.sessionId === undefined) {
+          return {
+            accepted: false,
+            failureMessage: `Skaha session create failed with HTTP ${createResponse.statusCode}`,
+            response: createResponse,
+          };
+        }
+        sessionId = createResponse.sessionId;
+        return { accepted: true, response: createResponse };
+      },
+    },
+    pollUntil,
+    {
+      recordCompleted(completionLatencyMs) {
+        recorder?.recordCompleted(completionLatencyMs);
+      },
+      recordFailure(stage) {
+        if (isCoreWorkLifecycleFailureStage(stage)) {
+          recorder?.recordFailure(stage);
+        }
+      },
+      recordSubmitted(submissionDurationMs) {
+        recorder?.recordSubmitted(submissionDurationMs);
+      },
+      recordVisible(visibilityLatencyMs) {
+        recorder?.recordVisible(visibilityLatencyMs);
+      },
+    },
+    now,
+    group,
   );
-  if (visibleSession === undefined || !visibleSession.found) {
-    recorder?.recordFailure("visibility");
-    return {
-      completed: false,
-      createResponse,
-      failure: {
-        message: `Skaha session was not visible within ${config.visibilityGateSeconds}s`,
-        stage: "visibility",
-      },
-      submissionDurationMs,
-      visible: false,
-    };
-  }
 
-  const visibilityLatencyMs = now() - submittedAt;
-  recorder?.recordVisible(visibilityLatencyMs);
-  if (config.requireCompletion === false) {
-    return {
-      completed: false,
-      createResponse,
-      submissionDurationMs,
-      visible: true,
-      visibilityLatencyMs,
-    };
-  }
-
-  const completedSession = pollUntil(
-    config.completionTimeoutSeconds,
-    config.pollIntervalSeconds,
-    () => client.getSession(createResponse.sessionId as string),
-    (result) =>
-      isSuccessfulCompletionStatus(result.status) || isTerminalFailureStatus(result.status),
-    config.pollJitterMaxMs,
-  );
-
-  if (!isSuccessfulCompletionStatus(completedSession?.status)) {
-    recorder?.recordFailure("completion");
-    const failureMessage = isTerminalFailureStatus(completedSession?.status)
-      ? `Skaha session ${createResponse.sessionId} reached terminal status ${completedSession?.status}`
-      : `Skaha session ${createResponse.sessionId} did not reach Succeeded or Completed within ${config.completionTimeoutSeconds}s`;
-    return {
-      completed: false,
-      createResponse,
-      failure: {
-        message: failureMessage,
-        stage: "completion",
-      },
-      submissionDurationMs,
-      visible: true,
-      visibilityLatencyMs,
-    };
-  }
-
-  const completionLatencyMs = now() - submittedAt;
-  recorder?.recordCompleted(completionLatencyMs);
+  const failure =
+    lifecycle.failure !== undefined && isCoreWorkLifecycleFailureStage(lifecycle.failure.stage)
+      ? mapSkahaFailure(config, sessionId, latestStatus, {
+          message: lifecycle.failure.message,
+          stage: lifecycle.failure.stage,
+        })
+      : undefined;
 
   return {
-    completed: true,
-    completionLatencyMs,
-    createResponse,
-    submissionDurationMs,
-    visible: true,
-    visibilityLatencyMs,
+    completed: lifecycle.completed,
+    ...(lifecycle.completionLatencyMs === undefined
+      ? {}
+      : { completionLatencyMs: lifecycle.completionLatencyMs }),
+    createResponse: lifecycle.submitResponse,
+    ...(failure === undefined ? {} : { failure }),
+    submissionDurationMs: lifecycle.submissionDurationMs,
+    visible: lifecycle.visible,
+    ...(lifecycle.visibilityLatencyMs === undefined
+      ? {}
+      : { visibilityLatencyMs: lifecycle.visibilityLatencyMs }),
   };
+}
+
+function skahaTerminalState(
+  status: SkahaSessionStatus | undefined,
+): "failed" | "succeeded" | undefined {
+  if (isSuccessfulCompletionStatus(status)) {
+    return "succeeded";
+  }
+  if (isTerminalFailureStatus(status)) {
+    return "failed";
+  }
+  return undefined;
+}
+
+function mapSkahaFailure(
+  config: SkahaSurfaceConfig,
+  sessionId: string | undefined,
+  latestStatus: SkahaSessionStatus | undefined,
+  failure: { message: string; stage: SkahaFailureStage },
+): SkahaSurfaceFailure {
+  switch (failure.stage) {
+    case "submission":
+      return failure;
+    case "visibility":
+      return {
+        message: `Skaha session was not visible within ${config.visibilityGateSeconds}s`,
+        stage: failure.stage,
+      };
+    case "completion":
+      if (failure.message === "work reached a failed terminal state") {
+        return {
+          message: `Skaha session ${sessionId} reached terminal status ${latestStatus}`,
+          stage: failure.stage,
+        };
+      }
+      return {
+        message: `Skaha session ${sessionId} did not reach Succeeded or Completed within ${config.completionTimeoutSeconds}s`,
+        stage: failure.stage,
+      };
+  }
 }
 
 function encodeCreateSessionParams(params: SkahaCreateSessionParams): string {

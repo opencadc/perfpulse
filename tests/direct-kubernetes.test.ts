@@ -133,6 +133,54 @@ describe("direct Kubernetes Test surface", () => {
     expect(result.completed).toBe(false);
   });
 
+  test("succeeds after visibility for stress without require completion", () => {
+    const config = resolveRunConfig({
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_HIGH_USERS: "true",
+      CONFIRM_STRESS: "true",
+      LOGICAL_USERS: "100",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "campaign",
+      SURFACE: "k8s-direct",
+      TOTAL_JOBS: "10000",
+      TESTID: "stress-direct",
+    });
+    const lifecycleEvents: string[] = [];
+    const client = createClient({
+      listJobsByTestId() {
+        return {
+          items: [
+            {
+              metadata: { name: "perfpulse-stress-direct-direct-0" },
+              status: { conditions: [{ status: "True", type: "Failed" }] },
+            },
+          ],
+        };
+      },
+    });
+    const poller: PollUntil = (_timeout, _interval, read) => read();
+
+    const result = runDirectKubernetesSurface(config, client, poller, () => 10, {
+      recordCompleted() {
+        lifecycleEvents.push("completed");
+      },
+      recordFailure(stage) {
+        lifecycleEvents.push(`failure:${stage}`);
+      },
+      recordSubmitted() {
+        lifecycleEvents.push("submitted");
+      },
+      recordVisible() {
+        lifecycleEvents.push("visible");
+      },
+    });
+
+    expect(result.failure).toBeUndefined();
+    expect(result.visible).toBe(true);
+    expect(result.completed).toBe(false);
+    expect(lifecycleEvents).toEqual(["submitted", "visible"]);
+  });
+
   test("emits a visibility failure callback before returning a timeout", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",

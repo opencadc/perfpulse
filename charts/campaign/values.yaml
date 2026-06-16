@@ -8,7 +8,6 @@ image:
   tag: v0.1.13 # x-release-please-version
   pullPolicy: Always
 workload:
-  durationSeconds: 30
   kubernetesImage: ""
   image: images.canfar.net/skaha/stress-ng:latest
 campaign:

@@ -1,10 +1,14 @@
-import { check, fail, sleep } from "k6";
+import { check, fail, group, sleep } from "k6";
 import { b64encode } from "k6/encoding";
 import * as exec from "k6/execution";
 import http from "k6/http";
 import { createCleanupAdapter } from "./cleanup";
 import { deriveRunConfigForJob, type RunConfig, resolveRunConfig } from "./config";
-import { finishSurfaceRun } from "./finish-surface-run";
+import {
+  executeSurfaceRun,
+  kubernetesJobCreateChecks,
+  skahaSessionCreateChecks,
+} from "./finish-surface-run";
 import { createKubernetesClient, pollUntil } from "./kubernetes/api";
 import { runDirectKubernetesSurface } from "./kubernetes/direct";
 import { runKueueKubernetesSurface } from "./kubernetes/kueue";
@@ -99,55 +103,54 @@ function runNoop(data: RunConfig, recorder: LifecycleRecorder): void {
   sleep(data.noopSleepSeconds);
 }
 
+type KubernetesSurfaceRunner = (
+  runtimeData: RuntimeData,
+  data: RunConfig,
+  recorder: LifecycleRecorder,
+) => void;
+
+const kubernetesSurfaceRegistry: Record<RunConfig["surface"], KubernetesSurfaceRunner> = {
+  "k8s-direct": (_runtimeData, data, recorder) => runDirectKubernetes(data, recorder),
+  "k8s-kueue": (_runtimeData, data, recorder) => runKueueKubernetes(data, recorder),
+  skaha: (runtimeData, data, recorder) => runSkaha(runtimeData, data, recorder),
+};
+
 function runKubernetesSurface(
   runtimeData: RuntimeData,
   data: RunConfig,
   recorder: LifecycleRecorder,
 ): void {
   applySubmissionJitter(data);
-  switch (data.surface) {
-    case "k8s-direct":
-      runDirectKubernetes(data, recorder);
-      return;
-    case "k8s-kueue":
-      runKueueKubernetes(data, recorder);
-      return;
-    case "skaha":
-      runSkaha(runtimeData, data, recorder);
-  }
+  kubernetesSurfaceRegistry[data.surface](runtimeData, data, recorder);
 }
 
 function runDirectKubernetes(data: RunConfig, recorder: LifecycleRecorder): void {
   const client = createKubernetesClient(data, serviceAccountToken);
   const cleanup = createCleanupAdapter(data, recorder, { kubernetes: client });
-  const result = runDirectKubernetesSurface(data, client, pollUntil, Date.now, recorder);
-  finishSurfaceRun(
-    data,
-    cleanup,
-    result,
-    { "kubernetes job create returned 201": (response) => response.status === 201 },
-    (adapter) => adapter.cleanupKubernetesJob(data.jobName),
-  );
+  executeSurfaceRun(data, cleanup, {
+    execute: () => runDirectKubernetesSurface(data, client, pollUntil, Date.now, recorder, group),
+    createChecks: kubernetesJobCreateChecks("kubernetes job create returned 201"),
+    cleanupWith: (adapter) => adapter.cleanupKubernetesJob(data.jobName),
+  });
 }
 
 function runKueueKubernetes(data: RunConfig, recorder: LifecycleRecorder): void {
   const client = createKubernetesClient(data, serviceAccountToken);
   const cleanup = createCleanupAdapter(data, recorder, { kubernetes: client });
-  const result = runKueueKubernetesSurface(
-    data,
-    { ...data.kueue, userBucketIndex: data.userBucketIndex },
-    client,
-    pollUntil,
-    Date.now,
-    recorder,
-  );
-  finishSurfaceRun(
-    data,
-    cleanup,
-    result,
-    { "kueue job create returned 201": (response) => response.status === 201 },
-    (adapter) => adapter.cleanupKubernetesJob(data.jobName),
-  );
+  executeSurfaceRun(data, cleanup, {
+    execute: () =>
+      runKueueKubernetesSurface(
+        data,
+        { ...data.kueue, userBucketIndex: data.userBucketIndex },
+        client,
+        pollUntil,
+        Date.now,
+        recorder,
+        group,
+      ),
+    createChecks: kubernetesJobCreateChecks("kueue job create returned 201"),
+    cleanupWith: (adapter) => adapter.cleanupKubernetesJob(data.jobName),
+  });
 }
 
 function runSkaha(runtimeData: RuntimeData, data: RunConfig, recorder: LifecycleRecorder): void {
@@ -159,29 +162,33 @@ function runSkaha(runtimeData: RuntimeData, data: RunConfig, recorder: Lifecycle
     token: resolveSkahaBearerToken(runtimeData, data),
   });
   const cleanup = createCleanupAdapter(data, recorder, { skaha: client });
-  const result = runSkahaSurface(
-    {
-      completionTimeoutSeconds: data.completionTimeoutSeconds,
-      pollIntervalSeconds: data.kubernetes.pollIntervalSeconds,
-      pollJitterMaxMs: data.pollJitterMaxMs,
-      requireCompletion: true,
-      session: {
-        args: data.workload.args,
-        cmd: data.workload.command?.join(" ") ?? "stress-ng",
-        env: { PERF_PULSE_TESTID: data.testid },
-        image: data.workload.image,
-        name: data.jobName,
-      },
-      visibilityGateSeconds: data.visibilityGateSeconds,
-    },
-    client,
-    pollUntil,
-    Date.now,
-    recorder,
-  );
-  finishSurfaceRun(data, cleanup, result, undefined, (adapter) =>
-    adapter.cleanupSkahaSession(result.createResponse.sessionId),
-  );
+  executeSurfaceRun(data, cleanup, {
+    execute: () =>
+      runSkahaSurface(
+        {
+          completionTimeoutSeconds: data.completionTimeoutSeconds,
+          pollIntervalSeconds: data.kubernetes.pollIntervalSeconds,
+          pollJitterMaxMs: data.pollJitterMaxMs,
+          requireCompletion: data.requireCompletion,
+          session: {
+            args: data.workload.args,
+            cmd: data.workload.command?.join(" ") ?? "stress-ng",
+            env: { PERF_PULSE_TESTID: data.testid },
+            image: data.workload.image,
+            name: data.jobName,
+          },
+          visibilityGateSeconds: data.visibilityGateSeconds,
+        },
+        client,
+        pollUntil,
+        Date.now,
+        recorder,
+        group,
+      ),
+    createChecks: skahaSessionCreateChecks(),
+    cleanupWith: (adapter, result) =>
+      adapter.cleanupSkahaSession((result.createResponse as { sessionId: string }).sessionId),
+  });
 }
 
 function normalizeRuntimeData(data: RunConfig | RuntimeData): RuntimeData {
@@ -201,7 +208,13 @@ function createSkahaBearerToken(data: RunConfig): string {
     tags: { name: "skaha_login", ...metricTags(data) },
     timeout: `${data.skaha.requestTimeoutSeconds}s`,
   });
-  if (response.status < 200 || response.status >= 300) {
+  const loginSucceeded = check(response, {
+    "skaha login returned 2xx": (loginResponse) => {
+      const status = (loginResponse as { status: number }).status;
+      return status >= 200 && status < 300;
+    },
+  });
+  if (!loginSucceeded) {
     fail(`Skaha login failed with HTTP ${response.status}`);
   }
   const token = normalizeSkahaLoginToken(String(response.body ?? ""));

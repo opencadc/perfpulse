@@ -299,7 +299,12 @@ pressure, Kueue controller health, workload execution, Grafana visibility, and c
 
 ## Dashboard Evidence
 
-Use Grafana dashboard `PerfPulse Overview` and filter by:
+See `docs/runbooks/run-evidence.md` for the dashboard entry points:
+
+- cron checks use `docs/dashboards/perfpulse-cron.json`
+- benchmark and stress drilldown use `docs/dashboards/perfpulse-campaign.json`
+
+For campaign evidence, use the campaign dashboard and filter by:
 
 - `testid`
 - `runClass`

@@ -17,8 +17,6 @@ describe("PerfPulse Kubernetes labels", () => {
       [KUBERNETES_LABEL_KEYS.runClass]: "cron",
       [KUBERNETES_LABEL_KEYS.surface]: "k8s-direct",
       [KUBERNETES_LABEL_KEYS.scenario]: "single-bulk-user",
-      [KUBERNETES_LABEL_KEYS.cohort]: "baseline",
-      [KUBERNETES_LABEL_KEYS.jobProfile]: "tiny",
       [KUBERNETES_LABEL_KEYS.userBucket]: "bucket-0",
     });
   });
