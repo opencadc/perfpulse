@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.15](https://github.com/opencadc/perfpulse/compare/v0.1.14...v0.1.15) (2026-06-16)
+
+
+### Features
+
+* bulk Skaha stress lifecycle and jobs-per-VU cap ([86455f9](https://github.com/opencadc/perfpulse/commit/86455f9e5df2d3609770d7cd79c1fa56a41b7398))
+
 ## [0.1.14](https://github.com/opencadc/perfpulse/compare/v0.1.13...v0.1.14) (2026-06-16)
 
 
