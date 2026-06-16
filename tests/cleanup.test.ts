@@ -1,17 +1,10 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { resolveRunConfig } from "../src/config";
 import { KUBERNETES_LABEL_KEYS } from "../src/labels";
 import { createLifecycleRecorder } from "../src/lifecycle-recorder";
 import { METRIC_NAMES, metricTags } from "../src/metrics-contract";
 import { createLifecycleMetricSpies } from "./helpers/lifecycle-metric-spies";
-
-mock.module("k6", () => ({
-  check: () => true,
-  fail: (message: string) => {
-    throw new Error(message);
-  },
-  sleep: () => {},
-}));
+import "./helpers/k6-runtime-harness";
 
 describe("CleanupAdapter", () => {
   test("emits no cleanup metrics when cleanup is disabled for inline Kubernetes Job delete", async () => {

@@ -1,26 +1,7 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { shouldCleanupAfterFailure } from "../src/cleanup-policy";
 import { resolveRunConfig } from "../src/config";
-
-const finishHarness = {
-  checkCalls: [] as Array<{ checks: Record<string, boolean>; subject: unknown }>,
-  failures: [] as string[],
-  lastCheckPassed: true,
-};
-
-mock.module("k6", () => ({
-  check(subject: unknown, checks: Record<string, (value: unknown) => boolean>) {
-    const results = Object.fromEntries(
-      Object.entries(checks).map(([name, predicate]) => [name, predicate(subject)]),
-    );
-    finishHarness.checkCalls.push({ checks: results, subject });
-    return finishHarness.lastCheckPassed && Object.values(results).every(Boolean);
-  },
-  fail(message: string) {
-    finishHarness.failures.push(message);
-    throw new Error(message);
-  },
-}));
+import { runtimeHarness } from "./helpers/k6-runtime-harness";
 
 const { executeSurfaceRun, finishSurfaceRun, kubernetesJobCreateChecks, skahaSessionCreateChecks } =
   await import("../src/finish-surface-run");
@@ -55,9 +36,7 @@ describe("shouldCleanupAfterFailure", () => {
 
 describe("finishSurfaceRun", () => {
   test("fails when create checks do not pass even without a lifecycle failure", () => {
-    finishHarness.checkCalls.length = 0;
-    finishHarness.failures.length = 0;
-    finishHarness.lastCheckPassed = false;
+    runtimeHarness.checkCalls.length = 0;
     const config = resolveRunConfig({ PERF_PULSE_CLIENT_MODE: "kubernetes" });
     let cleanupCalled = false;
 
@@ -76,14 +55,17 @@ describe("finishSurfaceRun", () => {
       ),
     ).toThrow("work create response checks failed");
 
-    expect(finishHarness.failures).toEqual(["work create response checks failed"]);
+    expect(runtimeHarness.checkCalls).toEqual([
+      {
+        checks: { "kubernetes job create returned 201": false },
+        subject: { status: 500 },
+      },
+    ]);
     expect(cleanupCalled).toBe(false);
   });
 
   test("prefers lifecycle failure messages when both checks and lifecycle fail", () => {
-    finishHarness.checkCalls.length = 0;
-    finishHarness.failures.length = 0;
-    finishHarness.lastCheckPassed = false;
+    runtimeHarness.checkCalls.length = 0;
     const config = resolveRunConfig({ PERF_PULSE_CLIENT_MODE: "kubernetes" });
 
     expect(() =>
@@ -102,15 +84,13 @@ describe("finishSurfaceRun", () => {
       ),
     ).toThrow("Kubernetes Job create failed with HTTP 500");
 
-    expect(finishHarness.failures).toEqual(["Kubernetes Job create failed with HTTP 500"]);
+    expect(runtimeHarness.checkCalls).toEqual([]);
   });
 });
 
 describe("executeSurfaceRun", () => {
   test("runs execute, passes result to finish flow, and cleans up on success when config.cleanup=true", () => {
-    finishHarness.checkCalls.length = 0;
-    finishHarness.failures.length = 0;
-    finishHarness.lastCheckPassed = true;
+    runtimeHarness.checkCalls.length = 0;
     const config = resolveRunConfig({
       CLEANUP: "true",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
@@ -133,13 +113,12 @@ describe("executeSurfaceRun", () => {
     });
 
     expect(executeCalled).toBe(true);
-    expect(finishHarness.checkCalls).toEqual([
+    expect(runtimeHarness.checkCalls).toEqual([
       {
         checks: { "kubernetes job create returned 201": true },
         subject: createResponse,
       },
     ]);
-    expect(finishHarness.failures).toEqual([]);
     expect(cleanupAdapter).toBeDefined();
     expect(cleanupResult).toEqual({ createResponse });
   });
