@@ -188,6 +188,16 @@ iteration. Direct and Kueue wait for Kubernetes Job `Complete` or `Failed`. Skah
 session id and polls that session until it transitions from `Pending` or `Running` to `Completed`,
 `Succeeded`, `Failed`, or `Error`.
 
+Campaign sizing must satisfy the jobs-per-VU cap (default `JOBS_PER_VU_CAP=500`):
+
+```text
+logicalUsers >= ceil(totalJobs / JOBS_PER_VU_CAP)
+```
+
+For example, 10,000 jobs with the default cap requires at least 20 logical users. The runner rejects
+undersized campaigns and tells the operator to raise `campaign.logicalUsers` or
+`campaign.jobsPerVuCap`.
+
 Always pass a unique `campaign.testid`. Reusing a testid makes Grafana and Prometheus aggregate
 separate campaign runs.
 
@@ -293,7 +303,28 @@ Stress runtime taxonomy:
 - `profile=campaign`
 - `campaignType=stress`
 
-Stress uses the same exact-job lifecycle as benchmark, with larger sizing and explicit confirmation.
+Stress uses the same exact-job lifecycle as benchmark on Direct and Kueue, with larger sizing and
+explicit confirmation. Skaha stress is different: each VU runs one k6 iteration that submits all of
+its sessions in a batch, polls them on a round-robin schedule, and deletes each session as it
+reaches a terminal state. k6 runs `iterations = logicalUsers` and `vus = logicalUsers` for Skaha
+stress (not `iterations = totalJobs`).
+
+Skaha bulk poll pacing defaults:
+
+- `SKAHA_BULK_POLL_MIN_SECONDS=15` — minimum interval between GETs for the same session id
+- `SKAHA_BULK_POLL_CYCLE_SECONDS=1` — global poll tick
+
+Override via Helm when needed:
+
+```bash
+--set campaign.jobsPerVuCap=250 \
+--set skaha.bulkPollMinSeconds=30 \
+--set skaha.bulkPollCycleSeconds=2
+```
+
+The jobs-per-VU cap applies to stress as well. Size `campaign.logicalUsers` using
+`ceil(campaign.totalJobs / campaign.jobsPerVuCap)` before launch.
+
 Evidence focuses on accepted work, visible work, completion, rejection categories, API-server
 pressure, Kueue controller health, workload execution, Grafana visibility, and cleanup status.
 

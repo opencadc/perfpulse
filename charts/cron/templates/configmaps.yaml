@@ -26,7 +26,7 @@ data:
   SUBMISSION_JITTER_MAX_MS: {{ $.Values.submissionJitterMaxMs | quote }}
   SURFACE: {{ $surface }}
   WORKLOAD_COMMAND: '["stress-ng"]'
-  WORKLOAD_ARGS: '["--stressors","cpu","--cpu","1","--temp-path","/tmp","--timeout","60s","--metrics-brief"]'
+  WORKLOAD_ARGS: '["--cpu","1","--temp-path","/tmp","--timeout","60s","--metrics-brief"]'
   {{- if eq $surface "skaha" }}
   WORKLOAD_IMAGE: {{ $.Values.workload.image | quote }}
   {{- else }}

@@ -40,6 +40,7 @@ export const runtimeHarness = {
   runtimeEvents: [] as string[],
   sessionGetStatuses: [] as number[],
   sessionStatus: "Completed",
+  skahaSessionCounter: 0,
   sleepCalls: [] as number[],
   vuIdInTest: 1,
   workloadAdmitted: true,
@@ -70,6 +71,7 @@ export function resetK6RuntimeHarness(): void {
   runtimeHarness.workloadAdmitted = true;
   runtimeHarness.jobConditionType = "Complete";
   runtimeHarness.sessionStatus = "Completed";
+  runtimeHarness.skahaSessionCounter = 0;
 }
 
 Reflect.set(globalThis, "__ENV", {
@@ -224,9 +226,11 @@ mock.module("k6/http", () => ({
       if (url === "https://ws-cadc.canfar.net/ac/login") {
         return { body: JSON.stringify("runtime-token"), status: 200 };
       }
-      if (url.includes("/session")) {
+      if (url.includes("/session?")) {
         runtimeHarness.runtimeEvents.push("skaha_create_session");
-        return { body: "session-runtime", status: 200 };
+        const sessionId = `session-runtime-${runtimeHarness.skahaSessionCounter}`;
+        runtimeHarness.skahaSessionCounter += 1;
+        return { body: sessionId, status: 200 };
       }
       const manifest = JSON.parse(body);
       runtimeHarness.createdJobs.push({

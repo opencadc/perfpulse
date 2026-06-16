@@ -20,9 +20,12 @@ import {
   DEFAULT_CAMPAIGN_COMPLETION_TIMEOUT_SECONDS,
   DEFAULT_CRON_COMPLETION_TIMEOUT_SECONDS,
   DEFAULT_JITTER_MAX_MS,
+  DEFAULT_JOBS_PER_VU_CAP,
   DEFAULT_PROFILE,
   DEFAULT_SCENARIO,
   DEFAULT_SKAHA_API_URL,
+  DEFAULT_SKAHA_BULK_POLL_CYCLE_SECONDS,
+  DEFAULT_SKAHA_BULK_POLL_MIN_SECONDS,
   DEFAULT_SKAHA_LOGIN_URL,
   DEFAULT_SKAHA_PASSWORD_PATH,
   DEFAULT_SKAHA_REQUEST_TIMEOUT_SECONDS,
@@ -39,11 +42,12 @@ import {
 import {
   FIXED_WORKLOAD_DURATION_SECONDS,
   resolveRequireCompletion,
-  validateSequentialCampaignMode,
+  validateJobsPerVuCap,
 } from "./run-policy";
 
 export {
   defaultTestId,
+  deriveBulkSkahaStressBatch,
   deriveRunConfigForJob,
   makeJobName,
   sanitizeDnsLabel,
@@ -77,9 +81,11 @@ export {
   PROFILES,
   RUN_CLASSES,
 } from "./profile-defaults";
+export type { CampaignExecutionLifecycle, CampaignExecutionShape } from "./run-policy";
 export {
   FIXED_WORKLOAD_DURATION_SECONDS,
-  SEQUENTIAL_CAMPAIGN_THRESHOLD,
+  isBulkSkahaStressSurface,
+  resolveCampaignExecutionShape,
 } from "./run-policy";
 
 export function resolveRunConfig(env: EnvSource = {}): RunConfig {
@@ -122,10 +128,25 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   if (runClass === "campaign" && jobsPerSurface > 10000 && campaignType !== "stress") {
     throw new Error("Campaigns with more than 10000 jobs per surface require CAMPAIGN_TYPE=stress");
   }
-  validateSequentialCampaignMode(env, runClass, logicalUsers, jobsPerSurface);
+  const jobsPerVuCap = parsePositiveInteger(
+    env.JOBS_PER_VU_CAP,
+    DEFAULT_JOBS_PER_VU_CAP,
+    "JOBS_PER_VU_CAP",
+  );
+  validateJobsPerVuCap(runClass, logicalUsers, jobsPerSurface, jobsPerVuCap);
   const jobsPerLogicalUser = Math.ceil(jobsPerSurface / logicalUsers);
   const skahaConfig: SkahaConfig = {
     apiUrl: env.SKAHA_API_URL ?? DEFAULT_SKAHA_API_URL,
+    bulkPollCycleSeconds: parsePositiveInteger(
+      env.SKAHA_BULK_POLL_CYCLE_SECONDS,
+      DEFAULT_SKAHA_BULK_POLL_CYCLE_SECONDS,
+      "SKAHA_BULK_POLL_CYCLE_SECONDS",
+    ),
+    bulkPollMinSeconds: parsePositiveInteger(
+      env.SKAHA_BULK_POLL_MIN_SECONDS,
+      DEFAULT_SKAHA_BULK_POLL_MIN_SECONDS,
+      "SKAHA_BULK_POLL_MIN_SECONDS",
+    ),
     loginUrl: env.SKAHA_LOGIN_URL ?? DEFAULT_SKAHA_LOGIN_URL,
     passwordPath: env.SKAHA_PASSWORD_PATH ?? DEFAULT_SKAHA_PASSWORD_PATH,
     requestTimeoutSeconds: parsePositiveInteger(
@@ -195,6 +216,7 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     jobName: makeJobName(testid, surface, 0),
     jobsPerLogicalUser,
     jobsPerSurface,
+    jobsPerVuCap,
     kueue: {
       admissionGateSeconds: parsePositiveInteger(
         env.KUEUE_ADMISSION_GATE_SECONDS,

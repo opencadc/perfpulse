@@ -20,6 +20,7 @@ data:
   {{- if $.Values.campaign.confirmHighUsers }}
   CONFIRM_HIGH_USERS: "true"
   {{- end }}
+  JOBS_PER_VU_CAP: {{ $.Values.campaign.jobsPerVuCap | quote }}
   K6_OTEL_EXPORTER_PROTOCOL: http/protobuf
   K6_OTEL_HTTP_EXPORTER_ENDPOINT: {{ $.Values.otlp.endpoint | quote }}
   K6_OTEL_HTTP_EXPORTER_INSECURE: "true"
@@ -38,7 +39,7 @@ data:
   TOTAL_JOBS: {{ $.Values.campaign.totalJobs | quote }}
   VISIBILITY_GATE_SECONDS: {{ $.Values.campaign.visibilityGateSeconds | quote }}
   WORKLOAD_COMMAND: '["stress-ng"]'
-  WORKLOAD_ARGS: '["--stressors","cpu","--cpu","1","--temp-path","/tmp","--timeout","60s","--metrics-brief"]'
+  WORKLOAD_ARGS: '["--cpu","1","--temp-path","/tmp","--timeout","60s","--metrics-brief"]'
   {{- if eq $surface "skaha" }}
   WORKLOAD_IMAGE: {{ $.Values.workload.image | quote }}
   {{- else }}
@@ -54,6 +55,8 @@ data:
   {{- end }}
   {{- if eq $surface "skaha" }}
   SKAHA_API_URL: {{ $.Values.skaha.apiUrl | quote }}
+  SKAHA_BULK_POLL_CYCLE_SECONDS: {{ $.Values.skaha.bulkPollCycleSeconds | quote }}
+  SKAHA_BULK_POLL_MIN_SECONDS: {{ $.Values.skaha.bulkPollMinSeconds | quote }}
   SKAHA_LOGIN_URL: {{ $.Values.skaha.loginUrl | quote }}
   SKAHA_PASSWORD_PATH: /var/run/secrets/perfpulse/skaha-auth/password
   SKAHA_REQUEST_TIMEOUT_SECONDS: {{ $.Values.skaha.requestTimeoutSeconds | quote }}

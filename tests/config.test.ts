@@ -3,8 +3,10 @@ import {
   DEFAULT_SKAHA_API_URL,
   DEFAULT_SKAHA_WORKLOAD_IMAGE,
   DEFAULT_WORKLOAD_IMAGE,
+  deriveBulkSkahaStressBatch,
   deriveRunConfigForJob,
   makeJobName,
+  resolveCampaignExecutionShape,
   resolveRunConfig,
   sanitizeDnsLabel,
   sanitizeLabelValue,
@@ -43,8 +45,6 @@ describe("resolveRunConfig", () => {
     expect(config.workload.image).toBe(DEFAULT_WORKLOAD_IMAGE);
     expect(config.workload.command).toEqual(["stress-ng"]);
     expect(config.workload.args).toEqual([
-      "--stressors",
-      "cpu",
       "--cpu",
       "1",
       "--temp-path",
@@ -150,9 +150,8 @@ describe("resolveRunConfig", () => {
     expect(
       resolveRunConfig({
         CAMPAIGN_TYPE: "stress",
-        CONFIRM_HIGH_USERS: "true",
         CONFIRM_STRESS: "true",
-        LOGICAL_USERS: "10",
+        LOGICAL_USERS: "20",
         PROFILE: "campaign",
         TOTAL_JOBS: "10000",
       }).requireCompletion,
@@ -160,9 +159,8 @@ describe("resolveRunConfig", () => {
     expect(
       resolveRunConfig({
         CAMPAIGN_TYPE: "stress",
-        CONFIRM_HIGH_USERS: "true",
         CONFIRM_STRESS: "true",
-        LOGICAL_USERS: "10",
+        LOGICAL_USERS: "20",
         PROFILE: "campaign",
         REQUIRE_COMPLETION: "true",
         TOTAL_JOBS: "10000",
@@ -173,24 +171,85 @@ describe("resolveRunConfig", () => {
     );
   });
 
-  test("rejects sequential campaign mode without explicit confirmation", () => {
+  test("rejects campaigns when logical users are below the jobs-per-VU cap", () => {
     expect(() =>
       resolveRunConfig({
         CAMPAIGN_TYPE: "benchmark",
-        LOGICAL_USERS: "1",
+        LOGICAL_USERS: "5",
         PROFILE: "campaign",
-        TOTAL_JOBS: "101",
+        TOTAL_JOBS: "10000",
       }),
-    ).toThrow("Sequential campaign mode requires CONFIRM_SEQUENTIAL=true");
-    expect(() =>
-      resolveRunConfig({
-        CAMPAIGN_TYPE: "benchmark",
-        CONFIRM_SEQUENTIAL: "true",
-        LOGICAL_USERS: "1",
-        PROFILE: "campaign",
-        TOTAL_JOBS: "101",
-      }),
-    ).not.toThrow();
+    ).toThrow(/raise LOGICAL_USERS or JOBS_PER_VU_CAP/);
+  });
+
+  test("accepts campaigns when logical users meet the jobs-per-VU cap", () => {
+    const config = resolveRunConfig({
+      CAMPAIGN_TYPE: "benchmark",
+      LOGICAL_USERS: "20",
+      PROFILE: "campaign",
+      TOTAL_JOBS: "10000",
+    });
+
+    expect(config.logicalUsers).toBe(20);
+    expect(config.jobsPerVuCap).toBe(500);
+    expect(config.totalJobs).toBe(10000);
+  });
+
+  test("resolves bulk Skaha stress execution shape from run config", () => {
+    const skahaStress = resolveRunConfig({
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_HIGH_USERS: "true",
+      CONFIRM_STRESS: "true",
+      LOGICAL_USERS: "20",
+      PROFILE: "campaign",
+      SURFACE: "skaha",
+      TOTAL_JOBS: "10000",
+    });
+
+    expect(resolveCampaignExecutionShape(skahaStress)).toEqual({
+      lifecycle: "bulk-skaha-stress",
+      iterations: 20,
+      waves: 1,
+    });
+  });
+
+  test("resolves per-job execution shape for direct stress campaigns", () => {
+    const directStress = resolveRunConfig({
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_HIGH_USERS: "true",
+      CONFIRM_STRESS: "true",
+      LOGICAL_USERS: "100",
+      PROFILE: "campaign",
+      SURFACE: "k8s-direct",
+      TOTAL_JOBS: "10000",
+    });
+
+    expect(resolveCampaignExecutionShape(directStress)).toEqual({
+      lifecycle: "per-job",
+      iterations: 10000,
+      waves: 100,
+    });
+  });
+
+  test("derives bulk Skaha stress batch job range from logical user bucket", () => {
+    const config = resolveRunConfig({
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_HIGH_USERS: "true",
+      CONFIRM_STRESS: "true",
+      LOGICAL_USERS: "2",
+      PROFILE: "campaign",
+      SURFACE: "skaha",
+      TOTAL_JOBS: "7",
+    });
+
+    expect(deriveBulkSkahaStressBatch({ ...config, userBucketIndex: 0 })).toEqual({
+      baseJobIndex: 0,
+      sessionCount: 4,
+    });
+    expect(deriveBulkSkahaStressBatch({ ...config, userBucketIndex: 1 })).toEqual({
+      baseJobIndex: 4,
+      sessionCount: 3,
+    });
   });
 
   test("uses the fixed 60 second workload runtime on every surface", () => {
@@ -238,9 +297,8 @@ describe("resolveRunConfig", () => {
     expect(() =>
       resolveRunConfig({
         CAMPAIGN_TYPE: "stress",
-        CONFIRM_SEQUENTIAL: "true",
         CONFIRM_STRESS: "true",
-        LOGICAL_USERS: "1",
+        LOGICAL_USERS: "21",
         PROFILE: "campaign",
         TOTAL_JOBS: "10001",
       }),
@@ -282,6 +340,8 @@ describe("resolveRunConfig", () => {
     expect(DEFAULT_SKAHA_API_URL).toBe(EXPECTED_DEFAULT_SKAHA_API_URL);
     expect(config.skaha).toEqual({
       apiUrl: EXPECTED_DEFAULT_SKAHA_API_URL,
+      bulkPollCycleSeconds: 1,
+      bulkPollMinSeconds: 15,
       loginUrl: "https://ws-cadc.canfar.net/ac/login",
       passwordPath: "/var/run/secrets/perfpulse/skaha-auth/password",
       requestTimeoutSeconds: 600,
@@ -290,8 +350,6 @@ describe("resolveRunConfig", () => {
     expect(config.workload.image).toBe(DEFAULT_SKAHA_WORKLOAD_IMAGE);
     expect(config.workload.command).toEqual(["stress-ng"]);
     expect(config.workload.args).toEqual([
-      "--stressors",
-      "cpu",
       "--cpu",
       "1",
       "--temp-path",

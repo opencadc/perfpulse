@@ -1,4 +1,4 @@
-import type { RunConfig } from "./config";
+import { type RunConfig, resolveCampaignExecutionShape } from "./config";
 
 /** Reference core budget used to estimate queue backlog for large campaigns. */
 export const DEFAULT_CAMPAIGN_CORE_BUDGET = 2_000;
@@ -16,6 +16,7 @@ function perIterationOverheadSeconds(config: Pick<RunConfig, "skaha" | "surface"
 export function computeScenarioMaxDurationSeconds(
   config: Pick<
     RunConfig,
+    | "campaignType"
     | "completionTimeoutSeconds"
     | "logicalUsers"
     | "runClass"
@@ -27,7 +28,7 @@ export function computeScenarioMaxDurationSeconds(
   >,
   coreBudget = DEFAULT_CAMPAIGN_CORE_BUDGET,
 ): number {
-  if (config.runClass === "cron" || config.totalJobs <= config.logicalUsers) {
+  if (config.runClass === "cron") {
     return (
       config.completionTimeoutSeconds +
       config.visibilityGateSeconds +
@@ -36,7 +37,28 @@ export function computeScenarioMaxDurationSeconds(
     );
   }
 
-  const waves = Math.ceil(config.totalJobs / Math.max(config.logicalUsers, 1));
+  const executionShape = resolveCampaignExecutionShape(config);
+  if (executionShape.lifecycle === "bulk-skaha-stress") {
+    const jobsPerLogicalUser = Math.ceil(config.totalJobs / Math.max(config.logicalUsers, 1));
+    const submitBudgetSeconds = jobsPerLogicalUser * config.skaha.requestTimeoutSeconds;
+    return (
+      submitBudgetSeconds +
+      config.completionTimeoutSeconds +
+      perIterationOverheadSeconds(config) +
+      SETUP_BUFFER_SECONDS
+    );
+  }
+
+  if (config.totalJobs <= config.logicalUsers) {
+    return (
+      config.completionTimeoutSeconds +
+      config.visibilityGateSeconds +
+      perIterationOverheadSeconds(config) +
+      SETUP_BUFFER_SECONDS
+    );
+  }
+
+  const waves = executionShape.waves;
   const queueFactor = Math.max(1, Math.ceil(config.totalJobs / Math.max(coreBudget, 1)));
   const expectedJobSeconds = config.workload.durationSeconds * queueFactor;
   const perIterationSeconds =

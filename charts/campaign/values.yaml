@@ -21,6 +21,7 @@ campaign:
   completionTimeoutSeconds: 259200
   submissionJitterMaxMs: 1000
   pollJitterMaxMs: 1000
+  jobsPerVuCap: 500
   profile: campaign
   scenario: many-small-users
 otlp:
@@ -30,6 +31,8 @@ otlp:
 skaha:
   credentialsSecretName: perfpulse-skaha-auth
   requestTimeoutSeconds: 600
+  bulkPollMinSeconds: 15
+  bulkPollCycleSeconds: 1
   apiUrl: >-
     http://canfar-skaha-staging-skaha-tomcat-svc.canfar-system-staging.svc.keel-prod.local:8080/skaha/v1
   loginUrl: https://ws-cadc.canfar.net/ac/login

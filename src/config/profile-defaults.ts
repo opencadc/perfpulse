@@ -53,6 +53,8 @@ export interface KueueConfig {
 
 export interface SkahaConfig {
   apiUrl: string;
+  bulkPollCycleSeconds: number;
+  bulkPollMinSeconds: number;
   loginUrl: string;
   passwordPath: string;
   requestTimeoutSeconds: number;
@@ -71,6 +73,7 @@ export interface RunConfig {
   jobName: string;
   jobsPerLogicalUser: number;
   jobsPerSurface: number;
+  jobsPerVuCap: number;
   kueue: KueueConfig;
   kubernetes: KubernetesConfig;
   logicalUsers: number;
@@ -97,7 +100,10 @@ export interface RunConfig {
 export const SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 export const DEFAULT_SKAHA_PASSWORD_PATH = "/var/run/secrets/perfpulse/skaha-auth/password";
 export const DEFAULT_SKAHA_REQUEST_TIMEOUT_SECONDS = 600;
+export const DEFAULT_SKAHA_BULK_POLL_MIN_SECONDS = 15;
+export const DEFAULT_SKAHA_BULK_POLL_CYCLE_SECONDS = 1;
 export const DEFAULT_SKAHA_USERNAME_PATH = "/var/run/secrets/perfpulse/skaha-auth/username";
 export const DEFAULT_CAMPAIGN_COMPLETION_TIMEOUT_SECONDS = 259_200;
 export const DEFAULT_CRON_COMPLETION_TIMEOUT_SECONDS = 86_400;
 export const DEFAULT_JITTER_MAX_MS = 1_000;
+export const DEFAULT_JOBS_PER_VU_CAP = 500;

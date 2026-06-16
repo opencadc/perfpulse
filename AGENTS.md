@@ -17,12 +17,13 @@ Single-context repo: read root `CONTEXT.md` and `docs/adr/` when present. See `d
 - Prefers ambitious structural simplification over accepting incidental complexity when tests pass.
 - Resolves design decisions via grill-with-docs-style Q&A; capture outcomes in `CONTEXT.md` and `docs/adr/`.
 - Implements changes with TDD vertical slices; tests exercise public interfaces, not implementation details.
-- Rejects large sequential campaigns by default (`TOTAL_JOBS > 100` with `LOGICAL_USERS === 1`) unless `CONFIRM_SEQUENTIAL=true`.
+- Rejects campaigns where `logicalUsers < ceil(totalJobs / jobsPerVuCap)`; operator raises `LOGICAL_USERS` or `JOBS_PER_VU_CAP`.
 - Prefers deleting unused runtime config and orphan modules over keeping phantom switches.
 - Uses Grafana as the primary evidence surface; offline markdown campaign reports are out of scope.
 - Keeps keel-prod validation runs small (about 5–10 jobs per surface) while still tracking every job to completion.
 - Expects Skaha submission HTTP timeouts around 10 minutes because submissions can be slow.
 - After substantive work: transition Jira subtasks and ensure `bun run check` passes before handoff.
+- Do not deploy or run ad-hoc containers in the target cluster unless explicitly asked; validate workload images locally with docker and debug Skaha from local bash and server logs first.
 
 ## Learned Workspace Facts
 
@@ -35,3 +36,5 @@ Single-context repo: read root `CONTEXT.md` and `docs/adr/` when present. See `d
 - Admission gate hard-fails on cron for Kueue only; diagnostic for benchmark and stress campaigns.
 - Production validation target cluster: keel-prod.
 - Helm must not emit removed runtime env vars (for example `WORKLOAD_DURATION_SECONDS`); `rejectRemovedEnv()` fails fast on boot.
+- Skaha session `ram` must be a whole GiB integer per ADR-0003 (`ram=1` aligned with ADR-0002); Skaha integration rules in ADR-0004.
+- Skaha workload image: `images.canfar.net/skaha/stress-ng:latest`, built from `docker/stress-ng/Dockerfile` with local `docker build` / `docker push` (see README).

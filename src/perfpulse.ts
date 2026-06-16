@@ -3,8 +3,16 @@ import { b64encode } from "k6/encoding";
 import * as exec from "k6/execution";
 import http from "k6/http";
 import { createCleanupAdapter } from "./cleanup";
-import { deriveRunConfigForJob, type RunConfig, resolveRunConfig } from "./config";
 import {
+  deriveBulkSkahaStressBatch,
+  deriveRunConfigForJob,
+  isBulkSkahaStressSurface,
+  type RunConfig,
+  resolveCampaignExecutionShape,
+  resolveRunConfig,
+} from "./config";
+import {
+  executeBulkSkahaStressRun,
   executeSurfaceRun,
   kubernetesJobCreateChecks,
   skahaSessionCreateChecks,
@@ -15,7 +23,7 @@ import { runKueueKubernetesSurface } from "./kubernetes/kueue";
 import { createLifecycleRecorder, type LifecycleRecorder } from "./metrics";
 import { metricTags } from "./metrics-contract";
 import { createOptions } from "./options";
-import { createSkahaClient, runSkahaSurface } from "./skaha";
+import { createSkahaClient, runBulkSkahaStressSurface, runSkahaSurface } from "./skaha";
 
 interface RuntimeData {
   config: RunConfig;
@@ -161,6 +169,13 @@ function runSkaha(runtimeData: RuntimeData, data: RunConfig, recorder: Lifecycle
     runConfig: data,
     token: resolveSkahaBearerToken(runtimeData, data),
   });
+
+  const executionShape = resolveCampaignExecutionShape(data);
+  if (isBulkSkahaStressSurface(data.surface, executionShape)) {
+    runSkahaBulkStress(runtimeData, data, client, recorder);
+    return;
+  }
+
   const cleanup = createCleanupAdapter(data, recorder, { skaha: client });
   executeSurfaceRun(data, cleanup, {
     execute: () =>
@@ -170,13 +185,7 @@ function runSkaha(runtimeData: RuntimeData, data: RunConfig, recorder: Lifecycle
           pollIntervalSeconds: data.kubernetes.pollIntervalSeconds,
           pollJitterMaxMs: data.pollJitterMaxMs,
           requireCompletion: data.requireCompletion,
-          session: {
-            args: data.workload.args,
-            cmd: data.workload.command?.join(" ") ?? "stress-ng",
-            env: { PERF_PULSE_TESTID: data.testid },
-            image: data.workload.image,
-            name: data.jobName,
-          },
+          session: skahaSessionParams(data),
           visibilityGateSeconds: data.visibilityGateSeconds,
         },
         client,
@@ -189,6 +198,70 @@ function runSkaha(runtimeData: RuntimeData, data: RunConfig, recorder: Lifecycle
     cleanupWith: (adapter, result) =>
       adapter.cleanupSkahaSession((result.createResponse as { sessionId: string }).sessionId),
   });
+}
+
+function runSkahaBulkStress(
+  _runtimeData: RuntimeData,
+  data: RunConfig,
+  client: ReturnType<typeof createSkahaClient>,
+  recorder: LifecycleRecorder,
+): void {
+  const cleanup = createCleanupAdapter(data, recorder, { skaha: client });
+  const { baseJobIndex, sessionCount } = deriveBulkSkahaStressBatch(data);
+
+  executeBulkSkahaStressRun(data, cleanup, {
+    execute: () => {
+      const bulkResult = runBulkSkahaStressSurface(
+        {
+          completionTimeoutSeconds: data.completionTimeoutSeconds,
+          pollCycleSeconds: data.skaha.bulkPollCycleSeconds,
+          pollMinSeconds: data.skaha.bulkPollMinSeconds,
+          session: (index) => {
+            const jobConfig = deriveRunConfigForJob(
+              data,
+              baseJobIndex + index,
+              data.userBucketIndex,
+            );
+            return skahaSessionParams(jobConfig);
+          },
+          sessionCount,
+        },
+        client,
+        recorder,
+        {
+          cleanupSession: (sessionId) => {
+            if (data.cleanup) {
+              cleanup.cleanupSkahaSession(sessionId);
+              return true;
+            }
+            return client.deleteSession(sessionId).cleanupSucceeded;
+          },
+          sleep: (seconds) => {
+            sleep(seconds);
+          },
+        },
+        group,
+      );
+
+      return {
+        createResponse: { accepted: bulkResult.succeeded },
+        ...(bulkResult.failure === undefined ? {} : { failure: bulkResult.failure }),
+        sessions: bulkResult.sessions,
+      };
+    },
+  });
+}
+
+function skahaSessionParams(data: RunConfig) {
+  return {
+    args: data.workload.args,
+    cmd: data.workload.command?.join(" ") ?? "stress-ng",
+    cores: 1,
+    env: { PERF_PULSE_TESTID: data.testid },
+    image: data.workload.image,
+    name: data.jobName,
+    ram: 1,
+  };
 }
 
 function normalizeRuntimeData(data: RunConfig | RuntimeData): RuntimeData {

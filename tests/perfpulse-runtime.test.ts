@@ -388,6 +388,178 @@ describe("PerfPulse k6 runtime dispatch", () => {
     expect(JSON.stringify(metricRecords)).not.toContain("perfpulse-shared-benchmark-kueue-75");
   });
 
+  test("submits jobsPerLogicalUser Skaha sessions per stress iteration", async () => {
+    runtimeHarness.iterationInTest = 1;
+    runtimeHarness.vuIdInTest = 2;
+    const config = resolveRunConfig({
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_STRESS: "true",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "2",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "campaign",
+      SKAHA_API_URL: "https://ws.example/skaha/v1",
+      SKAHA_BULK_POLL_MIN_SECONDS: "1",
+      SURFACE: "skaha",
+      TESTID: "stress-skaha-bulk",
+      TOTAL_JOBS: "6",
+    });
+    const runtime = await import("../src/perfpulse");
+
+    runtime.default({ config, skahaBearerToken: "runtime-token" });
+
+    const createRequests = httpRequests.filter(
+      (request) => request.options?.tags?.name === "skaha_create_session",
+    );
+    expect(createRequests).toHaveLength(3);
+    const sessionNames = createRequests.map((request) =>
+      new URL(String(request.url)).searchParams.get("name"),
+    );
+    expect(sessionNames).toEqual([
+      "perfpulse-stress-skaha-bulk-skaha-3",
+      "perfpulse-stress-skaha-bulk-skaha-4",
+      "perfpulse-stress-skaha-bulk-skaha-5",
+    ]);
+  });
+
+  test("anchors bulk Skaha stress sessions to the VU bucket, not iterationInTest", async () => {
+    runtimeHarness.iterationInTest = 1;
+    runtimeHarness.vuIdInTest = 1;
+    const config = resolveRunConfig({
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_STRESS: "true",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "2",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "campaign",
+      SKAHA_API_URL: "https://ws.example/skaha/v1",
+      SKAHA_BULK_POLL_MIN_SECONDS: "1",
+      SURFACE: "skaha",
+      TESTID: "stress-skaha-bucket",
+      TOTAL_JOBS: "6",
+    });
+    const runtime = await import("../src/perfpulse");
+
+    runtime.default({ config, skahaBearerToken: "runtime-token" });
+
+    const sessionNames = httpRequests
+      .filter((request) => request.options?.tags?.name === "skaha_create_session")
+      .map((request) => new URL(String(request.url)).searchParams.get("name"));
+    expect(sessionNames).toEqual([
+      "perfpulse-stress-skaha-bucket-skaha-0",
+      "perfpulse-stress-skaha-bucket-skaha-1",
+      "perfpulse-stress-skaha-bucket-skaha-2",
+    ]);
+  });
+
+  test("submits only the remaining jobs for the final logical user bucket", async () => {
+    runtimeHarness.iterationInTest = 1;
+    runtimeHarness.vuIdInTest = 2;
+    const config = resolveRunConfig({
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_STRESS: "true",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "2",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "campaign",
+      SKAHA_API_URL: "https://ws.example/skaha/v1",
+      SKAHA_BULK_POLL_MIN_SECONDS: "1",
+      SURFACE: "skaha",
+      TESTID: "stress-skaha-remainder",
+      TOTAL_JOBS: "7",
+    });
+    const runtime = await import("../src/perfpulse");
+
+    runtime.default({ config, skahaBearerToken: "runtime-token" });
+
+    expect(
+      httpRequests.filter((request) => request.options?.tags?.name === "skaha_create_session"),
+    ).toHaveLength(3);
+  });
+
+  test("records cleanup_deleted for each terminal bulk Skaha stress session", async () => {
+    runtimeHarness.iterationInTest = 0;
+    runtimeHarness.vuIdInTest = 1;
+    metricRecords.length = 0;
+    const config = resolveRunConfig({
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_STRESS: "true",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "1",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "campaign",
+      SKAHA_API_URL: "https://ws.example/skaha/v1",
+      SKAHA_BULK_POLL_MIN_SECONDS: "1",
+      SURFACE: "skaha",
+      TESTID: "stress-skaha-cleanup",
+      TOTAL_JOBS: "3",
+    });
+    const runtime = await import("../src/perfpulse");
+
+    runtime.default({ config, skahaBearerToken: "runtime-token" });
+
+    expect(
+      metricRecords.filter(
+        (record) =>
+          record.metric === METRIC_NAMES.cleanupDeleted &&
+          record.tags?.testid === "stress-skaha-cleanup",
+      ),
+    ).toEqual([
+      {
+        metric: METRIC_NAMES.cleanupDeleted,
+        tags: expect.objectContaining({ surface: "skaha", testid: "stress-skaha-cleanup" }),
+        value: 1,
+      },
+      {
+        metric: METRIC_NAMES.cleanupDeleted,
+        tags: expect.objectContaining({ surface: "skaha", testid: "stress-skaha-cleanup" }),
+        value: 1,
+      },
+      {
+        metric: METRIC_NAMES.cleanupDeleted,
+        tags: expect.objectContaining({ surface: "skaha", testid: "stress-skaha-cleanup" }),
+        value: 1,
+      },
+    ]);
+  });
+
+  test("records campaign jobsExpected as totalJobs for Skaha stress in setup", async () => {
+    const campaignEnv = {
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_STRESS: "true",
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "2",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "campaign",
+      SKAHA_API_URL: "https://ws.example/skaha/v1",
+      SURFACE: "skaha",
+      TESTID: "stress-skaha-expected",
+      TOTAL_JOBS: "6",
+    };
+    const config = resolveRunConfig(campaignEnv);
+    const runtime = await import("../src/perfpulse");
+    const savedEnv = { ...Reflect.get(globalThis, "__ENV") };
+
+    Reflect.set(globalThis, "__ENV", campaignEnv);
+    runtime.setup();
+
+    expect(metricRecords.filter((record) => record.metric === METRIC_NAMES.jobsExpected)).toEqual([
+      {
+        metric: METRIC_NAMES.jobsExpected,
+        tags: expect.objectContaining({ surface: "skaha", testid: "stress-skaha-expected" }),
+        value: 6,
+      },
+    ]);
+
+    metricRecords.length = 0;
+    runtime.default({ config, skahaBearerToken: "runtime-token" });
+    expect(metricRecords.filter((record) => record.metric === METRIC_NAMES.jobsExpected)).toEqual(
+      [],
+    );
+
+    Reflect.set(globalThis, "__ENV", savedEnv);
+  });
+
   test("runs the Skaha surface with runtime API URL and bearer-token auth", async () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
@@ -419,7 +591,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
     expect(url.searchParams.get("type")).toBe("headless");
     expect(url.searchParams.get("cmd")).toBe("stress-ng");
     expect(url.searchParams.get("args")).toBe(
-      "--stressors cpu --cpu 1 --temp-path /tmp --timeout 60s --metrics-brief",
+      "--cpu 1 --temp-path /tmp --timeout 60s --metrics-brief",
     );
     expect(url.searchParams.getAll("env")).toEqual(["PERF_PULSE_TESTID=skaha-spot"]);
     expect(createRequest?.options).toMatchObject({
@@ -534,32 +706,37 @@ describe("PerfPulse k6 runtime dispatch", () => {
       POLL_INTERVAL_SECONDS: "1",
       CAMPAIGN_TYPE: "stress",
       CONFIRM_HIGH_USERS: "true",
-      LOGICAL_USERS: "100",
+      LOGICAL_USERS: "2",
       PROFILE: "campaign",
-      TOTAL_JOBS: "10000",
       SKAHA_API_URL: "https://ws.example/skaha/v1",
+      SKAHA_BULK_POLL_MIN_SECONDS: "1",
       SURFACE: "skaha",
       TESTID: "stress-skaha",
+      TOTAL_JOBS: "6",
     });
     const runtime = await import("../src/perfpulse");
 
     expect(() => runtime.default({ config, skahaBearerToken: "runtime-token" })).not.toThrow();
 
-    expect(metricRecords).toContainEqual({
-      metric: METRIC_NAMES.jobsSubmitted,
-      tags: expect.objectContaining({ surface: "skaha", testid: "stress-skaha" }),
-      value: 1,
-    });
-    expect(metricRecords).toContainEqual({
-      metric: METRIC_NAMES.jobsVisible,
-      tags: expect.objectContaining({ surface: "skaha", testid: "stress-skaha" }),
-      value: 1,
-    });
-    expect(metricRecords).not.toContainEqual({
-      metric: METRIC_NAMES.jobsCompletionFailed,
-      tags: expect.objectContaining({ surface: "skaha", testid: "stress-skaha" }),
-      value: 1,
-    });
+    expect(
+      metricRecords.filter(
+        (record) =>
+          record.metric === METRIC_NAMES.jobsSubmitted && record.tags?.testid === "stress-skaha",
+      ),
+    ).toHaveLength(3);
+    expect(
+      metricRecords.filter(
+        (record) =>
+          record.metric === METRIC_NAMES.jobsVisible && record.tags?.testid === "stress-skaha",
+      ),
+    ).toHaveLength(0);
+    expect(
+      metricRecords.filter(
+        (record) =>
+          record.metric === METRIC_NAMES.jobsCompletionFailed &&
+          record.tags?.testid === "stress-skaha",
+      ),
+    ).toHaveLength(3);
   });
 
   test("applies submission jitter before session create", async () => {
@@ -654,7 +831,7 @@ describe("PerfPulse k6 runtime dispatch", () => {
         options: expect.objectContaining({
           tags: { name: "skaha_delete_session", ...metricTags(config) },
         }),
-        url: "https://ws.example/skaha/v1/session/session-runtime",
+        url: "https://ws.example/skaha/v1/session/session-runtime-0",
       }),
     );
     expect(httpRequests.some((request) => request.options?.tags?.name === "k8s_delete_job")).toBe(

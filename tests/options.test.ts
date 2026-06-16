@@ -115,6 +115,27 @@ describe("k6 options contract", () => {
     });
   });
 
+  test("omits completion-failed threshold for bulk Skaha stress campaigns", () => {
+    const options = createOptions(
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "stress",
+        CONFIRM_HIGH_USERS: "true",
+        CONFIRM_STRESS: "true",
+        LOGICAL_USERS: "20",
+        PROFILE: "campaign",
+        SURFACE: "skaha",
+        TOTAL_JOBS: "10000",
+      }),
+    );
+
+    expect(Object.keys(options.thresholds ?? {}).sort()).toEqual([
+      "http_req_failed",
+      "perfpulse_cleanup_failed",
+      "perfpulse_jobs_submission_failed",
+      "perfpulse_jobs_visibility_failed",
+    ]);
+  });
+
   test("keeps stress campaign thresholds on lifecycle failures and zero HTTP errors", () => {
     const options = createOptions(
       resolveRunConfig({
@@ -166,6 +187,69 @@ describe("k6 options contract", () => {
       surface: "k8s-kueue",
       testid: "benchmark-small-manual",
       user_shape: "100x1",
+    });
+  });
+
+  test("keeps Skaha benchmark campaigns on totalJobs iterations", () => {
+    const options = createOptions(
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        CONFIRM_HIGH_USERS: "true",
+        LOGICAL_USERS: "100",
+        PROFILE: "campaign",
+        SURFACE: "skaha",
+        TOTAL_JOBS: "100",
+      }),
+    );
+    const scenario = options.scenarios?.campaign;
+
+    expect(scenario).toMatchObject({
+      executor: "shared-iterations",
+      iterations: 100,
+      vus: 100,
+    });
+  });
+
+  test("keeps direct stress campaigns on totalJobs iterations", () => {
+    const options = createOptions(
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "stress",
+        CONFIRM_HIGH_USERS: "true",
+        CONFIRM_STRESS: "true",
+        LOGICAL_USERS: "100",
+        PROFILE: "campaign",
+        SURFACE: "k8s-direct",
+        TOTAL_JOBS: "10000",
+      }),
+    );
+    const scenario = options.scenarios?.campaign;
+
+    expect(scenario).toMatchObject({
+      executor: "shared-iterations",
+      iterations: 10000,
+      vus: 100,
+    });
+  });
+
+  test("uses logical-user shared iterations for Skaha stress campaigns", () => {
+    const options = createOptions(
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "stress",
+        CONFIRM_HIGH_USERS: "true",
+        CONFIRM_STRESS: "true",
+        LOGICAL_USERS: "100",
+        PROFILE: "campaign",
+        SURFACE: "skaha",
+        TOTAL_JOBS: "10000",
+        VISIBILITY_GATE_SECONDS: "120",
+      }),
+    );
+    const scenario = options.scenarios?.campaign;
+
+    expect(scenario).toMatchObject({
+      executor: "shared-iterations",
+      iterations: 100,
+      vus: 100,
     });
   });
 

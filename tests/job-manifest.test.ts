@@ -36,8 +36,6 @@ describe("direct Kubernetes Job manifest", () => {
     expect(manifest.spec.template.spec.containers[0]?.image).toBe(DEFAULT_WORKLOAD_IMAGE);
     expect(manifest.spec.template.spec.containers[0]?.command).toEqual(["stress-ng"]);
     expect(manifest.spec.template.spec.containers[0]?.args).toEqual([
-      "--stressors",
-      "cpu",
       "--cpu",
       "1",
       "--temp-path",

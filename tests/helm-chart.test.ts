@@ -66,6 +66,7 @@ describe("PerfPulse Helm charts", () => {
       expect(cronValues).not.toContain("bitnami/kubectl");
       expect(manifest).not.toContain("name: canfar-workloads\n");
       expect(manifest).not.toContain("kind: Secret");
+      expect(manifest).not.toContain("CONFIRM_SEQUENTIAL:");
     },
     { timeout: helmTestTimeoutMs },
   );
@@ -103,8 +104,7 @@ describe("PerfPulse Helm charts", () => {
       TESTID: "cron-direct",
       VISIBILITY_GATE_SECONDS: "600",
       WORKLOAD_COMMAND: '["stress-ng"]',
-      WORKLOAD_ARGS:
-        '["--stressors","cpu","--cpu","1","--temp-path","/tmp","--timeout","60s","--metrics-brief"]',
+      WORKLOAD_ARGS: '["--cpu","1","--temp-path","/tmp","--timeout","60s","--metrics-brief"]',
       WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04",
       WORKLOAD_NAMESPACE: "canfar-workloads",
     });
@@ -180,6 +180,36 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).toContain("allowPrivilegeEscalation: false");
     expect(manifest).not.toContain("kind: CronJob");
     expect(manifest).not.toContain("kind: Secret");
+    expect(manifest).not.toContain("CONFIRM_SEQUENTIAL:");
+    expect(count(manifest, 'JOBS_PER_VU_CAP: "500"')).toBe(3);
+    expect(count(manifest, 'SKAHA_BULK_POLL_MIN_SECONDS: "15"')).toBe(1);
+    expect(count(manifest, 'SKAHA_BULK_POLL_CYCLE_SECONDS: "1"')).toBe(1);
+  });
+
+  test("campaign chart exposes jobs-per-VU cap and bulk Skaha poll overrides", () => {
+    const manifest = helmTemplate("campaign", [
+      "--set",
+      "image.tag=2026.05.04",
+      "--set",
+      "campaign.totalJobs=12",
+      "--set",
+      "campaign.logicalUsers=3",
+      "--set",
+      "campaign.testid=manual-20260507",
+      "--set",
+      "campaign.jobsPerVuCap=250",
+      "--set",
+      "skaha.bulkPollMinSeconds=30",
+      "--set",
+      "skaha.bulkPollCycleSeconds=2",
+      "--set-json",
+      'surfaces=["skaha"]',
+    ]);
+
+    expect(manifest).toContain('JOBS_PER_VU_CAP: "250"');
+    expect(manifest).toContain('SKAHA_BULK_POLL_MIN_SECONDS: "30"');
+    expect(manifest).toContain('SKAHA_BULK_POLL_CYCLE_SECONDS: "2"');
+    expect(manifest).not.toContain("CONFIRM_SEQUENTIAL:");
   });
 
   test("campaign chart allows selecting one surface and overriding credential secret names", () => {

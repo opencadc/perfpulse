@@ -31,6 +31,17 @@ Stress campaigns require both:
 - explicit stress profile selection (`campaign.type=stress`)
 - `CONFIRM_STRESS=true`
 
+Campaign sizing must satisfy the jobs-per-VU cap (default `JOBS_PER_VU_CAP=500`):
+
+```text
+logicalUsers >= ceil(totalJobs / JOBS_PER_VU_CAP)
+```
+
+On Skaha stress, each VU submits a batch of sessions in one iteration, polls them with bulk pacing
+(`SKAHA_BULK_POLL_MIN_SECONDS`, `SKAHA_BULK_POLL_CYCLE_SECONDS`), and deletes each session inline
+when it reaches a terminal state. Direct and Kueue stress keep the per-job lifecycle with
+`iterations = totalJobs`.
+
 Stress success evidence focuses on acceptance, visibility, observability, control-plane behavior,
 and cleanup. Completion may be optional when `requireCompletion` is disabled for stress; use
 `campaign_type=stress` panels that do not treat missing completion as failure.

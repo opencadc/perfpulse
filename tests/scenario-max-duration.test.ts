@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { resolveRunConfig } from "../src/config";
+import { resolveCampaignExecutionShape, resolveRunConfig } from "../src/config";
 import {
   computeScenarioMaxDurationSeconds,
   DEFAULT_CAMPAIGN_CORE_BUDGET,
@@ -42,6 +42,38 @@ describe("computeScenarioMaxDurationSeconds", () => {
     const duration = computeScenarioMaxDurationSeconds(config, 10);
     expect(duration).toBeGreaterThan(
       computeScenarioMaxDurationSeconds(config, DEFAULT_CAMPAIGN_CORE_BUDGET),
+    );
+  });
+
+  test("budgets bulk Skaha stress maxDuration for sequential submit and batch poll", () => {
+    const bulkStress = resolveRunConfig({
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_HIGH_USERS: "true",
+      CONFIRM_STRESS: "true",
+      LOGICAL_USERS: "20",
+      PROFILE: "campaign",
+      SKAHA_REQUEST_TIMEOUT_SECONDS: "600",
+      SURFACE: "skaha",
+      TOTAL_JOBS: "10000",
+    });
+
+    expect(computeScenarioMaxDurationSeconds(bulkStress)).toBeGreaterThan(12_000);
+  });
+
+  test("uses one k6 wave for bulk Skaha stress campaigns", () => {
+    const bulkStress = resolveRunConfig({
+      CAMPAIGN_TYPE: "stress",
+      CONFIRM_HIGH_USERS: "true",
+      CONFIRM_STRESS: "true",
+      LOGICAL_USERS: "20",
+      PROFILE: "campaign",
+      SURFACE: "skaha",
+      TOTAL_JOBS: "10000",
+    });
+
+    expect(resolveCampaignExecutionShape(bulkStress).waves).toBe(1);
+    expect(computeScenarioMaxDurationSeconds(bulkStress)).toBeGreaterThan(
+      bulkStress.completionTimeoutSeconds + bulkStress.skaha.requestTimeoutSeconds,
     );
   });
 

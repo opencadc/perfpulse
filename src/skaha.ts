@@ -119,6 +119,40 @@ export interface SkahaSurfaceResult {
   visibilityLatencyMs?: number;
 }
 
+export interface SkahaBulkStressConfig {
+  completionTimeoutSeconds: number;
+  pollCycleSeconds: number;
+  pollMinSeconds: number;
+  session: SkahaCreateSessionParams | ((index: number) => SkahaCreateSessionParams);
+  sessionCount: number;
+}
+
+export interface SkahaBulkStressSessionResult {
+  cleanedUp: boolean;
+  completed: boolean;
+  sessionId?: string;
+  submitted: boolean;
+  terminalFailure: boolean;
+  visible: boolean;
+}
+
+export interface SkahaBulkStressFailure {
+  message: string;
+  stage: "completion" | "submission";
+}
+
+export interface SkahaBulkStressResult {
+  failure?: SkahaBulkStressFailure;
+  sessions: SkahaBulkStressSessionResult[];
+  succeeded: boolean;
+}
+
+export interface SkahaBulkStressDeps {
+  cleanupSession?: (sessionId: string) => boolean;
+  now?: () => number;
+  sleep?: (seconds: number) => void;
+}
+
 type SkahaLifecycleRecorder = Pick<
   LifecycleRecorder,
   "recordCompleted" | "recordFailure" | "recordSubmitted" | "recordVisible"
@@ -309,6 +343,163 @@ export function runSkahaSurface(
       : { visibilityLatencyMs: lifecycle.visibilityLatencyMs }),
   };
 }
+
+interface BulkSessionState {
+  acceptedAtMs?: number;
+  cleanedUp: boolean;
+  completed: boolean;
+  lastPolledAtMs?: number;
+  sessionId?: string;
+  submitted: boolean;
+  terminalFailure: boolean;
+  visible: boolean;
+}
+
+export function runBulkSkahaStressSurface(
+  config: SkahaBulkStressConfig,
+  client: SkahaSurfaceClient,
+  recorder?: SkahaLifecycleRecorder,
+  deps: SkahaBulkStressDeps = {},
+  group: LifecycleGroupFn = passthroughGroup,
+): SkahaBulkStressResult {
+  const now = deps.now ?? Date.now;
+  const sleep = deps.sleep ?? (() => undefined);
+  const cleanupTerminalSession =
+    deps.cleanupSession ??
+    ((sessionId: string) => client.deleteSession(sessionId).cleanupSucceeded);
+  const sessions: BulkSessionState[] = Array.from({ length: config.sessionCount }, () => ({
+    cleanedUp: false,
+    completed: false,
+    submitted: false,
+    terminalFailure: false,
+    visible: false,
+  }));
+
+  const submitResult = group("skaha_bulk_submit", () => {
+    for (let index = 0; index < config.sessionCount; index += 1) {
+      const submitStartedAt = now();
+      const params = typeof config.session === "function" ? config.session(index) : config.session;
+      const createResponse = client.createSession(params);
+      const submittedAt = now();
+      const session = sessions[index];
+      if (session === undefined) {
+        continue;
+      }
+      if (!createResponse.accepted || createResponse.sessionId === undefined) {
+        recorder?.recordFailure("submission");
+        continue;
+      }
+      session.submitted = true;
+      session.sessionId = createResponse.sessionId;
+      session.acceptedAtMs = submittedAt;
+      recorder?.recordSubmitted(submittedAt - submitStartedAt);
+    }
+    return sessions.every((session) => session.submitted);
+  });
+
+  if (!submitResult) {
+    return {
+      failure: {
+        message: "one or more Skaha bulk stress sessions were not accepted",
+        stage: "submission",
+      },
+      sessions: toBulkSessionResults(sessions),
+      succeeded: false,
+    };
+  }
+
+  const pollStartedAt = now();
+  const pollDeadlineMs = pollStartedAt + config.completionTimeoutSeconds * 1000;
+  const activeIndexes = () =>
+    sessions
+      .map((session, index) => ({ index, session }))
+      .filter(({ session }) => session.submitted && !session.completed)
+      .map(({ index }) => index);
+
+  let roundRobinIndex = 0;
+  while (activeIndexes().length > 0 && now() <= pollDeadlineMs) {
+    const active = activeIndexes();
+    if (active.length === 0) {
+      break;
+    }
+    const currentIndex = active[roundRobinIndex % active.length];
+    roundRobinIndex += 1;
+    if (currentIndex === undefined) {
+      sleep(config.pollCycleSeconds);
+      continue;
+    }
+    const session = sessions[currentIndex];
+    if (session === undefined || session.sessionId === undefined) {
+      sleep(config.pollCycleSeconds);
+      continue;
+    }
+    const lastPolledAtMs = session.lastPolledAtMs;
+    if (lastPolledAtMs !== undefined && now() - lastPolledAtMs < config.pollMinSeconds * 1000) {
+      sleep(config.pollCycleSeconds);
+      continue;
+    }
+
+    session.lastPolledAtMs = now();
+    const result = client.getSession(session.sessionId);
+    if (result.status !== undefined && !session.visible && isVisibleStatus(result.status)) {
+      session.visible = true;
+      const acceptedAtMs = session.acceptedAtMs ?? pollStartedAt;
+      recorder?.recordVisible(now() - acceptedAtMs);
+    }
+
+    const terminal = skahaTerminalState(result.status);
+    if (terminal === undefined) {
+      sleep(config.pollCycleSeconds);
+      continue;
+    }
+
+    session.completed = true;
+    const acceptedAtMs = session.acceptedAtMs ?? pollStartedAt;
+    if (terminal === "succeeded") {
+      recorder?.recordCompleted(now() - acceptedAtMs);
+    } else {
+      session.terminalFailure = true;
+      recorder?.recordFailure("completion");
+    }
+
+    const cleanup = cleanupTerminalSession(session.sessionId);
+    session.cleanedUp = cleanup;
+    sleep(config.pollCycleSeconds);
+  }
+
+  if (activeIndexes().length > 0) {
+    return {
+      failure: {
+        message: `Skaha bulk stress batch did not complete within ${config.completionTimeoutSeconds}s`,
+        stage: "completion",
+      },
+      sessions: toBulkSessionResults(sessions),
+      succeeded: false,
+    };
+  }
+
+  return {
+    sessions: toBulkSessionResults(sessions),
+    succeeded: true,
+  };
+}
+
+function toBulkSessionResults(sessions: BulkSessionState[]): SkahaBulkStressSessionResult[] {
+  return sessions.map((session) => ({
+    cleanedUp: session.cleanedUp,
+    completed: session.completed,
+    ...(session.sessionId === undefined ? {} : { sessionId: session.sessionId }),
+    submitted: session.submitted,
+    terminalFailure: session.terminalFailure,
+    visible: session.visible,
+  }));
+}
+
+function isVisibleStatus(status: SkahaSessionStatus): boolean {
+  return status === "Pending" || status === "Running";
+}
+
+const passthroughGroup: LifecycleGroupFn = (_name, fn) => fn();
 
 function skahaTerminalState(
   status: SkahaSessionStatus | undefined,

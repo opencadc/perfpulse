@@ -88,20 +88,37 @@ wait for terminal completion. Observation for a job begins when that job is acce
 all jobs in the run are submitted.
 _Avoid_: batch-then-poll, two-phase campaign
 
+**Jobs per VU cap**:
+The maximum workloads one k6 VU may own in a campaign (`jobsPerVuCap`, default 500). Config
+rejects runs where `logicalUsers < ceil(totalJobs / jobsPerVuCap)` and tells the operator to raise
+`LOGICAL_USERS` or increase `jobsPerVuCap`. For example 10,000 jobs with cap 500 requires at least
+20 VUs. Applies to **Stress campaign** and **Routine benchmark** on all **Test surfaces** unless
+a run class explicitly opts out.
+_Avoid_: sequential campaign threshold, silent VU auto-raise
+
+**Bulk Skaha stress lifecycle**:
+On **Skaha user-facing surface** **Stress campaign** runs only: k6 runs with
+`iterations = logicalUsers` and `vus = logicalUsers`. Each VU submits its full logical-user job
+quota consecutively (`totalJobs / logicalUsers`), retains session ids, then polls pending sessions
+in round-robin with a 1s global tick and at least ~15s between GETs for the same session id until
+each reaches a terminal state or the **Completion gate** expires, and deletes each terminal session
+immediately via the Skaha session DELETE API. Terminal `Failed` or `Error` sessions increment
+failure metrics but do not abort the batch. The VU iteration does not end until every session in
+the batch is terminal or timed out. Other surfaces and run classes keep **Per-job lifecycle** and
+`iterations = totalJobs`.
+_Avoid_: per-job lifecycle, shared-iterations stress shape on Skaha, visible-only stress exit,
+deferred bulk cleanup, fixed 15s full-batch scan only
+
 **Logical user**:
 A synthetic user bucket used by k6 to model submission shape in metrics and labels.
 _Avoid_: real Skaha user, service account, k6 VU
 
 **Submission concurrency**:
-The number of workloads whose **Per-job lifecycle** may run at the same time in one
-`TestRun`, expressed as k6 `vus` via `LOGICAL_USERS`. Independent of how many **Logical user**
-buckets appear in tags.
+The number of workloads whose lifecycle may run at the same time in one `TestRun`, expressed as
+k6 `vus` via `LOGICAL_USERS`. On **Bulk Skaha stress lifecycle** runs each VU owns up to
+**Jobs per VU cap** workloads in one iteration; on other runs **Submission concurrency** bounds
+overlapping **Per-job lifecycle** work.
 _Avoid_: logical user count, parallel users
-
-**Sequential campaign mode**:
-A debug-only configuration where `LOGICAL_USERS` is 1 while `TOTAL_JOBS` exceeds the campaign
-sequential threshold. Requires explicit `CONFIRM_SEQUENTIAL=true`; rejected otherwise.
-_Avoid_: single-bulk-user, default campaign shape
 
 **User shape**:
 The labeling dimension for how submitted work is attributed across **Logical user** buckets
@@ -163,6 +180,8 @@ _Avoid_: local run artifact as primary output, single monolithic dashboard
   **Stress campaign**; operators may override for a specific run except on **Cron check**.
 - Each workload follows a **Per-job lifecycle**: tracking starts at accept time, because work may
   finish before the last job in a large campaign is submitted.
+- **Skaha user-facing surface** **Stress campaign** runs use **Bulk Skaha stress lifecycle**
+  instead of **Per-job lifecycle**; all other surfaces and run classes keep **Per-job lifecycle**.
 - A **Logical user** can submit many workloads, but it is not necessarily a real authenticated user.
 - **User shape** labels attribution; **Submission concurrency** (`LOGICAL_USERS`) bounds how
   many **Per-job lifecycle** runs overlap in one `TestRun`.
@@ -183,11 +202,11 @@ _Avoid_: local run artifact as primary output, single monolithic dashboard
   **Stress campaign** are measurement activities with different failure semantics.
 - **Require completion** is resolved as always-on for cron and benchmark, configurable off for
   stress campaigns.
-- Large campaigns are resolved as concurrent **Per-job lifecycle** runs, not submit-all-then-poll.
-- **User shape** is resolved as a labeling dimension only; **Submission concurrency** is
-  always `LOGICAL_USERS` parallel workers in the k6 `shared-iterations` executor.
-- Campaigns with more than 100 **Expected jobs** and `LOGICAL_USERS` of 1 are rejected unless
-  **Sequential campaign mode** is explicitly confirmed.
+- Large campaigns use **Jobs per VU cap** (default 500): `logicalUsers` must be ≥
+  `ceil(totalJobs / jobsPerVuCap)`.
+- **Skaha user-facing surface** **Stress campaign** uses **Bulk Skaha stress lifecycle**;
+  other surfaces use concurrent **Per-job lifecycle** with `iterations = totalJobs`.
+- **User shape** is a labeling dimension; **Submission concurrency** is `LOGICAL_USERS` VUs.
 - Runtime configuration omits unused grouping and metric-profile switches; Helm owns TestRun
   layout per **Test surface**.
 - "Production-first" means production dashboards are the primary PerfPulse outcome; staging and

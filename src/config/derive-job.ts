@@ -1,6 +1,21 @@
 import type { Surface } from "../profiles";
 import type { ClientMode, RunConfig } from "./profile-defaults";
 
+export function deriveBulkSkahaStressBatch(
+  config: Pick<RunConfig, "jobsPerLogicalUser" | "totalJobs" | "userBucketIndex">,
+): { baseJobIndex: number; sessionCount: number } {
+  const baseJobIndex = config.userBucketIndex * config.jobsPerLogicalUser;
+  const remainingJobs = config.totalJobs - baseJobIndex;
+  if (remainingJobs <= 0) {
+    return { baseJobIndex, sessionCount: 0 };
+  }
+
+  return {
+    baseJobIndex,
+    sessionCount: Math.min(config.jobsPerLogicalUser, remainingJobs),
+  };
+}
+
 export function deriveRunConfigForJob(
   config: RunConfig,
   jobIndex: number,

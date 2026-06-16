@@ -1,5 +1,5 @@
 import type { Options } from "k6/options";
-import type { RunConfig } from "./config";
+import { type RunConfig, resolveCampaignExecutionShape } from "./config";
 import { METRIC_NAMES, metricTags } from "./metrics-contract";
 import { computeScenarioMaxDurationSeconds } from "./scenario-max-duration";
 
@@ -19,15 +19,20 @@ export function createOptions(config: RunConfig): Options {
 
 function createScenarios(config: RunConfig): NonNullable<Options["scenarios"]> {
   const scenarioName = config.profile.replace(/-/gu, "_");
+  const iterations = scenarioIterations(config);
   return {
     [scenarioName]: {
       executor: "shared-iterations",
       gracefulStop: "30s",
-      iterations: config.totalJobs,
+      iterations,
       maxDuration: `${computeScenarioMaxDurationSeconds(config)}s`,
       vus: config.logicalUsers,
     },
   };
+}
+
+function scenarioIterations(config: RunConfig): number {
+  return resolveCampaignExecutionShape(config).iterations;
 }
 
 export const CRON_HTTP_REQ_DURATION_P95_MS = 500;
@@ -41,8 +46,19 @@ function createThresholds(config: RunConfig): NonNullable<Options["thresholds"]>
   };
 
   if (config.campaignType === "stress") {
+    const stressThresholds =
+      resolveCampaignExecutionShape(config).lifecycle === "bulk-skaha-stress"
+        ? {
+            [METRIC_NAMES.cleanupFailed]: lifecycleThresholds[METRIC_NAMES.cleanupFailed],
+            [METRIC_NAMES.jobsSubmissionFailed]:
+              lifecycleThresholds[METRIC_NAMES.jobsSubmissionFailed],
+            [METRIC_NAMES.jobsVisibilityFailed]:
+              lifecycleThresholds[METRIC_NAMES.jobsVisibilityFailed],
+          }
+        : lifecycleThresholds;
+
     return {
-      ...lifecycleThresholds,
+      ...stressThresholds,
       http_req_failed: ["rate==0"],
     };
   }
