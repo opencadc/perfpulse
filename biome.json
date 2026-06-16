@@ -12,6 +12,14 @@
     }
   },
   "files": {
-    "includes": ["**", "!artifacts", "!bun.lock", "!dist", "!docs/dashboards", "!node_modules"]
+    "includes": [
+      "**",
+      "!artifacts",
+      "!bun.lock",
+      "!dist",
+      "!docs/dashboards",
+      "!node_modules",
+      "!.cursor"
+    ]
   }
 }

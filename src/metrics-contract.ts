@@ -53,8 +53,6 @@ export const ALLOWED_METRIC_TAGS = [
   "profile",
   "surface",
   "scenario",
-  "cohort",
-  "job_profile",
   "namespace",
   "user_shape",
 ] as const;
@@ -66,8 +64,6 @@ export type MetricTags = Partial<Record<AllowedMetricTag, string>> &
 export function metricTags(config: RunConfig): MetricTags {
   return {
     ...(config.campaignType === undefined ? {} : { campaign_type: config.campaignType }),
-    cohort: config.cohort,
-    job_profile: config.jobProfile,
     namespace: config.kubernetes.namespace,
     profile: config.profile,
     run_class: config.runClass,

@@ -1,12 +1,4 @@
-import {
-  isJobProfile,
-  isScenario,
-  isSurface,
-  JOB_PROFILE_DURATIONS_SECONDS,
-  type JobProfile,
-  type Scenario,
-  type Surface,
-} from "../profiles";
+import { isScenario, isSurface, type Scenario, type Surface } from "../profiles";
 import {
   CAMPAIGN_TYPES,
   type CampaignType,
@@ -23,11 +15,19 @@ import {
 export function rejectRemovedEnv(env: EnvSource): void {
   const removed: Record<string, string> = {
     COMPLETION_GATE_SECONDS: "COMPLETION_TIMEOUT_SECONDS",
+    JOB_PROFILE: "fixed 60 second workload runtime",
     SUBMISSION_STAGGER_SECONDS: "SUBMISSION_JITTER_MAX_MS",
+    WORKLOAD_DURATION_SECONDS: "fixed 60 second workload runtime",
   };
-  for (const [oldName, newName] of Object.entries(removed)) {
+  for (const [oldName, replacement] of Object.entries(removed)) {
     if (env[oldName] !== undefined) {
-      throw new Error(`${oldName} has been replaced by ${newName}`);
+      const message =
+        oldName === "JOB_PROFILE"
+          ? "JOB_PROFILE has been removed; workload runtime is fixed at 60 seconds"
+          : oldName === "WORKLOAD_DURATION_SECONDS"
+            ? "WORKLOAD_DURATION_SECONDS is fixed at 60 seconds"
+            : `${oldName} has been replaced by ${replacement}`;
+      throw new Error(message);
     }
   }
 }
@@ -86,19 +86,6 @@ export function parseOptionalScenario(value: string | undefined, fallback: Scena
     return value;
   }
   throw new Error(`SCENARIO has unsupported value "${value}"`);
-}
-
-export function parseOptionalJobProfile(
-  value: string | undefined,
-  fallback: JobProfile,
-): JobProfile {
-  if (value === undefined || value === "") {
-    return fallback;
-  }
-  if (isJobProfile(value)) {
-    return value;
-  }
-  throw new Error(`JOB_PROFILE has unsupported value "${value}"`);
 }
 
 export function resolveSurfaces(env: EnvSource, profile: Profile): Surface[] {
@@ -217,10 +204,6 @@ export function parseStringArray(
     throw new Error(`${name} must be a non-empty JSON array of strings`);
   }
   return parsed;
-}
-
-export function jobProfileDurationSeconds(jobProfile: JobProfile): number {
-  return JOB_PROFILE_DURATIONS_SECONDS[jobProfile];
 }
 
 export function defaultStressNgArgs(durationSeconds: number): string[] {

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { resolveRunConfig } from "../src/config";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
 const cronValues = readFileSync("charts/cron/values.yaml", "utf8");
@@ -40,7 +41,8 @@ describe("PerfPulse Helm charts", () => {
       expect(manifest).toContain("PROFILE: cron");
       expect(manifest).toContain("RUN_CLASS: cron");
       expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
-      expect(manifest).toContain('WORKLOAD_DURATION_SECONDS: "60"');
+      expect(manifest).not.toContain("WORKLOAD_DURATION_SECONDS:");
+      expect(manifest).toContain('"--timeout","60s"');
       expect(
         count(manifest, 'WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04"'),
       ).toBe(2);
@@ -67,6 +69,61 @@ describe("PerfPulse Helm charts", () => {
     },
     { timeout: helmTestTimeoutMs },
   );
+
+  test("campaign chart keeps the fixed 60 second workload runtime regardless of values overrides", () => {
+    const manifest = helmTemplate("campaign", [
+      "--set",
+      "image.tag=2026.05.04",
+      "--set",
+      "campaign.totalJobs=12",
+      "--set",
+      "campaign.logicalUsers=3",
+      "--set",
+      "campaign.testid=manual-20260507",
+      "--set",
+      "workload.durationSeconds=30",
+    ]);
+
+    expect(manifest).not.toContain("WORKLOAD_DURATION_SECONDS:");
+    expect(manifest).toContain('"--timeout","60s"');
+    expect(manifest).not.toContain('"--timeout","30s"');
+  });
+
+  test("cron chart emitted env resolves through RunConfig without removed tuning keys", () => {
+    const manifest = helmTemplate("cron", ["--set", "image.tag=2026.05.04"]);
+
+    expect(manifest).not.toContain("WORKLOAD_DURATION_SECONDS:");
+
+    const config = resolveRunConfig({
+      COMPLETION_TIMEOUT_SECONDS: "86400",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "cron",
+      RUN_CLASS: "cron",
+      SURFACE: "k8s-direct",
+      TESTID: "cron-direct",
+      VISIBILITY_GATE_SECONDS: "600",
+      WORKLOAD_COMMAND: '["stress-ng"]',
+      WORKLOAD_ARGS:
+        '["--stressors","cpu","--cpu","1","--temp-path","/tmp","--timeout","60s","--metrics-brief"]',
+      WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04",
+      WORKLOAD_NAMESPACE: "canfar-workloads",
+    });
+
+    expect(config.workload.durationSeconds).toBe(60);
+  });
+
+  test("cron chart keeps the fixed 60 second workload runtime regardless of values overrides", () => {
+    const manifest = helmTemplate("cron", [
+      "--set",
+      "image.tag=2026.05.04",
+      "--set",
+      "testDurationSeconds=30",
+    ]);
+
+    expect(manifest).not.toContain("WORKLOAD_DURATION_SECONDS:");
+    expect(manifest).toContain('"--timeout","60s"');
+    expect(manifest).not.toContain('"--timeout","30s"');
+  });
 
   test("campaign chart renders manual TestRuns for all default surfaces with required sizing", () => {
     const manifest = helmTemplate("campaign", [

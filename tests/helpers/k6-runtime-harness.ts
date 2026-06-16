@@ -21,13 +21,21 @@ export interface HttpRequest {
   url: string;
 }
 
+export interface CheckCall {
+  checks: Record<string, boolean>;
+  subject: unknown;
+}
+
 export const runtimeHarness = {
+  checkCalls: [] as CheckCall[],
   createdJobs: [] as Array<{ labels?: Record<string, string>; name: string }>,
   deleteStatuses: [] as number[],
+  groupCalls: [] as string[],
   httpRequests: [] as HttpRequest[],
   iterationInTest: 0,
   jobConditionType: "Complete" as "Complete" | "Failed" | undefined,
   listJobsStatus: undefined as number | undefined,
+  listJobsReturnEmpty: false,
   metricRecords: [] as MetricRecord[],
   runtimeEvents: [] as string[],
   sessionGetStatuses: [] as number[],
@@ -46,6 +54,8 @@ export const deleteStatuses = runtimeHarness.deleteStatuses;
 export const sessionGetStatuses = runtimeHarness.sessionGetStatuses;
 
 export function resetK6RuntimeHarness(): void {
+  runtimeHarness.checkCalls.length = 0;
+  runtimeHarness.groupCalls.length = 0;
   runtimeHarness.httpRequests.length = 0;
   runtimeHarness.metricRecords.length = 0;
   runtimeHarness.createdJobs.length = 0;
@@ -54,6 +64,7 @@ export function resetK6RuntimeHarness(): void {
   runtimeHarness.deleteStatuses.length = 0;
   runtimeHarness.sessionGetStatuses.length = 0;
   runtimeHarness.listJobsStatus = undefined;
+  runtimeHarness.listJobsReturnEmpty = false;
   runtimeHarness.iterationInTest = 0;
   runtimeHarness.vuIdInTest = 1;
   runtimeHarness.workloadAdmitted = true;
@@ -81,9 +92,19 @@ Reflect.set(globalThis, "open", (path: string) => {
 });
 
 mock.module("k6", () => ({
-  check: () => true,
+  check(subject: unknown, checks: Record<string, (value: unknown) => boolean>) {
+    const results = Object.fromEntries(
+      Object.entries(checks).map(([name, predicate]) => [name, predicate(subject)]),
+    );
+    runtimeHarness.checkCalls.push({ checks: results, subject });
+    return Object.values(results).every(Boolean);
+  },
   fail: (message: string) => {
     throw new Error(message);
+  },
+  group(name: string, fn: () => unknown) {
+    runtimeHarness.groupCalls.push(name);
+    return fn();
   },
   sleep: (seconds: number) => {
     runtimeHarness.sleepCalls.push(seconds);
@@ -167,6 +188,9 @@ mock.module("k6/http", () => ({
           }),
           status: 200,
         };
+      }
+      if (runtimeHarness.listJobsReturnEmpty) {
+        return { body: JSON.stringify({ items: [] }), status: 200 };
       }
       if (runtimeHarness.listJobsStatus !== undefined) {
         return { body: "list refused", status: runtimeHarness.listJobsStatus };

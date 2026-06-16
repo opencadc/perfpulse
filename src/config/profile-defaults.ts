@@ -1,6 +1,6 @@
-import type { JobProfile, MetricProfile, Scenario, Surface, TestRunGrouping } from "../profiles";
+import type { Scenario, Surface } from "../profiles";
 
-export type { JobProfile, Scenario, Surface } from "../profiles";
+export type { Scenario, Surface } from "../profiles";
 
 export const RUN_CLASSES = ["cron", "campaign"] as const;
 export const CAMPAIGN_TYPES = ["benchmark", "stress"] as const;
@@ -14,7 +14,6 @@ export const DEFAULT_PROFILE = "cron" as const;
 export const DEFAULT_RUN_CLASS = "cron" as const;
 export const DEFAULT_SCENARIO = "single-bulk-user" as const;
 export const DEFAULT_SURFACE = "k8s-direct" as const;
-export const DEFAULT_JOB_PROFILE = "tiny" as const;
 export const DEFAULT_WORKLOAD_NAMESPACE = "canfar-workloads" as const;
 export const DEFAULT_WORKLOAD_IMAGE = "images.canfar.net/skaha/stress-ng:latest" as const;
 export const DEFAULT_SKAHA_WORKLOAD_IMAGE = DEFAULT_WORKLOAD_IMAGE;
@@ -66,29 +65,26 @@ export interface RunConfig {
   campaignType?: CampaignType;
   cleanup: boolean;
   clientMode: ClientMode;
-  cohort: "baseline";
   completionTimeoutSeconds: number;
   expectedJobsEmission: ExpectedJobsEmission;
   jobIndex: number;
   jobName: string;
-  jobProfile: JobProfile;
   jobsPerLogicalUser: number;
   jobsPerSurface: number;
   kueue: KueueConfig;
   kubernetes: KubernetesConfig;
   logicalUsers: number;
-  metricProfile: MetricProfile;
   noopSleepSeconds: number;
   pollJitterMaxMs: number;
   preserveOnFailure: boolean;
   profile: Profile;
+  requireCompletion: boolean;
   runClass: RunClass;
   scenario: Scenario;
   surface: Surface;
   surfaces: Surface[];
   skaha: SkahaConfig;
   testid: string;
-  testRunGrouping: TestRunGrouping;
   totalJobs: number;
   userBucket: string;
   userBucketIndex: number;

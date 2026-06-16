@@ -120,12 +120,12 @@ function buildJobManifest(
     name: "workload",
     resources: {
       limits: {
-        cpu: "100m",
+        cpu: "1",
         "ephemeral-storage": "1Gi",
         memory: "1Gi",
       },
       requests: {
-        cpu: "100m",
+        cpu: "1",
         "ephemeral-storage": "1Gi",
         memory: "1Gi",
       },

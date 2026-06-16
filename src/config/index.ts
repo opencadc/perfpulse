@@ -2,13 +2,11 @@ import { defaultTestId, makeJobName, sanitizeLabelValue } from "./derive-job";
 import {
   defaultStressNgArgs,
   defaultWorkloadCommand,
-  jobProfileDurationSeconds,
   parseBoolean,
   parseCampaignType,
   parseClientMode,
   parseImagePullPolicy,
   parseNonNegativeInteger,
-  parseOptionalJobProfile,
   parseOptionalRunClass,
   parseOptionalScenario,
   parseOptionalStringArray,
@@ -22,7 +20,6 @@ import {
   DEFAULT_CAMPAIGN_COMPLETION_TIMEOUT_SECONDS,
   DEFAULT_CRON_COMPLETION_TIMEOUT_SECONDS,
   DEFAULT_JITTER_MAX_MS,
-  DEFAULT_JOB_PROFILE,
   DEFAULT_PROFILE,
   DEFAULT_SCENARIO,
   DEFAULT_SKAHA_API_URL,
@@ -39,6 +36,11 @@ import {
   SERVICE_ACCOUNT_TOKEN_PATH,
   type SkahaConfig,
 } from "./profile-defaults";
+import {
+  FIXED_WORKLOAD_DURATION_SECONDS,
+  resolveRequireCompletion,
+  validateSequentialCampaignMode,
+} from "./run-policy";
 
 export {
   defaultTestId,
@@ -51,7 +53,6 @@ export type {
   CampaignType,
   ClientMode,
   EnvSource,
-  JobProfile,
   KubernetesConfig,
   KueueConfig,
   Profile,
@@ -64,7 +65,6 @@ export type {
 } from "./profile-defaults";
 export {
   CAMPAIGN_TYPES,
-  DEFAULT_JOB_PROFILE,
   DEFAULT_PROFILE,
   DEFAULT_RUN_CLASS,
   DEFAULT_SCENARIO,
@@ -77,6 +77,10 @@ export {
   PROFILES,
   RUN_CLASSES,
 } from "./profile-defaults";
+export {
+  FIXED_WORKLOAD_DURATION_SECONDS,
+  SEQUENTIAL_CAMPAIGN_THRESHOLD,
+} from "./run-policy";
 
 export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   rejectRemovedEnv(env);
@@ -96,10 +100,6 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   const surfaces = resolveSurfaces(env, profile);
   const surface = surfaces[0] ?? DEFAULT_SURFACE;
   const scenario = parseOptionalScenario(env.SCENARIO, DEFAULT_SCENARIO);
-  const jobProfile = parseOptionalJobProfile(
-    env.JOB_PROFILE,
-    campaignType === "benchmark" ? "small" : DEFAULT_JOB_PROFILE,
-  );
   const testid = sanitizeLabelValue(
     env.TESTID ?? env.testid ?? defaultTestId(clientMode),
     defaultTestId(clientMode),
@@ -122,6 +122,7 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   if (runClass === "campaign" && jobsPerSurface > 10000 && campaignType !== "stress") {
     throw new Error("Campaigns with more than 10000 jobs per surface require CAMPAIGN_TYPE=stress");
   }
+  validateSequentialCampaignMode(env, runClass, logicalUsers, jobsPerSurface);
   const jobsPerLogicalUser = Math.ceil(jobsPerSurface / logicalUsers);
   const skahaConfig: SkahaConfig = {
     apiUrl: env.SKAHA_API_URL ?? DEFAULT_SKAHA_API_URL,
@@ -148,11 +149,7 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
       throw new Error("SKAHA_PASSWORD_PATH is required when the skaha surface is selected");
     }
   }
-  const workloadDurationSeconds = parsePositiveInteger(
-    env.WORKLOAD_DURATION_SECONDS,
-    jobProfileDurationSeconds(jobProfile),
-    "WORKLOAD_DURATION_SECONDS",
-  );
+  const workloadDurationSeconds = FIXED_WORKLOAD_DURATION_SECONDS;
 
   const workloadImage =
     env.WORKLOAD_IMAGE ??
@@ -192,12 +189,10 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     ...(campaignType === undefined ? {} : { campaignType }),
     cleanup: parseBoolean(env.CLEANUP, true),
     clientMode,
-    cohort: "baseline",
     completionTimeoutSeconds,
     expectedJobsEmission: profile === "campaign" ? "setup-once" : "per-iteration",
     jobIndex: 0,
     jobName: makeJobName(testid, surface, 0),
-    jobProfile,
     jobsPerLogicalUser,
     jobsPerSurface,
     kueue: {
@@ -224,7 +219,6 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
       tokenPath: env.K8S_TOKEN_PATH ?? SERVICE_ACCOUNT_TOKEN_PATH,
     },
     logicalUsers,
-    metricProfile: campaignType === "stress" ? "lean" : "full",
     noopSleepSeconds: parsePositiveInteger(env.NOOP_SLEEP_SECONDS, 1, "NOOP_SLEEP_SECONDS"),
     pollJitterMaxMs: parseNonNegativeInteger(
       env.POLL_JITTER_MAX_MS,
@@ -233,13 +227,13 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     ),
     preserveOnFailure: parseBoolean(env.PRESERVE_ON_FAILURE, false),
     profile,
+    requireCompletion: resolveRequireCompletion(env, runClass, campaignType),
     runClass,
     scenario,
     surface,
     surfaces,
     skaha: skahaConfig,
     testid,
-    testRunGrouping: runClass === "campaign" ? "separate-per-surface" : "combined",
     totalJobs: jobsPerSurface,
     userBucket: "bucket-0",
     userBucketIndex: 0,

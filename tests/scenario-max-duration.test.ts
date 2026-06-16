@@ -24,10 +24,9 @@ describe("computeScenarioMaxDurationSeconds", () => {
       PROFILE: "campaign",
       TOTAL_JOBS: "10000",
       VISIBILITY_GATE_SECONDS: "120",
-      WORKLOAD_DURATION_SECONDS: "30",
     });
 
-    expect(computeScenarioMaxDurationSeconds(config)).toBe(39_300);
+    expect(computeScenarioMaxDurationSeconds(config)).toBe(54_300);
   });
 
   test("respects a smaller core budget when supplied", () => {
@@ -38,7 +37,6 @@ describe("computeScenarioMaxDurationSeconds", () => {
       PROFILE: "campaign",
       TOTAL_JOBS: "100",
       VISIBILITY_GATE_SECONDS: "120",
-      WORKLOAD_DURATION_SECONDS: "60",
     });
 
     const duration = computeScenarioMaxDurationSeconds(config, 10);

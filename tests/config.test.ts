@@ -39,7 +39,7 @@ describe("resolveRunConfig", () => {
     expect(config.testid).toBe("kind-smoke-01");
     expect(config.kubernetes.namespace).toBe("canfar-workloads");
     expect(config.jobName).toBe("perfpulse-kind-smoke-01-direct-0");
-    expect(config.workload.durationSeconds).toBe(10);
+    expect(config.workload.durationSeconds).toBe(60);
     expect(config.workload.image).toBe(DEFAULT_WORKLOAD_IMAGE);
     expect(config.workload.command).toEqual(["stress-ng"]);
     expect(config.workload.args).toEqual([
@@ -50,7 +50,7 @@ describe("resolveRunConfig", () => {
       "--temp-path",
       "/tmp",
       "--timeout",
-      "10s",
+      "60s",
       "--metrics-brief",
     ]);
   });
@@ -70,13 +70,12 @@ describe("resolveRunConfig", () => {
     expect(config.surfaces).toEqual(["k8s-kueue", "k8s-direct", "skaha"]);
     expect(config.surface).toBe("k8s-kueue");
     expect(config.scenario).toBe("single-bulk-user");
-    expect(config.jobProfile).toBe("small");
     expect(config.jobsPerSurface).toBe(100);
     expect(config.totalJobs).toBe(100);
     expect(config.expectedJobsEmission).toBe("setup-once");
     expect(config.logicalUsers).toBe(1);
     expect(config.userShape).toBe("1x100");
-    expect(config.workload.durationSeconds).toBe(30);
+    expect(config.workload.durationSeconds).toBe(60);
   });
 
   test("resolves the runtime taxonomy through public configuration", () => {
@@ -138,6 +137,78 @@ describe("resolveRunConfig", () => {
     );
   });
 
+  test("derives require completion from run class and campaign type", () => {
+    expect(resolveRunConfig({}).requireCompletion).toBe(true);
+    expect(
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        LOGICAL_USERS: "10",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "100",
+      }).requireCompletion,
+    ).toBe(true);
+    expect(
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "stress",
+        CONFIRM_HIGH_USERS: "true",
+        CONFIRM_STRESS: "true",
+        LOGICAL_USERS: "10",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "10000",
+      }).requireCompletion,
+    ).toBe(false);
+    expect(
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "stress",
+        CONFIRM_HIGH_USERS: "true",
+        CONFIRM_STRESS: "true",
+        LOGICAL_USERS: "10",
+        PROFILE: "campaign",
+        REQUIRE_COMPLETION: "true",
+        TOTAL_JOBS: "10000",
+      }).requireCompletion,
+    ).toBe(true);
+    expect(() => resolveRunConfig({ REQUIRE_COMPLETION: "false" })).toThrow(
+      "REQUIRE_COMPLETION cannot be disabled for cron checks",
+    );
+  });
+
+  test("rejects sequential campaign mode without explicit confirmation", () => {
+    expect(() =>
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        LOGICAL_USERS: "1",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "101",
+      }),
+    ).toThrow("Sequential campaign mode requires CONFIRM_SEQUENTIAL=true");
+    expect(() =>
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        CONFIRM_SEQUENTIAL: "true",
+        LOGICAL_USERS: "1",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "101",
+      }),
+    ).not.toThrow();
+  });
+
+  test("uses the fixed 60 second workload runtime on every surface", () => {
+    expect(resolveRunConfig({}).workload.durationSeconds).toBe(60);
+    expect(
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        LOGICAL_USERS: "1",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "100",
+      }).workload.durationSeconds,
+    ).toBe(60);
+    expect(() => resolveRunConfig({ JOB_PROFILE: "tiny" })).toThrow("JOB_PROFILE has been removed");
+    expect(() => resolveRunConfig({ WORKLOAD_DURATION_SECONDS: "30" })).toThrow(
+      "WORKLOAD_DURATION_SECONDS is fixed at 60",
+    );
+  });
+
   test("enforces campaign safety gates before work is created", () => {
     expect(() =>
       resolveRunConfig({
@@ -167,6 +238,7 @@ describe("resolveRunConfig", () => {
     expect(() =>
       resolveRunConfig({
         CAMPAIGN_TYPE: "stress",
+        CONFIRM_SEQUENTIAL: "true",
         CONFIRM_STRESS: "true",
         LOGICAL_USERS: "1",
         PROFILE: "campaign",
@@ -177,7 +249,6 @@ describe("resolveRunConfig", () => {
 
   test("accepts constrained run overrides and testid aliases", () => {
     const config = resolveRunConfig({
-      JOB_PROFILE: "heavy",
       LOGICAL_USERS: "4",
       SCENARIO: "many-small-users",
       SURFACES: "k8s-direct,skaha",
@@ -189,7 +260,6 @@ describe("resolveRunConfig", () => {
     expect(config.surfaces).toEqual(["k8s-direct", "skaha"]);
     expect(config.surface).toBe("k8s-direct");
     expect(config.scenario).toBe("many-small-users");
-    expect(config.jobProfile).toBe("heavy");
     expect(config.workload.durationSeconds).toBe(60);
     expect(config.logicalUsers).toBe(4);
     expect(config.jobsPerLogicalUser).toBe(3);
@@ -227,7 +297,7 @@ describe("resolveRunConfig", () => {
       "--temp-path",
       "/tmp",
       "--timeout",
-      "10s",
+      "60s",
       "--metrics-brief",
     ]);
   });
@@ -404,8 +474,6 @@ describe("resolveRunConfig", () => {
     );
 
     expect(metricTags(config)).toEqual({
-      cohort: "baseline",
-      job_profile: "tiny",
       namespace: "canfar-workloads",
       profile: "cron",
       run_class: "cron",

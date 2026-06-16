@@ -4,11 +4,23 @@ import { buildDirectJobManifest, buildKueueJobManifest } from "../src/kubernetes
 import { KUBERNETES_LABEL_KEYS } from "../src/labels";
 
 describe("direct Kubernetes Job manifest", () => {
+  test("uses the fixed 1 CPU workload footprint", () => {
+    const config = resolveRunConfig({
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      TESTID: "kind-smoke",
+    });
+    const manifest = buildDirectJobManifest(config);
+    const resources = manifest.spec.template.spec.containers[0]?.resources;
+
+    expect(resources?.requests?.cpu).toBe("1");
+    expect(resources?.limits?.cpu).toBe("1");
+    expect(resources?.requests?.memory).toBe("1Gi");
+  });
+
   test("builds the M0.5 no-Kueue workload manifest", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       TESTID: "kind-smoke",
-      WORKLOAD_DURATION_SECONDS: "3",
     });
     const manifest = buildDirectJobManifest(config);
 
@@ -31,7 +43,7 @@ describe("direct Kubernetes Job manifest", () => {
       "--temp-path",
       "/tmp",
       "--timeout",
-      "3s",
+      "60s",
       "--metrics-brief",
     ]);
     expect(manifest.spec.template.spec.securityContext).toEqual(restrictedPodSecurityContext);

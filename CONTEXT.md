@@ -65,9 +65,59 @@ _Avoid_: completion SLO
 The configured time window in which a tiny cron workload must reach the target terminal state.
 _Avoid_: visibility gate, benchmark SLO
 
+**Admission gate**:
+The configured time window in which a Kueue Workload must be admitted on the **Kueue dependency
+surface**. A hard failure gate for **Cron check** only; diagnostic evidence for **Routine
+benchmark** and **Stress campaign**.
+_Avoid_: completion gate, visibility gate
+
+**Require completion**:
+Whether a run waits for each accepted workload to reach a terminal state before the iteration
+ends. Required for **Cron check** and **Routine benchmark**; optional for **Stress campaign**
+via configuration.
+_Avoid_: completion gate, hard gate
+
+**Opportunistic completion**:
+When **Require completion** is off, the iteration succeeds after visibility. Completion metrics
+are recorded only if the workload is already terminal during the visibility pass.
+_Avoid_: completion poll, stress completion gate
+
+**Per-job lifecycle**:
+The ordered evidence path for one workload: submit, then observe visibility, then optionally
+wait for terminal completion. Observation for a job begins when that job is accepted, not after
+all jobs in the run are submitted.
+_Avoid_: batch-then-poll, two-phase campaign
+
 **Logical user**:
-A synthetic user bucket used by k6 to model submission shape.
-_Avoid_: real Skaha user, service account
+A synthetic user bucket used by k6 to model submission shape in metrics and labels.
+_Avoid_: real Skaha user, service account, k6 VU
+
+**Submission concurrency**:
+The number of workloads whose **Per-job lifecycle** may run at the same time in one
+`TestRun`, expressed as k6 `vus` via `LOGICAL_USERS`. Independent of how many **Logical user**
+buckets appear in tags.
+_Avoid_: logical user count, parallel users
+
+**Sequential campaign mode**:
+A debug-only configuration where `LOGICAL_USERS` is 1 while `TOTAL_JOBS` exceeds the campaign
+sequential threshold. Requires explicit `CONFIRM_SEQUENTIAL=true`; rejected otherwise.
+_Avoid_: single-bulk-user, default campaign shape
+
+**User shape**:
+The labeling dimension for how submitted work is attributed across **Logical user** buckets
+(for example one bucket submitting many jobs vs many buckets each submitting few). Does not
+set k6 executor concurrency; **Submission concurrency** does.
+_Avoid_: scenario executor, VU model
+
+**Fixed workload footprint**:
+The standard PerfPulse workload size on every **Test surface**: 1 CPU and 1 GiB RAM. Intentionally
+small so measurements target submission, queueing, visibility, and cleanup—not resource pressure.
+_Avoid_: tiny job profile, configurable workload size
+
+**Fixed workload runtime**:
+The standard in-pod execution time for every PerfPulse workload: 60 seconds. Same on all **Test
+surfaces** and run classes.
+_Avoid_: job profile, duration sweep, workload duration override
 
 **Expected jobs**:
 The planned work count for one selected **Test surface** in a run. For cron this is currently one
@@ -78,8 +128,10 @@ _Avoid_: submitted jobs, visible jobs, completed jobs
 
 **Dashboard evidence surface**:
 Grafana dashboards backed by Prometheus metrics ingested from k6 OTLP export. This is the primary
-operator-facing PerfPulse output.
-_Avoid_: local run artifact as primary output
+operator-facing PerfPulse output. Two repo-managed dashboard artifacts serve operators: one for
+**Cron check** steady-state health and one for **Routine benchmark** / **Stress campaign**
+drilldown by `testid`.
+_Avoid_: local run artifact as primary output, single monolithic dashboard
 
 ## Relationships
 
@@ -91,9 +143,29 @@ _Avoid_: local run artifact as primary output
   **Skaha user-facing surface**.
 - **Dashboard evidence surface** is the primary output; run logs and artifacts are diagnostic
   support.
+- Two Grafana dashboard artifacts replace the monolithic overview: cron health and campaign
+  drilldown.
+- Every **Test surface** uses the same **Fixed workload footprint** and **Fixed workload
+  runtime** so comparisons isolate path behavior.
+- Offline markdown report generators are out of scope; Grafana is the reporting surface.
+- The `cohort` label dimension is dropped; mixed-pressure work is out of scope until reintroduced
+  with a real second cohort value.
+- `job_profile` duration variants are dropped in favor of **Fixed workload runtime**.
 - A **Visibility gate** applies after submission succeeds and before completion is evaluated.
 - A **Completion gate** is a hard cron-check gate for tiny direct Kubernetes and Skaha workloads.
+- An **Admission gate** is a hard cron-check gate for Kueue only; campaigns record admission
+  latency without failing solely on slow admission.
+- **Require completion** is on for **Cron check** and **Routine benchmark**; **Stress campaign**
+  may turn it off so iterations end after submit and visibility.
+- When **Require completion** is off, **Opportunistic completion** applies: record completion
+  only if the workload is already terminal during the visibility pass.
+- **Require completion** defaults on for **Cron check** and **Routine benchmark**, and off for
+  **Stress campaign**; operators may override for a specific run except on **Cron check**.
+- Each workload follows a **Per-job lifecycle**: tracking starts at accept time, because work may
+  finish before the last job in a large campaign is submitted.
 - A **Logical user** can submit many workloads, but it is not necessarily a real authenticated user.
+- **User shape** labels attribution; **Submission concurrency** (`LOGICAL_USERS`) bounds how
+  many **Per-job lifecycle** runs overlap in one `TestRun`.
 - **Expected jobs** are per **Test surface**, not shared across surfaces.
 
 ## Example Dialogue
@@ -109,5 +181,14 @@ _Avoid_: local run artifact as primary output
   metrics ingestion or Grafana queryability.
 - "Cron check" is resolved as an operational hard gate, while **Routine benchmark** and
   **Stress campaign** are measurement activities with different failure semantics.
+- **Require completion** is resolved as always-on for cron and benchmark, configurable off for
+  stress campaigns.
+- Large campaigns are resolved as concurrent **Per-job lifecycle** runs, not submit-all-then-poll.
+- **User shape** is resolved as a labeling dimension only; **Submission concurrency** is
+  always `LOGICAL_USERS` parallel workers in the k6 `shared-iterations` executor.
+- Campaigns with more than 100 **Expected jobs** and `LOGICAL_USERS` of 1 are rejected unless
+  **Sequential campaign mode** is explicitly confirmed.
+- Runtime configuration omits unused grouping and metric-profile switches; Helm owns TestRun
+  layout per **Test surface**.
 - "Production-first" means production dashboards are the primary PerfPulse outcome; staging and
   integration promotion gates reuse the same cron-check evidence model.

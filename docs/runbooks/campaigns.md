@@ -3,68 +3,39 @@
 Benchmark and stress campaigns are manual evidence activities. They are not scheduled cron
 checks and they are not the source of official SLO or SLA gates.
 
-Use `src/campaign-report.ts` to turn structured campaign input into a Confluence-ready Markdown
-report. The report generator rejects sensitive input instead of rendering secrets.
+Use the **campaign Grafana dashboard** (`docs/dashboards/perfpulse-campaign.json`) as the primary
+evidence surface. Filter by `testid`, `surface`, and `campaign_type`.
 
 ## Benchmark Campaigns
 
-Benchmark reports compare each selected surface by:
+Compare each selected surface in Grafana by:
 
-- expected work
-- accepted work
-- visible work
-- visible percentage of expected work
-- p50, p95, and p99 latency
+- expected work (`k6_perfpulse_jobs_expected`)
+- accepted work (`k6_perfpulse_jobs_submitted_total`)
+- visible work (`k6_perfpulse_jobs_visible_total`)
+- completed work (`k6_perfpulse_jobs_completed_total`)
+- submission, visibility, and completion latency histograms
 - dropped k6 iterations
-- cleanup status
-- relevant cluster metrics
+- cleanup counters
 
-`expected work` is the selected campaign's `campaign.totalJobs` value for that surface. It is the
-same denominator used by the Grafana dashboard's surface percentage panels.
+`expected work` is the selected campaign's `campaign.totalJobs` value for that surface. Dashboard
+percentage panels use it as the denominator.
 
-The structured input must state whether baselines exist. When baselines do not exist, benchmark
-thresholds are evidence only. Do not describe guessed thresholds as official SLO or SLA gates.
+Benchmark thresholds are evidence only until baselines exist. Do not describe guessed thresholds
+as official SLO or SLA gates.
 
 ## Stress Campaigns
 
-Stress reports are runnable only when the structured input includes both:
+Stress campaigns require both:
 
-- `explicitProfileSelection: true`
-- `confirmStress: true`
+- explicit stress profile selection (`campaign.type=stress`)
+- `CONFIRM_STRESS=true`
 
-Stress success evidence focuses on:
-
-- expected work
-- accepted work
-- visible work
-- visible percentage of expected work
-- rejection categories
-- dropped iterations
-- API-server pressure
-- Kueue controller health
-- workload execution
-- Grafana visibility
-- cleanup status
-
-Completion is recorded in a secondary section because large stress campaigns are primarily about
-acceptance, visibility, observability, control-plane behavior, and cleanup.
+Stress success evidence focuses on acceptance, visibility, observability, control-plane behavior,
+and cleanup. Completion may be optional when `requireCompletion` is disabled for stress; use
+`campaign_type=stress` panels that do not treat missing completion as failure.
 
 ## Preserve On Failure
 
-Every campaign report states whether preserve-on-failure is enabled or disabled.
-
-When enabled, the structured input must include labels for:
-
-- `testid`
-- `profile`
-- `surface`
-
-These labels are required so preserved resources can be found, reviewed, and cleaned up.
-
-## Later Mixed Pressure Profile
-
-Mixed background and foreground pressure is represented as a later profile model, not a runnable
-campaign. The model must include an active hypothesis and both cohort labels:
-
-- `background`
-- `foreground`
+When `PRESERVE_ON_FAILURE=true`, failed workloads may remain labeled with `testid`, `profile`, and
+`surface` for manual follow-up. Scheduled cron checks still delete by default.

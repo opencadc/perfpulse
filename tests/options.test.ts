@@ -26,12 +26,50 @@ describe("k6 options contract", () => {
 
     expect(Object.keys(options.thresholds ?? {}).sort()).toEqual([
       "checks",
+      "http_req_duration",
       "http_req_failed",
       "perfpulse_cleanup_failed",
       "perfpulse_jobs_completion_failed",
       "perfpulse_jobs_submission_failed",
       "perfpulse_jobs_visibility_failed",
     ]);
+  });
+
+  test("uses smoke-strict HTTP and check thresholds for cron checks", () => {
+    const options = createOptions(resolveRunConfig({}));
+
+    expect(options.thresholds?.checks).toEqual(["rate==1"]);
+    expect(options.thresholds?.http_req_failed).toEqual(["rate==0"]);
+    expect(options.thresholds?.http_req_duration).toEqual(["p(95)<500"]);
+  });
+
+  test("does not add HTTP duration thresholds to benchmark campaigns", () => {
+    const options = createOptions(
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        CONFIRM_HIGH_USERS: "true",
+        LOGICAL_USERS: "100",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "100",
+      }),
+    );
+
+    expect(options.thresholds?.http_req_duration).toBeUndefined();
+  });
+
+  test("keeps benchmark campaigns on slightly relaxed HTTP and check thresholds", () => {
+    const options = createOptions(
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        CONFIRM_HIGH_USERS: "true",
+        LOGICAL_USERS: "100",
+        PROFILE: "campaign",
+        TOTAL_JOBS: "100",
+      }),
+    );
+
+    expect(options.thresholds?.checks).toEqual(["rate>0.99"]);
+    expect(options.thresholds?.http_req_failed).toEqual(["rate<0.01"]);
   });
 
   test("adds campaign completion failure gates", () => {
@@ -65,7 +103,6 @@ describe("k6 options contract", () => {
         PROFILE: "campaign",
         TOTAL_JOBS: "10000",
         VISIBILITY_GATE_SECONDS: "120",
-        WORKLOAD_DURATION_SECONDS: "30",
       }),
     );
     const scenario = options.scenarios?.campaign;
@@ -73,12 +110,12 @@ describe("k6 options contract", () => {
     expect(scenario).toMatchObject({
       executor: "shared-iterations",
       iterations: 10000,
-      maxDuration: "39300s",
+      maxDuration: "54300s",
       vus: 100,
     });
   });
 
-  test("keeps stress campaign thresholds limited to lifecycle failures", () => {
+  test("keeps stress campaign thresholds on lifecycle failures and zero HTTP errors", () => {
     const options = createOptions(
       resolveRunConfig({
         CAMPAIGN_TYPE: "stress",
@@ -91,11 +128,13 @@ describe("k6 options contract", () => {
     );
 
     expect(Object.keys(options.thresholds ?? {}).sort()).toEqual([
+      "http_req_failed",
       "perfpulse_cleanup_failed",
       "perfpulse_jobs_completion_failed",
       "perfpulse_jobs_submission_failed",
       "perfpulse_jobs_visibility_failed",
     ]);
+    expect(options.thresholds?.http_req_failed).toEqual(["rate==0"]);
   });
 
   test("keeps k6 system tags low-cardinality", () => {
@@ -120,8 +159,6 @@ describe("k6 options contract", () => {
 
     expect(options.tags).toEqual({
       campaign_type: "benchmark",
-      cohort: "baseline",
-      job_profile: "small",
       namespace: "canfar-workloads",
       profile: "campaign",
       run_class: "campaign",

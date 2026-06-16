@@ -1,5 +1,10 @@
 import type { RunConfig } from "../config";
 import type { LifecycleRecorder } from "../metrics";
+import {
+  isCoreWorkLifecycleFailureStage,
+  type LifecycleGroupFn,
+  runWorkLifecycle,
+} from "../work-lifecycle";
 import { buildDirectJobManifest, type KubernetesJobManifest } from "./job";
 import {
   findJobByName,
@@ -55,110 +60,128 @@ export function runDirectKubernetesSurface(
   pollUntil: PollUntil,
   now: () => number = Date.now,
   recorder?: DirectLifecycleRecorder,
+  group?: LifecycleGroupFn,
 ): DirectKubernetesRunResult {
-  const manifest = buildDirectJobManifest(config);
-  const createStartedAt = now();
-  const createResponse = client.createJob(manifest);
-  const submittedAt = now();
-  const submissionDurationMs = submittedAt - createStartedAt;
+  let latestJobList: JobListLike = {};
 
-  if (createResponse.status !== 201) {
-    recorder?.recordFailure("submission");
-    return {
-      completed: false,
-      createResponse,
-      failure: {
-        message: `Kubernetes Job create failed with HTTP ${createResponse.status}: ${String(
-          createResponse.body,
-        )}`,
-        stage: "submission",
+  const lifecycle = runWorkLifecycle(
+    {
+      completionTimeoutSeconds: config.completionTimeoutSeconds,
+      pollIntervalSeconds: config.kubernetes.pollIntervalSeconds,
+      pollJitterMaxMs: config.pollJitterMaxMs,
+      requireCompletion: config.requireCompletion,
+      visibilityGateSeconds: config.visibilityGateSeconds,
+    },
+    {
+      pollVisibility() {
+        latestJobList = client.listJobsByTestId();
+        return findJobByName(latestJobList, config.jobName) !== undefined;
       },
-      submissionDurationMs,
-      visible: false,
-    };
-  }
-
-  recorder?.recordSubmitted(submissionDurationMs);
-
-  const visibleList = pollUntil(
-    config.visibilityGateSeconds,
-    config.kubernetes.pollIntervalSeconds,
-    () => client.listJobsByTestId(),
-    (list) => findJobByName(list, config.jobName) !== undefined,
-    config.pollJitterMaxMs,
+      readTerminalState() {
+        const job = currentJob(client, latestJobList, config.jobName);
+        return terminalState(job);
+      },
+      submit() {
+        const createResponse = client.createJob(buildDirectJobManifest(config));
+        if (createResponse.status !== 201) {
+          return {
+            accepted: false,
+            failureMessage: `Kubernetes Job create failed with HTTP ${createResponse.status}: ${String(
+              createResponse.body,
+            )}`,
+            response: createResponse,
+          };
+        }
+        return { accepted: true, response: createResponse };
+      },
+    },
+    pollUntil,
+    {
+      recordCompleted(completionLatencyMs) {
+        recorder?.recordCompleted(completionLatencyMs);
+      },
+      recordFailure(stage) {
+        if (isCoreWorkLifecycleFailureStage(stage)) {
+          recorder?.recordFailure(stage);
+        }
+      },
+      recordSubmitted(submissionDurationMs) {
+        recorder?.recordSubmitted(submissionDurationMs);
+      },
+      recordVisible(visibilityLatencyMs) {
+        recorder?.recordVisible(visibilityLatencyMs);
+      },
+    },
+    now,
+    group,
   );
-  if (visibleList === undefined) {
-    recorder?.recordFailure("visibility");
-    return {
-      completed: false,
-      createResponse,
-      failure: {
-        message: `Kubernetes Job ${config.jobName} was not visible within ${config.visibilityGateSeconds}s`,
-        stage: "visibility",
-      },
-      submissionDurationMs,
-      visible: false,
-    };
-  }
 
-  const visibilityLatencyMs = now() - submittedAt;
-  recorder?.recordVisible(visibilityLatencyMs);
-  const visibleJob = findJobByName(visibleList, config.jobName);
-  const terminalJob = isTerminalJob(visibleJob)
-    ? visibleJob
-    : findJobByName(
-        pollUntil(
-          config.completionTimeoutSeconds,
-          config.kubernetes.pollIntervalSeconds,
-          () => client.listJobsByTestId(),
-          (list) => isTerminalJob(findJobByName(list, config.jobName)),
-          config.pollJitterMaxMs,
-        ) ?? {},
-        config.jobName,
-      );
-
-  if (terminalJob === undefined) {
-    recorder?.recordFailure("completion");
-    return {
-      completed: false,
-      createResponse,
-      failure: {
-        message: `Kubernetes Job ${config.jobName} did not complete within ${config.completionTimeoutSeconds}s`,
-        stage: "completion",
-      },
-      submissionDurationMs,
-      visible: true,
-      visibilityLatencyMs,
-    };
-  }
-
-  if (isJobFailed(terminalJob)) {
-    recorder?.recordFailure("completion");
-    return {
-      completed: false,
-      createResponse,
-      failure: {
-        message: `Kubernetes Job ${config.jobName} reached Failed`,
-        stage: "completion",
-      },
-      submissionDurationMs,
-      visible: true,
-      visibilityLatencyMs,
-    };
-  }
-
-  recorder?.recordCompleted(now() - submittedAt);
+  const failure =
+    lifecycle.failure !== undefined && isCoreWorkLifecycleFailureStage(lifecycle.failure.stage)
+      ? mapDirectFailure(config, {
+          message: lifecycle.failure.message,
+          stage: lifecycle.failure.stage,
+        })
+      : undefined;
 
   return {
-    completed: true,
-    completionLatencyMs: now() - submittedAt,
-    createResponse,
-    submissionDurationMs,
-    visible: true,
-    visibilityLatencyMs,
+    completed: lifecycle.completed,
+    ...(lifecycle.completionLatencyMs === undefined
+      ? {}
+      : { completionLatencyMs: lifecycle.completionLatencyMs }),
+    createResponse: lifecycle.submitResponse,
+    ...(failure === undefined ? {} : { failure }),
+    submissionDurationMs: lifecycle.submissionDurationMs,
+    visible: lifecycle.visible,
+    ...(lifecycle.visibilityLatencyMs === undefined
+      ? {}
+      : { visibilityLatencyMs: lifecycle.visibilityLatencyMs }),
   };
 }
 
-function isTerminalJob(job: JobLike | undefined): boolean {
-  return job !== undefined && (isJobComplete(job) || isJobFailed(job));
+function currentJob(
+  client: DirectKubernetesClient,
+  cachedList: JobListLike,
+  jobName: string,
+): JobLike | undefined {
+  return findJobByName(cachedList, jobName) ?? findJobByName(client.listJobsByTestId(), jobName);
+}
+
+function terminalState(job: JobLike | undefined): "failed" | "succeeded" | undefined {
+  if (job === undefined) {
+    return undefined;
+  }
+  if (isJobComplete(job)) {
+    return "succeeded";
+  }
+  if (isJobFailed(job)) {
+    return "failed";
+  }
+  return undefined;
+}
+
+function mapDirectFailure(
+  config: RunConfig,
+  failure: { message: string; stage: DirectKubernetesFailureStage },
+): DirectKubernetesRunFailure {
+  switch (failure.stage) {
+    case "submission":
+      return failure;
+    case "visibility":
+      return {
+        message: `Kubernetes Job ${config.jobName} was not visible within ${config.visibilityGateSeconds}s`,
+        stage: failure.stage,
+      };
+    case "completion":
+      if (failure.message === "work reached a failed terminal state") {
+        return {
+          message: `Kubernetes Job ${config.jobName} reached Failed`,
+          stage: failure.stage,
+        };
+      }
+      return {
+        message: `Kubernetes Job ${config.jobName} did not complete within ${config.completionTimeoutSeconds}s`,
+        stage: failure.stage,
+      };
+  }
 }
