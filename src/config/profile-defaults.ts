@@ -84,6 +84,7 @@ export interface RunConfig {
   requireCompletion: boolean;
   runClass: RunClass;
   scenario: Scenario;
+  sequentialSurfaces: boolean;
   surface: Surface;
   surfaces: Surface[];
   skaha: SkahaConfig;
@@ -104,6 +105,7 @@ export const DEFAULT_SKAHA_BULK_POLL_MIN_SECONDS = 15;
 export const DEFAULT_SKAHA_BULK_POLL_CYCLE_SECONDS = 1;
 export const DEFAULT_SKAHA_USERNAME_PATH = "/var/run/secrets/perfpulse/skaha-auth/username";
 export const DEFAULT_CAMPAIGN_COMPLETION_TIMEOUT_SECONDS = 259_200;
-export const DEFAULT_CRON_COMPLETION_TIMEOUT_SECONDS = 86_400;
+export const DEFAULT_CRON_COMPLETION_TIMEOUT_SECONDS = 900;
+export const DEFAULT_WORKLOAD_TTL_SECONDS_AFTER_FINISHED = 3600;
 export const DEFAULT_JITTER_MAX_MS = 1_000;
 export const DEFAULT_JOBS_PER_VU_CAP = 500;

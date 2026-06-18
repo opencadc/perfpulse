@@ -6,6 +6,7 @@ import { createCleanupAdapter } from "./cleanup";
 import {
   deriveBulkSkahaStressBatch,
   deriveRunConfigForJob,
+  deriveRunConfigForSurface,
   isBulkSkahaStressSurface,
   type RunConfig,
   resolveCampaignExecutionShape,
@@ -55,7 +56,11 @@ export function setup(): RuntimeData {
   );
   const setupConfig = resolveRunConfig(__ENV);
   if (setupConfig.expectedJobsEmission === "setup-once") {
-    createLifecycleRecorder(setupConfig).recordExpected(setupConfig.totalJobs);
+    const expectedJobs =
+      setupConfig.sequentialSurfaces && setupConfig.surfaces.length > 1
+        ? setupConfig.totalJobs * setupConfig.surfaces.length
+        : setupConfig.totalJobs;
+    createLifecycleRecorder(setupConfig).recordExpected(expectedJobs);
   }
   if (config.clientMode === "kubernetes" && config.surface === "skaha") {
     return {
@@ -70,6 +75,22 @@ export function setup(): RuntimeData {
 export default function (data: RunConfig | RuntimeData): void {
   const runtimeData = normalizeRuntimeData(data);
   const runConfig = deriveRuntimeConfig(runtimeData.config);
+
+  if (shouldRunCronSurfacesSequentially(runtimeData.config)) {
+    for (const surface of runtimeData.config.surfaces) {
+      const surfaceConfig = deriveRunConfigForSurface(
+        deriveRunConfigForJob(runtimeData.config, 0, 0),
+        surface,
+      );
+      runConfiguredSurface(runtimeData, surfaceConfig);
+    }
+    return;
+  }
+
+  runConfiguredSurface(runtimeData, runConfig);
+}
+
+function runConfiguredSurface(runtimeData: RuntimeData, runConfig: RunConfig): void {
   const recorder = createLifecycleRecorder(runConfig);
   if (runConfig.expectedJobsEmission === "per-iteration") {
     recorder.recordExpected(runConfig.totalJobs);
@@ -81,6 +102,15 @@ export default function (data: RunConfig | RuntimeData): void {
   }
 
   runKubernetesSurface(runtimeData, runConfig, recorder);
+}
+
+function shouldRunCronSurfacesSequentially(config: RunConfig): boolean {
+  return (
+    config.runClass === "cron" &&
+    config.sequentialSurfaces &&
+    config.surfaces.length > 1 &&
+    config.clientMode === "kubernetes"
+  );
 }
 
 export function teardown(data: RunConfig | RuntimeData): void {
@@ -359,5 +389,21 @@ function deriveRuntimeConfig(data: RunConfig): RunConfig {
     return data;
   }
   const vuIdInTest = (exec as { vu?: { idInTest?: number } }).vu?.idInTest ?? 1;
+  if (
+    data.sequentialSurfaces &&
+    data.surfaces.length > 1 &&
+    data.runClass === "campaign" &&
+    !isBulkSkahaStressSurface(data.surface, resolveCampaignExecutionShape(data))
+  ) {
+    const iterationInTest = exec.scenario.iterationInTest;
+    const surfaceIndex = Math.min(
+      data.surfaces.length - 1,
+      Math.floor((iterationInTest - 1) / data.totalJobs),
+    );
+    const surface = data.surfaces[surfaceIndex] ?? data.surface;
+    const jobIndexInSurface = (iterationInTest - 1) % data.totalJobs;
+    const surfaceConfig = deriveRunConfigForSurface(data, surface);
+    return deriveRunConfigForJob(surfaceConfig, jobIndexInSurface, vuIdInTest - 1);
+  }
   return deriveRunConfigForJob(data, exec.scenario.iterationInTest, vuIdInTest - 1);
 }

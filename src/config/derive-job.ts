@@ -1,5 +1,10 @@
 import type { Surface } from "../profiles";
-import type { ClientMode, RunConfig } from "./profile-defaults";
+import {
+  type ClientMode,
+  DEFAULT_SKAHA_WORKLOAD_IMAGE,
+  DEFAULT_WORKLOAD_IMAGE,
+  type RunConfig,
+} from "./profile-defaults";
 
 export function deriveBulkSkahaStressBatch(
   config: Pick<RunConfig, "jobsPerLogicalUser" | "totalJobs" | "userBucketIndex">,
@@ -13,6 +18,20 @@ export function deriveBulkSkahaStressBatch(
   return {
     baseJobIndex,
     sessionCount: Math.min(config.jobsPerLogicalUser, remainingJobs),
+  };
+}
+
+export function deriveRunConfigForSurface(config: RunConfig, surface: Surface): RunConfig {
+  const workloadImage = surface === "skaha" ? DEFAULT_SKAHA_WORKLOAD_IMAGE : DEFAULT_WORKLOAD_IMAGE;
+
+  return {
+    ...config,
+    jobName: makeJobName(config.testid, surface, config.jobIndex),
+    surface,
+    workload: {
+      ...config.workload,
+      image: workloadImage,
+    },
   };
 }
 

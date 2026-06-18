@@ -15,7 +15,7 @@ describe("PerfPulse Helm charts", () => {
   });
 
   test(
-    "cron chart renders one non-overlapping 5-minute CronJob per default surface",
+    "cron chart renders one sequential 5-minute CronJob with a single TestRun template",
     () => {
       const manifest = helmTemplate("cron", ["--set", "image.tag=2026.05.04"]);
 
@@ -25,17 +25,17 @@ describe("PerfPulse Helm charts", () => {
       expect(manifest).not.toContain("docker.io/bitnami/kubectl");
       expect(manifest).not.toContain("bitnami/kubectl");
       expect(manifest).not.toContain("docker.io/alexeiled/stress-ng");
-      expect(manifest).toContain("name: perfpulse-cron-direct");
-      expect(manifest).toContain("name: perfpulse-cron-kueue");
-      expect(manifest).toContain("name: perfpulse-cron-skaha");
-      expect(count(manifest, 'image: "images.opencadc.org/platform/perfpulse:2026.05.04"')).toBe(
-        12,
-      );
-      expect(count(manifest, "kind: CronJob")).toBe(3);
+      expect(manifest).toContain("name: perfpulse-cron");
+      expect(manifest).not.toContain("name: perfpulse-cron-direct");
+      expect(count(manifest, 'image: "images.opencadc.org/platform/perfpulse:2026.05.04"')).toBe(4);
+      expect(count(manifest, "kind: CronJob")).toBe(1);
       expect(manifest).toContain('schedule: "*/5 * * * *"');
       expect(manifest).toContain("concurrencyPolicy: Forbid");
-      expect(manifest).toContain("activeDeadlineSeconds: 87060");
-      expect(manifest).toContain('COMPLETION_TIMEOUT_SECONDS: "86400"');
+      expect(manifest).toContain("activeDeadlineSeconds: 1560");
+      expect(manifest).toContain('COMPLETION_TIMEOUT_SECONDS: "900"');
+      expect(manifest).toContain('SEQUENTIAL_SURFACES: "true"');
+      expect(manifest).toContain('SURFACES: "k8s-direct,k8s-kueue,skaha"');
+      expect(manifest).toContain('WORKLOAD_TTL_SECONDS_AFTER_FINISHED: "3600"');
       expect(manifest).toContain('POLL_JITTER_MAX_MS: "1000"');
       expect(manifest).toContain('SUBMISSION_JITTER_MAX_MS: "1000"');
       expect(manifest).toContain("PROFILE: cron");
@@ -43,16 +43,15 @@ describe("PerfPulse Helm charts", () => {
       expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
       expect(manifest).not.toContain("WORKLOAD_DURATION_SECONDS:");
       expect(manifest).toContain('"--timeout","60s"');
-      expect(
-        count(manifest, 'WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04"'),
-      ).toBe(2);
-      expect(count(manifest, 'WORKLOAD_IMAGE: "images.canfar.net/skaha/stress-ng:latest"')).toBe(1);
+      expect(manifest).toContain(
+        'WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04"',
+      );
+      expect(manifest).not.toContain("K6_OTEL_SERVICE_NAME: perfpulse");
       expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "600"');
       expect(manifest).toContain("K6_OTEL_EXPORT_INTERVAL: 5s");
       expect(manifest).not.toContain("OBSERVE_SECONDS");
       expect(manifest).toContain("kind: TestRun");
       expect(manifest).toContain("secretName: perfpulse-skaha-auth");
-      expect(manifest).toContain("secretRef:");
       expect(manifest).toContain("name: perfpulse-otlp-credentials");
       expect(manifest).toMatch(/apiVersion: v1\nkind: ServiceAccount/u);
       expect(manifest).toContain("name: canfar-perfpulse");
@@ -60,9 +59,10 @@ describe("PerfPulse Helm charts", () => {
       expect(manifest).toContain("cron-workload-writer");
       expect(manifest).toContain("cron-testrun-writer");
       expect(manifest).toContain("cron-runner-gate");
-      expect(manifest).toContain("Skipping TestRun for surface");
+      expect(manifest).toContain("name: perfpulse-cron-config");
+      expect(manifest).toContain("Skipping cron TestRun");
       expect(manifest).toContain("K6_OTEL_SERVICE_NAME");
-      expect(manifest).toContain("value: perfpulse-${TESTID}");
+      expect(manifest).toMatch(/value: perfpulse-\$\{TESTID\}/);
       expect(manifest).not.toContain("name: perfpulse-workload-writer");
       expect(manifest).toContain("runAsNonRoot: true");
       expect(manifest).toContain("allowPrivilegeEscalation: false");
@@ -129,7 +129,7 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).not.toContain('"--timeout","30s"');
   });
 
-  test("campaign chart renders manual TestRuns for all default surfaces with required sizing", () => {
+  test("campaign chart renders one sequential TestRun for benchmark campaigns", () => {
     const manifest = helmTemplate("campaign", [
       "--set",
       "image.tag=2026.05.04",
@@ -147,27 +147,20 @@ describe("PerfPulse Helm charts", () => {
       "skaha.apiUrl=https://ws.example/skaha/v1",
     ]);
 
-    expect(count(manifest, "kind: TestRun")).toBe(3);
+    expect(count(manifest, "kind: TestRun")).toBe(1);
     expect(manifest).not.toContain("kind: Namespace");
-    expect(count(manifest, 'image: "images.opencadc.org/platform/perfpulse:2026.05.04"')).toBe(9);
-    expect(manifest).not.toContain("docker.io/bitnami/kubectl");
-    expect(manifest).not.toContain("docker.io/alexeiled/stress-ng");
-    expect(manifest).toContain("name: campaign-direct");
-    expect(manifest).toContain("name: campaign-direct-config");
-    expect(manifest).toContain("name: campaign-kueue");
-    expect(manifest).toContain("name: campaign-kueue-config");
-    expect(manifest).toContain("name: campaign-skaha");
-    expect(manifest).toContain("name: campaign-skaha-config");
+    expect(count(manifest, 'image: "images.opencadc.org/platform/perfpulse:2026.05.04"')).toBe(3);
+    expect(manifest).toContain("name: campaign");
+    expect(manifest).toContain("name: campaign-config");
+    expect(manifest).not.toContain("name: campaign-direct");
+    expect(manifest).toContain('SEQUENTIAL_SURFACES: "true"');
+    expect(manifest).toContain('SURFACES: "k8s-direct,k8s-kueue,skaha"');
     expect(manifest).toContain('PROFILE: "campaign"');
     expect(manifest).toContain("RUN_CLASS: campaign");
     expect(manifest).toContain("CAMPAIGN_TYPE: benchmark");
     expect(manifest).toContain('TOTAL_JOBS: "12"');
     expect(manifest).toContain('LOGICAL_USERS: "3"');
     expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
-    expect(
-      count(manifest, 'WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04"'),
-    ).toBe(2);
-    expect(count(manifest, 'WORKLOAD_IMAGE: "images.canfar.net/skaha/stress-ng:latest"')).toBe(1);
     expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "120"');
     expect(manifest).toContain('COMPLETION_TIMEOUT_SECONDS: "300"');
     expect(manifest).toContain('POLL_JITTER_MAX_MS: "1000"');
@@ -186,9 +179,6 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).not.toContain("kind: CronJob");
     expect(manifest).not.toContain("kind: Secret");
     expect(manifest).not.toContain("CONFIRM_SEQUENTIAL:");
-    expect(count(manifest, 'JOBS_PER_VU_CAP: "500"')).toBe(3);
-    expect(count(manifest, 'SKAHA_BULK_POLL_MIN_SECONDS: "15"')).toBe(1);
-    expect(count(manifest, 'SKAHA_BULK_POLL_CYCLE_SECONDS: "1"')).toBe(1);
   });
 
   test("campaign chart exposes jobs-per-VU cap and bulk Skaha poll overrides", () => {
@@ -240,8 +230,9 @@ describe("PerfPulse Helm charts", () => {
     ]);
 
     expect(count(manifest, "kind: TestRun")).toBe(1);
-    expect(manifest).toContain("name: campaign-skaha");
-    expect(manifest).toContain("name: campaign-skaha-config");
+    expect(manifest).toContain("name: campaign");
+    expect(manifest).toContain("name: campaign-config");
+    expect(manifest).toContain('SURFACES: "skaha"');
     expect(manifest).not.toContain("name: campaign-direct");
     expect(manifest).not.toContain("name: campaign-kueue");
     expect(manifest).toContain("name: otlp-custom");
@@ -291,12 +282,12 @@ describe("PerfPulse Helm charts", () => {
       "campaign.testid=skaha-20260507",
     ]);
 
-    expect(benchmarkManifest).toContain("name: perfpulse-benchmark-skaha");
-    expect(benchmarkManifest).toContain("name: perfpulse-benchmark-skaha-config");
+    expect(benchmarkManifest).toContain("name: perfpulse-benchmark");
+    expect(benchmarkManifest).toContain("name: perfpulse-benchmark-config");
     expect(benchmarkManifest).toContain("name: perfpulse-benchmark-workload-writer");
     expect(benchmarkManifest).not.toContain("perfpulse-campaign-skaha-config");
-    expect(skahaManifest).toContain("name: perfpulse-skaha-skaha");
-    expect(skahaManifest).toContain("name: perfpulse-skaha-skaha-config");
+    expect(skahaManifest).toContain("name: perfpulse-skaha");
+    expect(skahaManifest).toContain("name: perfpulse-skaha-config");
     expect(skahaManifest).toContain("name: perfpulse-skaha-workload-writer");
     expect(skahaManifest).not.toContain("perfpulse-campaign-skaha-config");
   });

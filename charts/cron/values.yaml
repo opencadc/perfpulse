@@ -10,6 +10,7 @@ image:
 workload:
   kubernetesImage: ""
   image: images.canfar.net/skaha/stress-ng:latest
+  ttlSecondsAfterFinished: 3600
 schedule: '*/5 * * * *'
 cronGate:
   # skip: do not create a TestRun while runner jobs are active for this surface
@@ -18,7 +19,7 @@ cronGate:
   maxActiveRunnerJobs: 1
   pruneTestRuns: true
 observeSeconds: 600
-completionTimeoutSeconds: 86400
+completionTimeoutSeconds: 900
 submissionJitterMaxMs: 1000
 pollJitterMaxMs: 1000
 otlp:

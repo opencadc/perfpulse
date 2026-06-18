@@ -34,6 +34,7 @@ import {
   DEFAULT_SURFACE,
   DEFAULT_WORKLOAD_IMAGE,
   DEFAULT_WORKLOAD_NAMESPACE,
+  DEFAULT_WORKLOAD_TTL_SECONDS_AFTER_FINISHED,
   type EnvSource,
   type RunConfig,
   SERVICE_ACCOUNT_TOKEN_PATH,
@@ -42,6 +43,7 @@ import {
 import {
   FIXED_WORKLOAD_DURATION_SECONDS,
   resolveRequireCompletion,
+  resolveSequentialSurfaces,
   validateJobsPerVuCap,
 } from "./run-policy";
 
@@ -49,6 +51,7 @@ export {
   defaultTestId,
   deriveBulkSkahaStressBatch,
   deriveRunConfigForJob,
+  deriveRunConfigForSurface,
   makeJobName,
   sanitizeDnsLabel,
   sanitizeLabelValue,
@@ -86,6 +89,8 @@ export {
   FIXED_WORKLOAD_DURATION_SECONDS,
   isBulkSkahaStressSurface,
   resolveCampaignExecutionShape,
+  resolveRequireCompletion,
+  resolveSequentialSurfaces,
 } from "./run-policy";
 
 export function resolveRunConfig(env: EnvSource = {}): RunConfig {
@@ -191,7 +196,7 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     imagePullPolicy: parseImagePullPolicy(env.WORKLOAD_IMAGE_PULL_POLICY),
     ttlSecondsAfterFinished: parsePositiveInteger(
       env.WORKLOAD_TTL_SECONDS_AFTER_FINISHED,
-      60,
+      DEFAULT_WORKLOAD_TTL_SECONDS_AFTER_FINISHED,
       "WORKLOAD_TTL_SECONDS_AFTER_FINISHED",
     ),
   };
@@ -252,6 +257,7 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     requireCompletion: resolveRequireCompletion(env, runClass, campaignType),
     runClass,
     scenario,
+    sequentialSurfaces: resolveSequentialSurfaces(env, runClass, campaignType),
     surface,
     surfaces,
     skaha: skahaConfig,

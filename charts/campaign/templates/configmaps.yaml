@@ -1,3 +1,4 @@
+{{- if and (eq .Values.campaign.type "stress") .Values.campaign.parallelSurfaces }}
 {{- range $surface := .Values.surfaces }}
 {{- $short := include "perfpulse.nameForSurface" $surface }}
 {{- $configMapName := include "perfpulse.campaignConfigMapName" (dict "releaseName" $.Release.Name "surfaceShort" $short) }}
@@ -14,9 +15,7 @@ data:
   CLEANUP: "true"
   CAMPAIGN_TYPE: {{ $.Values.campaign.type }}
   COMPLETION_TIMEOUT_SECONDS: {{ $.Values.campaign.completionTimeoutSeconds | quote }}
-  {{- if eq $.Values.campaign.type "stress" }}
   CONFIRM_STRESS: "true"
-  {{- end }}
   {{- if $.Values.campaign.confirmHighUsers }}
   CONFIRM_HIGH_USERS: "true"
   {{- end }}
@@ -26,7 +25,6 @@ data:
   K6_OTEL_HTTP_EXPORTER_INSECURE: "true"
   K6_OTEL_HTTP_EXPORTER_URL_PATH: {{ $.Values.otlp.urlPath | quote }}
   K6_OTEL_METRIC_PREFIX: k6_
-  K6_OTEL_SERVICE_NAME: perfpulse-campaign-{{ $short }}
   K6_OTEL_EXPORT_INTERVAL: 5s
   LOGICAL_USERS: {{ $.Values.campaign.logicalUsers | quote }}
   PERF_PULSE_CLIENT_MODE: kubernetes
@@ -34,6 +32,7 @@ data:
   POLL_JITTER_MAX_MS: {{ $.Values.campaign.pollJitterMaxMs | quote }}
   RUN_CLASS: campaign
   SCENARIO: {{ $.Values.campaign.scenario | quote }}
+  SEQUENTIAL_SURFACES: "false"
   SUBMISSION_JITTER_MAX_MS: {{ $.Values.campaign.submissionJitterMaxMs | quote }}
   SURFACE: {{ $surface }}
   TOTAL_JOBS: {{ $.Values.campaign.totalJobs | quote }}
@@ -45,9 +44,8 @@ data:
   {{- else }}
   WORKLOAD_IMAGE: {{ default (printf "%s:%s" $.Values.image.repository $.Values.image.tag) $.Values.workload.kubernetesImage | quote }}
   {{- end }}
-  {{- if or (eq $surface "k8s-direct") (eq $surface "k8s-kueue") }}
-  WORKLOAD_NAMESPACE: {{ $.Values.workloadNamespace }}
-  {{- end }}
+  WORKLOAD_NAMESPACE: {{ $.Values.workloadNamespace | quote }}
+  WORKLOAD_TTL_SECONDS_AFTER_FINISHED: {{ $.Values.workload.ttlSecondsAfterFinished | quote }}
   {{- if eq $surface "k8s-kueue" }}
   KUEUE_ADMISSION_GATE_SECONDS: {{ $.Values.campaign.completionTimeoutSeconds | quote }}
   KUEUE_PRIORITY_CLASS: low
@@ -62,4 +60,57 @@ data:
   SKAHA_REQUEST_TIMEOUT_SECONDS: {{ $.Values.skaha.requestTimeoutSeconds | quote }}
   SKAHA_USERNAME_PATH: /var/run/secrets/perfpulse/skaha-auth/username
   {{- end }}
+{{- end }}
+{{- else }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  namespace: {{ .Values.controlNamespace }}
+  labels:
+{{ include "perfpulse.labels" . | indent 4 }}
+data:
+  CLEANUP: "true"
+  CAMPAIGN_TYPE: {{ .Values.campaign.type }}
+  COMPLETION_TIMEOUT_SECONDS: {{ .Values.campaign.completionTimeoutSeconds | quote }}
+  {{- if eq .Values.campaign.type "stress" }}
+  CONFIRM_STRESS: "true"
+  {{- end }}
+  {{- if .Values.campaign.confirmHighUsers }}
+  CONFIRM_HIGH_USERS: "true"
+  {{- end }}
+  JOBS_PER_VU_CAP: {{ .Values.campaign.jobsPerVuCap | quote }}
+  K6_OTEL_EXPORTER_PROTOCOL: http/protobuf
+  K6_OTEL_HTTP_EXPORTER_ENDPOINT: {{ .Values.otlp.endpoint | quote }}
+  K6_OTEL_HTTP_EXPORTER_INSECURE: "true"
+  K6_OTEL_HTTP_EXPORTER_URL_PATH: {{ .Values.otlp.urlPath | quote }}
+  K6_OTEL_METRIC_PREFIX: k6_
+  K6_OTEL_EXPORT_INTERVAL: 5s
+  LOGICAL_USERS: {{ .Values.campaign.logicalUsers | quote }}
+  PERF_PULSE_CLIENT_MODE: kubernetes
+  PROFILE: {{ .Values.campaign.profile | quote }}
+  POLL_JITTER_MAX_MS: {{ .Values.campaign.pollJitterMaxMs | quote }}
+  RUN_CLASS: campaign
+  SCENARIO: {{ .Values.campaign.scenario | quote }}
+  SEQUENTIAL_SURFACES: "true"
+  SUBMISSION_JITTER_MAX_MS: {{ .Values.campaign.submissionJitterMaxMs | quote }}
+  SURFACES: {{ join "," .Values.surfaces | quote }}
+  TOTAL_JOBS: {{ .Values.campaign.totalJobs | quote }}
+  VISIBILITY_GATE_SECONDS: {{ .Values.campaign.visibilityGateSeconds | quote }}
+  WORKLOAD_COMMAND: '["stress-ng"]'
+  WORKLOAD_ARGS: '["--cpu","1","--temp-path","/tmp","--timeout","60s","--metrics-brief"]'
+  WORKLOAD_IMAGE: {{ default (printf "%s:%s" .Values.image.repository .Values.image.tag) .Values.workload.kubernetesImage | quote }}
+  WORKLOAD_NAMESPACE: {{ .Values.workloadNamespace | quote }}
+  WORKLOAD_TTL_SECONDS_AFTER_FINISHED: {{ .Values.workload.ttlSecondsAfterFinished | quote }}
+  KUEUE_ADMISSION_GATE_SECONDS: {{ .Values.campaign.completionTimeoutSeconds | quote }}
+  KUEUE_PRIORITY_CLASS: low
+  KUEUE_QUEUE_NAME: cadc-default
+  SKAHA_API_URL: {{ .Values.skaha.apiUrl | quote }}
+  SKAHA_BULK_POLL_CYCLE_SECONDS: {{ .Values.skaha.bulkPollCycleSeconds | quote }}
+  SKAHA_BULK_POLL_MIN_SECONDS: {{ .Values.skaha.bulkPollMinSeconds | quote }}
+  SKAHA_LOGIN_URL: {{ .Values.skaha.loginUrl | quote }}
+  SKAHA_PASSWORD_PATH: /var/run/secrets/perfpulse/skaha-auth/password
+  SKAHA_REQUEST_TIMEOUT_SECONDS: {{ .Values.skaha.requestTimeoutSeconds | quote }}
+  SKAHA_USERNAME_PATH: /var/run/secrets/perfpulse/skaha-auth/username
 {{- end }}

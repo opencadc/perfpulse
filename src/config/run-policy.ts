@@ -11,8 +11,34 @@ export interface CampaignExecutionShape {
   waves: number;
 }
 
+export function resolveSequentialSurfaces(
+  env: EnvSource,
+  runClass: RunClass,
+  campaignType: CampaignType | undefined,
+): boolean {
+  if (env.SEQUENTIAL_SURFACES !== undefined && env.SEQUENTIAL_SURFACES !== "") {
+    return parseBoolean(env.SEQUENTIAL_SURFACES, true);
+  }
+  if (runClass === "cron") {
+    return true;
+  }
+  if (campaignType === "stress") {
+    return false;
+  }
+  return true;
+}
+
 export function resolveCampaignExecutionShape(
-  config: Pick<RunConfig, "campaignType" | "logicalUsers" | "runClass" | "surface" | "totalJobs">,
+  config: Pick<
+    RunConfig,
+    | "campaignType"
+    | "logicalUsers"
+    | "runClass"
+    | "sequentialSurfaces"
+    | "surface"
+    | "surfaces"
+    | "totalJobs"
+  >,
 ): CampaignExecutionShape {
   const isBulkSkahaStress =
     config.runClass === "campaign" &&
@@ -27,10 +53,22 @@ export function resolveCampaignExecutionShape(
     };
   }
 
+  if (config.runClass === "cron") {
+    return {
+      lifecycle: "per-job",
+      iterations: 1,
+      waves: 1,
+    };
+  }
+
+  const surfaceCount =
+    config.sequentialSurfaces && config.surfaces.length > 1 ? config.surfaces.length : 1;
+  const iterations = config.totalJobs * surfaceCount;
+
   return {
     lifecycle: "per-job",
-    iterations: config.totalJobs,
-    waves: Math.ceil(config.totalJobs / Math.max(config.logicalUsers, 1)),
+    iterations,
+    waves: Math.ceil(iterations / Math.max(config.logicalUsers, 1)),
   };
 }
 

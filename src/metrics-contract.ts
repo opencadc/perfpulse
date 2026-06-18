@@ -3,7 +3,8 @@ import type { RunConfig } from "./config";
 /**
  * OTLP deployment invariants (see charts/cron and charts/campaign configmaps):
  * - cron and campaign both set K6_OTEL_EXPORT_INTERVAL=5s
- * - runner pods override K6_OTEL_SERVICE_NAME per testid to avoid Prometheus out-of-order samples
+ * - one k6 runner per cron tick or benchmark release; K6_OTEL_SERVICE_NAME is set on the runner only
+ * - sequential SURFACES share one OTLP writer; surface remains a metric tag for Grafana drilldown
  * - counters are not zero-seeded at startup; only recordExpected sets jobs_expected
  * - failure counters increment only on real failures via recordFailure, never speculatively
  * - k6 has no env to cap OTLP export retries; overlap prevention lives in the cron gate chart
