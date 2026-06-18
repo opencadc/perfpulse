@@ -21,6 +21,7 @@ export interface KubernetesResponseLike {
 
 export interface DirectKubernetesClient {
   createJob(manifest: KubernetesJobManifest): KubernetesResponseLike;
+  getJob(name: string): KubernetesResponseLike;
   listJobsByTestId(): JobListLike;
 }
 
@@ -63,6 +64,7 @@ export function runDirectKubernetesSurface(
   group?: LifecycleGroupFn,
 ): DirectKubernetesRunResult {
   let latestJobList: JobListLike = {};
+  let jobWasVisible = false;
 
   const lifecycle = runWorkLifecycle(
     {
@@ -75,10 +77,14 @@ export function runDirectKubernetesSurface(
     {
       pollVisibility() {
         latestJobList = client.listJobsByTestId();
-        return findJobByName(latestJobList, config.jobName) !== undefined;
+        const visible = findJobByName(latestJobList, config.jobName) !== undefined;
+        if (visible) {
+          jobWasVisible = true;
+        }
+        return visible;
       },
       readTerminalState() {
-        const job = currentJob(client, latestJobList, config.jobName);
+        const job = currentJob(client, latestJobList, config.jobName, jobWasVisible);
         return terminalState(job);
       },
       submit() {
@@ -143,8 +149,27 @@ function currentJob(
   client: DirectKubernetesClient,
   cachedList: JobListLike,
   jobName: string,
+  jobWasVisible: boolean,
 ): JobLike | undefined {
-  return findJobByName(cachedList, jobName) ?? findJobByName(client.listJobsByTestId(), jobName);
+  const fromList =
+    findJobByName(cachedList, jobName) ?? findJobByName(client.listJobsByTestId(), jobName);
+  if (fromList !== undefined) {
+    return fromList;
+  }
+  if (!jobWasVisible) {
+    return undefined;
+  }
+  const response = client.getJob(jobName);
+  if (response.status === 404) {
+    return {
+      metadata: { name: jobName },
+      status: { conditions: [{ status: "True", type: "Complete" }] },
+    };
+  }
+  if (response.status !== 200) {
+    return undefined;
+  }
+  return JSON.parse(String(response.body ?? "{}")) as JobLike;
 }
 
 function terminalState(job: JobLike | undefined): "failed" | "succeeded" | undefined {

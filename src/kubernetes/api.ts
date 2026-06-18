@@ -44,6 +44,14 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
         timeout: "30s",
       });
     },
+    getJob(name: string): JsonResponse {
+      const getUrl = `${jobsUrl}/${encodeURIComponent(name)}`;
+      return http.get(getUrl, {
+        headers,
+        tags: requestTags("k8s_get_job", tags),
+        timeout: "30s",
+      });
+    },
     listJobsByTestId(): JobListLike {
       const selector = encodeURIComponent(testidSelector(config));
       const response = http.get(`${jobsUrl}?labelSelector=${selector}`, {

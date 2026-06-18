@@ -1,51 +1,38 @@
-{{- range $surface := .Values.surfaces }}
-{{- $short := include "perfpulse.nameForSurface" $surface }}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: perfpulse-cron-{{ $short }}-config
-  namespace: {{ $.Values.controlNamespace }}
+  name: perfpulse-cron-config
+  namespace: {{ .Values.controlNamespace }}
   labels:
-{{ include "perfpulse.labels" $ | indent 4 }}
-    perfpulse.opencadc.org/surface: {{ $surface }}
+{{ include "perfpulse.labels" . | indent 4 }}
 data:
   CLEANUP: "true"
-  COMPLETION_TIMEOUT_SECONDS: {{ $.Values.completionTimeoutSeconds | quote }}
+  COMPLETION_TIMEOUT_SECONDS: {{ .Values.completionTimeoutSeconds | quote }}
   K6_OTEL_EXPORTER_PROTOCOL: http/protobuf
-  K6_OTEL_HTTP_EXPORTER_ENDPOINT: {{ $.Values.otlp.endpoint | quote }}
+  K6_OTEL_HTTP_EXPORTER_ENDPOINT: {{ .Values.otlp.endpoint | quote }}
   K6_OTEL_HTTP_EXPORTER_INSECURE: "true"
-  K6_OTEL_HTTP_EXPORTER_URL_PATH: {{ $.Values.otlp.urlPath | quote }}
+  K6_OTEL_HTTP_EXPORTER_URL_PATH: {{ .Values.otlp.urlPath | quote }}
   K6_OTEL_METRIC_PREFIX: k6_
-  K6_OTEL_SERVICE_NAME: perfpulse
   K6_OTEL_EXPORT_INTERVAL: 5s
   PERF_PULSE_CLIENT_MODE: kubernetes
-  POLL_JITTER_MAX_MS: {{ $.Values.pollJitterMaxMs | quote }}
+  POLL_JITTER_MAX_MS: {{ .Values.pollJitterMaxMs | quote }}
   PROFILE: cron
   RUN_CLASS: cron
-  SUBMISSION_JITTER_MAX_MS: {{ $.Values.submissionJitterMaxMs | quote }}
-  SURFACE: {{ $surface }}
+  SEQUENTIAL_SURFACES: "true"
+  SUBMISSION_JITTER_MAX_MS: {{ .Values.submissionJitterMaxMs | quote }}
+  SURFACES: {{ join "," .Values.surfaces | quote }}
+  VISIBILITY_GATE_SECONDS: {{ .Values.observeSeconds | quote }}
   WORKLOAD_COMMAND: '["stress-ng"]'
   WORKLOAD_ARGS: '["--cpu","1","--temp-path","/tmp","--timeout","60s","--metrics-brief"]'
-  {{- if eq $surface "skaha" }}
-  WORKLOAD_IMAGE: {{ $.Values.workload.image | quote }}
-  {{- else }}
-  WORKLOAD_IMAGE: {{ default (printf "%s:%s" $.Values.image.repository $.Values.image.tag) $.Values.workload.kubernetesImage | quote }}
-  {{- end }}
-  VISIBILITY_GATE_SECONDS: {{ $.Values.observeSeconds | quote }}
-  {{- if or (eq $surface "k8s-direct") (eq $surface "k8s-kueue") }}
-  WORKLOAD_NAMESPACE: {{ $.Values.workloadNamespace }}
-  {{- end }}
-  {{- if eq $surface "k8s-kueue" }}
-  KUEUE_ADMISSION_GATE_SECONDS: {{ $.Values.completionTimeoutSeconds | quote }}
+  WORKLOAD_IMAGE: {{ default (printf "%s:%s" .Values.image.repository .Values.image.tag) .Values.workload.kubernetesImage | quote }}
+  WORKLOAD_NAMESPACE: {{ .Values.workloadNamespace | quote }}
+  WORKLOAD_TTL_SECONDS_AFTER_FINISHED: {{ .Values.workload.ttlSecondsAfterFinished | quote }}
+  KUEUE_ADMISSION_GATE_SECONDS: {{ .Values.completionTimeoutSeconds | quote }}
   KUEUE_PRIORITY_CLASS: low
   KUEUE_QUEUE_NAME: cadc-default
-  {{- end }}
-  {{- if eq $surface "skaha" }}
-  SKAHA_API_URL: {{ $.Values.skaha.apiUrl | quote }}
-  SKAHA_LOGIN_URL: {{ $.Values.skaha.loginUrl | quote }}
+  SKAHA_API_URL: {{ .Values.skaha.apiUrl | quote }}
+  SKAHA_LOGIN_URL: {{ .Values.skaha.loginUrl | quote }}
   SKAHA_PASSWORD_PATH: /var/run/secrets/perfpulse/skaha-auth/password
-  SKAHA_REQUEST_TIMEOUT_SECONDS: {{ $.Values.skaha.requestTimeoutSeconds | quote }}
+  SKAHA_REQUEST_TIMEOUT_SECONDS: {{ .Values.skaha.requestTimeoutSeconds | quote }}
   SKAHA_USERNAME_PATH: /var/run/secrets/perfpulse/skaha-auth/username
-  {{- end }}
-{{- end }}

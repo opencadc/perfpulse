@@ -10,8 +10,10 @@ image:
 workload:
   kubernetesImage: ""
   image: images.canfar.net/skaha/stress-ng:latest
+  ttlSecondsAfterFinished: 3600
 campaign:
   type: benchmark
+  parallelSurfaces: false
   confirmStress: false
   confirmHighUsers: false
   testid: null

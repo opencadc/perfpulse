@@ -181,6 +181,48 @@ describe("direct Kubernetes Test surface", () => {
     expect(lifecycleEvents).toEqual(["submitted", "visible"]);
   });
 
+  test("treats a TTL-deleted Job as complete after it was visible", () => {
+    const config = resolveRunConfig({
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      TESTID: "ttl-gone",
+    });
+    let visiblePass = false;
+    const client = createClient({
+      getJob(_name: string) {
+        return { body: "not found", status: 404 };
+      },
+      listJobsByTestId() {
+        if (!visiblePass) {
+          return {
+            items: [
+              {
+                metadata: { name: "perfpulse-ttl-gone-direct-0" },
+                status: { conditions: [{ status: "True", type: "Complete" }] },
+              },
+            ],
+          };
+        }
+        return { items: [] };
+      },
+    });
+    let pollCalls = 0;
+    const poller: PollUntil = (_timeout, _interval, read, done) => {
+      pollCalls += 1;
+      const list = read();
+      if (pollCalls === 1) {
+        visiblePass = true;
+        expect(done(list)).toBe(true);
+        return list;
+      }
+      return done(list) ? list : undefined;
+    };
+
+    const result = runDirectKubernetesSurface(config, client, poller, () => pollCalls * 100);
+
+    expect(result.completed).toBe(true);
+    expect(result.failure).toBeUndefined();
+  });
+
   test("emits a visibility failure callback before returning a timeout", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
@@ -216,6 +258,17 @@ function createClient(overrides: Partial<DirectKubernetesClient> = {}): DirectKu
   return {
     createJob(manifest: KubernetesJobManifest): KubernetesResponseLike {
       return overrides.createJob?.(manifest) ?? { body: "created", status: 201 };
+    },
+    getJob(name: string): KubernetesResponseLike {
+      return (
+        overrides.getJob?.(name) ?? {
+          body: JSON.stringify({
+            metadata: { name },
+            status: { conditions: [{ status: "True", type: "Complete" }] },
+          }),
+          status: 200,
+        }
+      );
     },
     listJobsByTestId(): JobListLike {
       return (

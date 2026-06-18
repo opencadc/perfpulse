@@ -82,6 +82,30 @@ describe("PerfPulse k6 runtime dispatch", () => {
     ]);
   });
 
+  test("runs cron check surfaces sequentially in one iteration", async () => {
+    const config = resolveRunConfig({
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "cron",
+      SURFACES: "k8s-direct,k8s-kueue",
+      TESTID: "cron-multi",
+    });
+    const runtime = await import("../src/perfpulse");
+
+    runtime.default(config);
+
+    const createRequests = httpRequests.filter(
+      (request) => request.options?.tags?.name === "k8s_create_job",
+    );
+    expect(createRequests).toHaveLength(2);
+    const createdNames = createRequests.map(
+      (request) => JSON.parse(request.body ?? "{}").metadata.name,
+    );
+    expect(createdNames).toEqual(["perfpulse-cron-multi-direct-0", "perfpulse-cron-multi-kueue-0"]);
+    expect(
+      metricRecords.filter((record) => record.metric === METRIC_NAMES.jobsExpected),
+    ).toHaveLength(2);
+  });
+
   test("runs the Kueue Kubernetes surface when runtime config selects k8s-kueue", async () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
