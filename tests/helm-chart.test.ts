@@ -59,6 +59,10 @@ describe("PerfPulse Helm charts", () => {
       expect(manifest).toContain("kind: Role");
       expect(manifest).toContain("cron-workload-writer");
       expect(manifest).toContain("cron-testrun-writer");
+      expect(manifest).toContain("cron-runner-gate");
+      expect(manifest).toContain("Skipping TestRun for surface");
+      expect(manifest).toContain("K6_OTEL_SERVICE_NAME");
+      expect(manifest).toContain("value: perfpulse-${TESTID}");
       expect(manifest).not.toContain("name: perfpulse-workload-writer");
       expect(manifest).toContain("runAsNonRoot: true");
       expect(manifest).toContain("allowPrivilegeEscalation: false");
@@ -170,6 +174,7 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).toContain('SUBMISSION_JITTER_MAX_MS: "1000"');
     expect(manifest).toContain('SKAHA_API_URL: "https://ws.example/skaha/v1"');
     expect(manifest).toContain('value: "manual-20260507"');
+    expect(manifest).toContain('value: "perfpulse-manual-20260507"');
     expect(manifest).toContain("secretName: perfpulse-skaha-auth");
     expect(manifest).toContain("name: perfpulse-otlp-credentials");
     expect(manifest).not.toMatch(/apiVersion: v1\nkind: ServiceAccount/u);

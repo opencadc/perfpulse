@@ -37,6 +37,44 @@ spec:
               args:
                 - |-
                   set -eu
+                  SHORT="{{ $short }}"
+                  SURFACE="{{ $surface }}"
+                  NS="{{ $.Values.controlNamespace }}"
+                  MAX_ACTIVE={{ $.Values.cronGate.maxActiveRunnerJobs }}
+                  POLICY="{{ $.Values.cronGate.policy }}"
+                  RUNNER_PREFIX="perfpulse-cron-${SHORT}-cron-${SHORT}-"
+
+                  count_active_runners() {
+                    kubectl get jobs -n "$NS" -o jsonpath='{range .items[?(@.status.active)]}{.metadata.name}{"\n"}{end}' \
+                      | { grep "^${RUNNER_PREFIX}" || true; } | grep -E '\-1$' | wc -l | tr -d ' '
+                  }
+
+                  delete_active_runners() {
+                    kubectl get jobs -n "$NS" -o jsonpath='{range .items[?(@.status.active)]}{.metadata.name}{"\n"}{end}' \
+                      | { grep "^${RUNNER_PREFIX}" || true; } | grep -E '\-1$' \
+                      | xargs -r kubectl delete job -n "$NS" --ignore-not-found
+                  }
+
+                  prune_testruns() {
+                    kubectl delete testruns.k6.io -n "$NS" \
+                      -l "app.kubernetes.io/name=perfpulse,perfpulse.opencadc.org/surface=${SURFACE}" \
+                      --ignore-not-found --wait=false
+                  }
+
+                  ACTIVE="$(count_active_runners)"
+                  if [ "$ACTIVE" -ge "$MAX_ACTIVE" ]; then
+                    if [ "$POLICY" = "preempt" ]; then
+                      echo "Preempting ${ACTIVE} active runner job(s) for surface ${SURFACE}"
+                      delete_active_runners
+                    else
+                      echo "Skipping TestRun for surface ${SURFACE}: ${ACTIVE} active runner job(s) (max ${MAX_ACTIVE})"
+                      exit 0
+                    fi
+                  fi
+                  {{- if $.Values.cronGate.pruneTestRuns }}
+                  echo "Pruning previous TestRuns for surface ${SURFACE}"
+                  prune_testruns
+                  {{- end }}
                   TESTID="cron-{{ $short }}-$(date -u +%Y%m%d%H%M%S)"
                   cat <<YAML | kubectl apply -f -
                   apiVersion: k6.io/v1alpha1
@@ -99,6 +137,8 @@ spec:
                       env:
                         - name: TESTID
                           value: ${TESTID}
+                        - name: K6_OTEL_SERVICE_NAME
+                          value: perfpulse-${TESTID}
                       envFrom:
                         - configMapRef:
                             name: perfpulse-cron-{{ $short }}-config

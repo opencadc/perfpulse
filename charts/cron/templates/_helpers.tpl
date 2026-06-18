@@ -15,6 +15,10 @@ app.kubernetes.io/part-of: perfpulse
 {{- printf "%s-testrun-writer" .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "perfpulse.cronRunnerGateName" -}}
+{{- printf "%s-runner-gate" .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
 {{- define "perfpulse.serviceAccountName" -}}
 {{- .Values.serviceAccount.name -}}
 {{- end -}}

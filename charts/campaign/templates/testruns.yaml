@@ -37,6 +37,8 @@ spec:
     env:
       - name: TESTID
         value: {{ $.Values.campaign.testid | quote }}
+      - name: K6_OTEL_SERVICE_NAME
+        value: {{ printf "perfpulse-%s" $.Values.campaign.testid | quote }}
     envFrom:
       - configMapRef:
           name: {{ $configMapName }}
