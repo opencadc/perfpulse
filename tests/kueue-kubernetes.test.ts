@@ -311,6 +311,68 @@ describe("direct Kubernetes Kueue surface", () => {
     expect(pollCount).toBe(3);
   });
 
+  test("refreshes workload admission after visibility instead of using a stale workload snapshot", () => {
+    const config = resolveRunConfig({
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      SURFACE: "k8s-kueue",
+      TESTID: "kueue-spot",
+    });
+    let workloadListCalls = 0;
+    const client = createClient({
+      listWorkloadsByTestId() {
+        workloadListCalls += 1;
+        if (workloadListCalls === 1) {
+          return {
+            items: [
+              {
+                metadata: {
+                  ownerReferences: [{ kind: "Job", name: config.jobName }],
+                },
+                status: {
+                  conditions: [{ status: "False", type: "Admitted" }],
+                },
+              },
+            ],
+          };
+        }
+        return {
+          items: [
+            {
+              metadata: {
+                ownerReferences: [{ kind: "Job", name: config.jobName }],
+              },
+              status: {
+                conditions: [{ status: "True", type: "Admitted" }],
+              },
+            },
+          ],
+        };
+      },
+    });
+    let pollCalls = 0;
+    const poller: PollUntil = (_timeout, _interval, read, done) => {
+      pollCalls += 1;
+      const value = read();
+      if (done(value)) {
+        return value;
+      }
+      return undefined;
+    };
+
+    const result = runKueueKubernetesSurface(
+      config,
+      { admissionGateSeconds: 120, priorityClass: "low", queueName: "cadc-default" },
+      client,
+      poller,
+      () => pollCalls * 100,
+    );
+
+    expect(result.failure).toBeUndefined();
+    expect(result.admitted).toBe(true);
+    expect(result.completed).toBe(true);
+    expect(workloadListCalls).toBeGreaterThan(1);
+  });
+
   test("emits a visibility failure callback when the Job never appears", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
