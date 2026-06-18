@@ -152,7 +152,7 @@ function currentJob(
   jobWasVisible: boolean,
 ): JobLike | undefined {
   const fromList =
-    findJobByName(cachedList, jobName) ?? findJobByName(client.listJobsByTestId(), jobName);
+    findJobByName(client.listJobsByTestId(), jobName) ?? findJobByName(cachedList, jobName);
   if (fromList !== undefined) {
     return fromList;
   }

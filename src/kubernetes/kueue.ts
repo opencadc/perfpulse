@@ -130,6 +130,7 @@ export function runKueueKubernetesSurface(
         return isWorkloadAdmitted(workload);
       },
       readTerminalState() {
+        latestJobList = client.listJobsByTestId();
         const job =
           findJobByName(latestJobList, config.jobName) ??
           findJobByName(client.listJobsByTestId(), config.jobName);
