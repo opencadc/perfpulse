@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.20](https://github.com/opencadc/perfpulse/compare/v0.1.19...v0.1.20) (2026-06-18)
+
+
+### Bug Fixes
+
+* sequential multi-surface Skaha auth, Kueue admission refresh, and maxDuration ([#28](https://github.com/opencadc/perfpulse/issues/28)) ([4acd53c](https://github.com/opencadc/perfpulse/commit/4acd53cbf78fa2f324b251454818f185fc29a678))
+
 ## [0.1.19](https://github.com/opencadc/perfpulse/compare/v0.1.18...v0.1.19) (2026-06-18)
 
 
