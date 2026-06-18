@@ -181,6 +181,52 @@ describe("direct Kubernetes Test surface", () => {
     expect(lifecycleEvents).toEqual(["submitted", "visible"]);
   });
 
+  test("refreshes Job status after visibility instead of using a stale list snapshot", () => {
+    const config = resolveRunConfig({
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      TESTID: "kind-smoke",
+    });
+    let listCalls = 0;
+    const client = createClient({
+      listJobsByTestId() {
+        listCalls += 1;
+        if (listCalls === 1) {
+          return {
+            items: [
+              {
+                metadata: { name: "perfpulse-kind-smoke-direct-0" },
+                status: { conditions: [] },
+              },
+            ],
+          };
+        }
+        return {
+          items: [
+            {
+              metadata: { name: "perfpulse-kind-smoke-direct-0" },
+              status: { conditions: [{ status: "True", type: "Complete" }] },
+            },
+          ],
+        };
+      },
+    });
+    let pollCalls = 0;
+    const poller: PollUntil = (_timeout, _interval, read, done) => {
+      pollCalls += 1;
+      const state = read();
+      if (done(state)) {
+        return state;
+      }
+      return undefined;
+    };
+
+    const result = runDirectKubernetesSurface(config, client, poller, () => pollCalls * 100);
+
+    expect(result.completed).toBe(true);
+    expect(result.failure).toBeUndefined();
+    expect(listCalls).toBeGreaterThan(1);
+  });
+
   test("treats a TTL-deleted Job as complete after it was visible", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
