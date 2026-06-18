@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.18](https://github.com/opencadc/perfpulse/compare/v0.1.17...v0.1.18) (2026-06-18)
+
+
+### Bug Fixes
+
+* use zero-based k6 iteration for sequential benchmark surfaces ([#24](https://github.com/opencadc/perfpulse/issues/24)) ([befd561](https://github.com/opencadc/perfpulse/commit/befd561192f7fa0c660b836cdcd44a060397b9d6))
+
 ## [0.1.17](https://github.com/opencadc/perfpulse/compare/v0.1.16...v0.1.17) (2026-06-18)
 
 
