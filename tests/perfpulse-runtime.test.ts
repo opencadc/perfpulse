@@ -106,6 +106,43 @@ describe("PerfPulse k6 runtime dispatch", () => {
     ).toHaveLength(2);
   });
 
+  test("maps sequential benchmark iterations to surface waves using zero-based k6 indices", async () => {
+    const config = resolveRunConfig({
+      CAMPAIGN_TYPE: "benchmark",
+      LOGICAL_USERS: "25",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "campaign",
+      SEQUENTIAL_SURFACES: "true",
+      SURFACES: "k8s-direct,k8s-kueue,skaha",
+      TESTID: "sequential-benchmark",
+      TOTAL_JOBS: "25",
+    });
+    const runtime = await import("../src/perfpulse");
+
+    runtimeHarness.iterationInTest = 0;
+    runtimeHarness.vuIdInTest = 1;
+    runtime.default(config);
+
+    const firstCreate = httpRequests.find(
+      (request) => request.options?.tags?.name === "k8s_create_job",
+    );
+    expect(JSON.parse(firstCreate?.body ?? "{}").metadata.name).toBe(
+      "perfpulse-sequential-benchmark-direct-0",
+    );
+
+    resetK6RuntimeHarness();
+    runtimeHarness.iterationInTest = 25;
+    runtimeHarness.vuIdInTest = 1;
+    runtime.default(config);
+
+    const secondCreate = httpRequests.find(
+      (request) => request.options?.tags?.name === "k8s_create_job",
+    );
+    expect(JSON.parse(secondCreate?.body ?? "{}").metadata.name).toBe(
+      "perfpulse-sequential-benchmark-kueue-0",
+    );
+  });
+
   test("runs the Kueue Kubernetes surface when runtime config selects k8s-kueue", async () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",

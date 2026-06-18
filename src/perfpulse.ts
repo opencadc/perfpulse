@@ -398,10 +398,10 @@ function deriveRuntimeConfig(data: RunConfig): RunConfig {
     const iterationInTest = exec.scenario.iterationInTest;
     const surfaceIndex = Math.min(
       data.surfaces.length - 1,
-      Math.floor((iterationInTest - 1) / data.totalJobs),
+      Math.floor(iterationInTest / data.totalJobs),
     );
     const surface = data.surfaces[surfaceIndex] ?? data.surface;
-    const jobIndexInSurface = (iterationInTest - 1) % data.totalJobs;
+    const jobIndexInSurface = iterationInTest % data.totalJobs;
     const surfaceConfig = deriveRunConfigForSurface(data, surface);
     return deriveRunConfigForJob(surfaceConfig, jobIndexInSurface, vuIdInTest - 1);
   }
