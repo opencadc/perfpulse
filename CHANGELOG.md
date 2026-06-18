@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.16](https://github.com/opencadc/perfpulse/compare/v0.1.15...v0.1.16) (2026-06-18)
+
+
+### Features
+
+* add cron gate backstops and per-testid OTLP service name ([93fdfa1](https://github.com/opencadc/perfpulse/commit/93fdfa190c0322d0e252c68face38844bb1747a8))
+
 ## [0.1.15](https://github.com/opencadc/perfpulse/compare/v0.1.14...v0.1.15) (2026-06-16)
 
 
