@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.17](https://github.com/opencadc/perfpulse/compare/v0.1.16...v0.1.17) (2026-06-18)
+
+
+### Features
+
+* run cron and benchmark as single sequential TestRuns ([1dd08bb](https://github.com/opencadc/perfpulse/commit/1dd08bb192b4d2ce028a763c2f4e52679293dd5f))
+* single sequential TestRun per cron tick and benchmark campaign ([b479c5f](https://github.com/opencadc/perfpulse/commit/b479c5fdf9eac7baed0341145f952eabb9236cac))
+
 ## [0.1.16](https://github.com/opencadc/perfpulse/compare/v0.1.15...v0.1.16) (2026-06-18)
 
 
