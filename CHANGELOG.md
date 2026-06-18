@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.19](https://github.com/opencadc/perfpulse/compare/v0.1.18...v0.1.19) (2026-06-18)
+
+
+### Bug Fixes
+
+* refresh Job status during completion polling ([#26](https://github.com/opencadc/perfpulse/issues/26)) ([0b16943](https://github.com/opencadc/perfpulse/commit/0b16943ca7d4ade0f7f1b0e0ea79815a0f0316aa))
+
 ## [0.1.18](https://github.com/opencadc/perfpulse/compare/v0.1.17...v0.1.18) (2026-06-18)
 
 
