@@ -124,9 +124,8 @@ export function runKueueKubernetesSurface(
         return findWorkloadForJob(latestWorkloadList, config.jobName) !== undefined;
       },
       readAdmitted() {
-        const workload =
-          findWorkloadForJob(latestWorkloadList, config.jobName) ??
-          findWorkloadForJob(client.listWorkloadsByTestId(), config.jobName);
+        latestWorkloadList = client.listWorkloadsByTestId();
+        const workload = findWorkloadForJob(latestWorkloadList, config.jobName);
         return isWorkloadAdmitted(workload);
       },
       readTerminalState() {

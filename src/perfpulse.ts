@@ -33,17 +33,24 @@ interface RuntimeData {
 }
 
 const config = resolveRunConfig(__ENV);
+
+function usesSkaha(config: RunConfig): boolean {
+  return (
+    config.clientMode === "kubernetes" &&
+    (config.surface === "skaha" || config.surfaces.includes("skaha"))
+  );
+}
+
 const serviceAccountToken =
   config.clientMode === "kubernetes" && config.surface !== "skaha"
     ? String(open(config.kubernetes.tokenPath)).trim()
     : "";
-const skahaCredentials =
-  config.clientMode === "kubernetes" && config.surface === "skaha"
-    ? {
-        password: String(open(config.skaha.passwordPath)),
-        username: String(open(config.skaha.usernamePath)).trim(),
-      }
-    : undefined;
+const skahaCredentials = usesSkaha(config)
+  ? {
+      password: String(open(config.skaha.passwordPath)),
+      username: String(open(config.skaha.usernamePath)).trim(),
+    }
+  : undefined;
 
 export const options = createOptions(config);
 
@@ -62,7 +69,7 @@ export function setup(): RuntimeData {
         : setupConfig.totalJobs;
     createLifecycleRecorder(setupConfig).recordExpected(expectedJobs);
   }
-  if (config.clientMode === "kubernetes" && config.surface === "skaha") {
+  if (usesSkaha(config)) {
     return {
       config,
       skahaBearerToken: createSkahaBearerToken(config),
@@ -364,7 +371,7 @@ function resolveSkahaBearerToken(runtimeData: RuntimeData, data: RunConfig): str
   if (runtimeData.skahaBearerToken !== undefined) {
     return runtimeData.skahaBearerToken;
   }
-  return "";
+  return createSkahaBearerToken(data);
 }
 
 function encodeFormEntries(entries: Array<readonly [string, string]>): string {

@@ -9,10 +9,22 @@ describe("computeScenarioMaxDurationSeconds", () => {
   test("keeps cron bounded to a single job lifecycle", () => {
     const config = resolveRunConfig({
       COMPLETION_TIMEOUT_SECONDS: "120",
+      SURFACES: "k8s-direct",
       VISIBILITY_GATE_SECONDS: "60",
     });
 
     expect(computeScenarioMaxDurationSeconds(config)).toBe(600);
+  });
+
+  test("scales cron maxDuration by sequential surface count", () => {
+    const config = resolveRunConfig({
+      COMPLETION_TIMEOUT_SECONDS: "120",
+      SEQUENTIAL_SURFACES: "true",
+      SURFACES: "k8s-direct,k8s-kueue,skaha",
+      VISIBILITY_GATE_SECONDS: "60",
+    });
+
+    expect(computeScenarioMaxDurationSeconds(config)).toBe(1_200);
   });
 
   test("scales campaign duration by iteration waves and queue backlog", () => {

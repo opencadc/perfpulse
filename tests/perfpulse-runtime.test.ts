@@ -106,6 +106,27 @@ describe("PerfPulse k6 runtime dispatch", () => {
     ).toHaveLength(2);
   });
 
+  test("logs into Skaha during setup when sequential cron includes the skaha surface", async () => {
+    resolveRunConfig({
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      PROFILE: "cron",
+      SURFACES: "k8s-direct,k8s-kueue,skaha",
+      TESTID: "cron-skaha-setup",
+    });
+    const runtime = await import("../src/perfpulse");
+
+    const runtimeData = runtime.setup();
+
+    expect(httpRequests.some((request) => request.options?.tags?.name === "skaha_login")).toBe(
+      true,
+    );
+    expect(runtimeData).toEqual(
+      expect.objectContaining({
+        skahaBearerToken: expect.any(String),
+      }),
+    );
+  });
+
   test("maps sequential benchmark iterations to surface waves using zero-based k6 indices", async () => {
     const config = resolveRunConfig({
       CAMPAIGN_TYPE: "benchmark",

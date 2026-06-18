@@ -31,12 +31,13 @@ export function computeScenarioMaxDurationSeconds(
   coreBudget = DEFAULT_CAMPAIGN_CORE_BUDGET,
 ): number {
   if (config.runClass === "cron") {
-    return (
+    const surfaceCount =
+      config.sequentialSurfaces && config.surfaces.length > 1 ? config.surfaces.length : 1;
+    const perSurfaceSeconds =
       config.completionTimeoutSeconds +
       config.visibilityGateSeconds +
-      perIterationOverheadSeconds(config) +
-      SETUP_BUFFER_SECONDS
-    );
+      perIterationOverheadSeconds(config);
+    return surfaceCount * perSurfaceSeconds + SETUP_BUFFER_SECONDS;
   }
 
   const executionShape = resolveCampaignExecutionShape(config);
@@ -52,11 +53,12 @@ export function computeScenarioMaxDurationSeconds(
   }
 
   if (config.totalJobs <= config.logicalUsers) {
-    return (
+    const perIterationSeconds =
       config.completionTimeoutSeconds +
       config.visibilityGateSeconds +
-      perIterationOverheadSeconds(config) +
-      SETUP_BUFFER_SECONDS
+      perIterationOverheadSeconds(config);
+    return (
+      resolveCampaignExecutionShape(config).iterations * perIterationSeconds + SETUP_BUFFER_SECONDS
     );
   }
 
