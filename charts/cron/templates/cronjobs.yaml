@@ -6,7 +6,7 @@ metadata:
   namespace: {{ .Values.controlNamespace }}
   labels:
 {{ include "perfpulse.labels" . | indent 4 }}
-    perfpulse.opencadc.org/profile: cron
+    perfpulse.opencadc.org/run-class: cron
 spec:
   schedule: {{ .Values.schedule | quote }}
   concurrencyPolicy: Forbid
@@ -21,153 +21,38 @@ spec:
         metadata:
           labels:
 {{ include "perfpulse.labels" . | indent 12 }}
-            perfpulse.opencadc.org/profile: cron
+            perfpulse.opencadc.org/run-class: cron
         spec:
           serviceAccountName: {{ include "perfpulse.serviceAccountName" . }}
           restartPolicy: Never
           securityContext:
 {{ include "perfpulse.podSecurityContext" . | indent 12 }}
           containers:
-            - name: create-testrun
+            - name: k6
               image: {{ include "perfpulse.image" . | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
               command: ["/bin/sh", "-c"]
               args:
                 - |-
                   set -eu
-                  NS="{{ .Values.controlNamespace }}"
-                  MAX_ACTIVE={{ .Values.cronGate.maxActiveRunnerJobs }}
-                  POLICY="{{ .Values.cronGate.policy }}"
-                  RUNNER_PREFIX="perfpulse-cron-"
-
-                  count_active_runners() {
-                    kubectl get jobs -n "$NS" -o jsonpath='{range .items[?(@.status.active)]}{.metadata.name}{"\n"}{end}' \
-                      | { grep "^${RUNNER_PREFIX}" || true; } | grep -E '\-1$' | wc -l | tr -d ' '
-                  }
-
-                  delete_active_runners() {
-                    kubectl get jobs -n "$NS" -o jsonpath='{range .items[?(@.status.active)]}{.metadata.name}{"\n"}{end}' \
-                      | { grep "^${RUNNER_PREFIX}" || true; } | grep -E '\-1$' \
-                      | xargs -r kubectl delete job -n "$NS" --ignore-not-found
-                  }
-
-                  prune_testruns() {
-                    kubectl delete testruns.k6.io -n "$NS" \
-                      -l "app.kubernetes.io/name=perfpulse,perfpulse.opencadc.org/profile=cron" \
-                      --ignore-not-found --wait=false
-                  }
-
-                  ACTIVE="$(count_active_runners)"
-                  if [ "$ACTIVE" -ge "$MAX_ACTIVE" ]; then
-                    if [ "$POLICY" = "preempt" ]; then
-                      echo "Preempting ${ACTIVE} active cron runner job(s)"
-                      delete_active_runners
-                    else
-                      echo "Skipping cron TestRun: ${ACTIVE} active runner job(s) (max ${MAX_ACTIVE})"
-                      exit 0
-                    fi
-                  fi
-                  {{- if .Values.cronGate.pruneTestRuns }}
-                  echo "Pruning previous cron TestRuns"
-                  prune_testruns
-                  {{- end }}
                   TESTID="cron-$(date -u +%Y%m%d%H%M%S)"
-                  cat <<YAML | kubectl apply -f -
-                  apiVersion: k6.io/v1alpha1
-                  kind: TestRun
-                  metadata:
-                    name: perfpulse-cron-${TESTID}
-                    namespace: {{ .Values.controlNamespace }}
-                    labels:
-                      app.kubernetes.io/name: perfpulse
-                      app.kubernetes.io/part-of: perfpulse
-                      perfpulse.opencadc.org/profile: cron
-                      perfpulse.opencadc.org/testid: ${TESTID}
-                  spec:
-                    cleanup: post
-                    parallelism: 1
-                    arguments: "-o opentelemetry"
-                    script:
-                      localFile: /test/perfpulse.js
-                    initializer:
-                      image: {{ include "perfpulse.image" . | quote }}
-                      imagePullPolicy: {{ .Values.image.pullPolicy }}
-                      serviceAccountName: {{ include "perfpulse.serviceAccountName" . }}
-                      securityContext:
-                        runAsGroup: 1000
-                        runAsNonRoot: true
-                        runAsUser: 1000
-                        seccompProfile:
-                          type: RuntimeDefault
-                      containerSecurityContext:
-                        allowPrivilegeEscalation: false
-                        capabilities:
-                          drop:
-                            - ALL
-                        runAsGroup: 1000
-                        runAsNonRoot: true
-                        runAsUser: 1000
-                        seccompProfile:
-                          type: RuntimeDefault
-                    runner:
-                      image: {{ include "perfpulse.image" . | quote }}
-                      imagePullPolicy: {{ .Values.image.pullPolicy }}
-                      serviceAccountName: {{ include "perfpulse.serviceAccountName" . }}
-                      securityContext:
-                        runAsGroup: 1000
-                        runAsNonRoot: true
-                        runAsUser: 1000
-                        seccompProfile:
-                          type: RuntimeDefault
-                      containerSecurityContext:
-                        allowPrivilegeEscalation: false
-                        capabilities:
-                          drop:
-                            - ALL
-                        runAsGroup: 1000
-                        runAsNonRoot: true
-                        runAsUser: 1000
-                        seccompProfile:
-                          type: RuntimeDefault
-                      env:
-                        - name: TESTID
-                          value: ${TESTID}
-                        - name: K6_OTEL_SERVICE_NAME
-                          value: perfpulse-${TESTID}
-                      envFrom:
-                        - configMapRef:
-                            name: perfpulse-cron-config
-                        - secretRef:
-                            name: {{ .Values.otlp.credentialsSecretName }}
-                            optional: true
-                      volumeMounts:
-                        - mountPath: /var/run/secrets/perfpulse/skaha-auth
-                          name: skaha-auth-credentials
-                          readOnly: true
-                      volumes:
-                        - name: skaha-auth-credentials
-                          secret:
-                            secretName: {{ .Values.skaha.credentialsSecretName }}
-                            optional: true
-                    starter:
-                      image: {{ include "perfpulse.image" . | quote }}
-                      imagePullPolicy: {{ .Values.image.pullPolicy }}
-                      serviceAccountName: {{ include "perfpulse.serviceAccountName" . }}
-                      securityContext:
-                        runAsGroup: 1000
-                        runAsNonRoot: true
-                        runAsUser: 1000
-                        seccompProfile:
-                          type: RuntimeDefault
-                      containerSecurityContext:
-                        allowPrivilegeEscalation: false
-                        capabilities:
-                          drop:
-                            - ALL
-                        runAsGroup: 1000
-                        runAsNonRoot: true
-                        runAsUser: 1000
-                        seccompProfile:
-                          type: RuntimeDefault
-                  YAML
+                  export TESTID
+                  export K6_OTEL_SERVICE_NAME="perfpulse-${TESTID}"
+                  exec k6 run -o opentelemetry /test/perfpulse.js
+              envFrom:
+                - configMapRef:
+                    name: perfpulse-cron-config
+                - secretRef:
+                    name: {{ .Values.otlp.credentialsSecretName }}
+                    optional: true
+              volumeMounts:
+                - mountPath: /var/run/secrets/perfpulse/skaha-auth
+                  name: skaha-auth-credentials
+                  readOnly: true
               securityContext:
 {{ include "perfpulse.containerSecurityContext" . | indent 16 }}
+          volumes:
+            - name: skaha-auth-credentials
+              secret:
+                secretName: {{ .Values.skaha.credentialsSecretName }}
+                optional: true

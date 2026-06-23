@@ -11,7 +11,7 @@ import {
 import type { JobListLike } from "../src/kubernetes/status";
 
 describe("direct Kubernetes Kueue surface", () => {
-  test("emits lifecycle stage callbacks through admission and completion", () => {
+  test("emits lifecycle stage callbacks through running and opportunistic completion", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-kueue",
@@ -53,12 +53,11 @@ describe("direct Kubernetes Kueue surface", () => {
     expect(lifecycleEvents).toEqual([
       ["submitted", 100],
       ["visible", 150],
-      ["admission", 600],
       ["completed", 600],
     ]);
   });
 
-  test("submits a suspended Kueue Job and reports Workload admission", () => {
+  test("submits a suspended Kueue Job and reports running evidence", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-kueue",
@@ -94,7 +93,7 @@ describe("direct Kubernetes Kueue surface", () => {
     expect(result.workloadVisible).toBe(true);
     expect(result.workloadVisibilityLatencyMs).toBe(300);
     expect(result.admitted).toBe(true);
-    expect(result.admissionLatencyMs).toBe(600);
+    expect(result.admissionLatencyMs).toBeUndefined();
     expect(result.completed).toBe(true);
     expect(result.completionLatencyMs).toBe(600);
     expect(createdManifests).toHaveLength(1);
@@ -102,17 +101,11 @@ describe("direct Kubernetes Kueue surface", () => {
     expect(createdManifests[0]?.metadata.labels["kueue.x-k8s.io/queue-name"]).toBe("cadc-default");
   });
 
-  test("succeeds after workload visibility for stress without require completion", () => {
+  test("succeeds for cron once the Kueue Job is running without waiting for admission or completion", () => {
     const config = resolveRunConfig({
-      CAMPAIGN_TYPE: "stress",
-      CONFIRM_HIGH_USERS: "true",
-      CONFIRM_STRESS: "true",
-      LOGICAL_USERS: "100",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "campaign",
       SURFACE: "k8s-kueue",
-      TOTAL_JOBS: "10000",
-      TESTID: "stress-kueue",
+      TESTID: "kueue-spot",
     });
     const lifecycleEvents: string[] = [];
     const client = createClient({
@@ -121,7 +114,82 @@ describe("direct Kubernetes Kueue surface", () => {
           items: [
             {
               metadata: { name: config.jobName },
-              status: { conditions: [{ status: "True", type: "Failed" }] },
+              status: { active: 1, conditions: [] },
+            },
+          ],
+        };
+      },
+      listWorkloadsByTestId() {
+        return {
+          items: [
+            {
+              metadata: {
+                ownerReferences: [{ kind: "Job", name: config.jobName }],
+              },
+              status: {
+                conditions: [{ status: "False", type: "Admitted" }],
+              },
+            },
+          ],
+        };
+      },
+    });
+    const poller: PollUntil = (_timeout, _interval, read, done) => {
+      const value = read();
+      return done(value) ? value : undefined;
+    };
+
+    const result = runKueueKubernetesSurface(
+      config,
+      { admissionGateSeconds: 120, priorityClass: "low", queueName: "cadc-default" },
+      client,
+      poller,
+      () => 10,
+      {
+        recordAdmission() {
+          lifecycleEvents.push("admission");
+        },
+        recordCompleted() {
+          lifecycleEvents.push("completed");
+        },
+        recordFailure(stage) {
+          lifecycleEvents.push(`failure:${stage}`);
+        },
+        recordSubmitted() {
+          lifecycleEvents.push("submitted");
+        },
+        recordVisible() {
+          lifecycleEvents.push("visible");
+        },
+      },
+    );
+
+    expect(result.failure).toBeUndefined();
+    expect(result.jobVisible).toBe(true);
+    expect(result.workloadVisible).toBe(true);
+    expect(result.admitted).toBe(false);
+    expect(result.completed).toBe(false);
+    expect(lifecycleEvents).toEqual(["submitted", "visible"]);
+  });
+
+  test("succeeds after running for benchmark without require completion", () => {
+    const config = resolveRunConfig({
+      CONFIRM_HIGH_USERS: "true",
+      LOGICAL_USERS: "100",
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      RUN_CLASS: "benchmark",
+      SURFACE: "k8s-kueue",
+      TOTAL_JOBS: "10000",
+      TESTID: "benchmark-kueue",
+    });
+    const lifecycleEvents: string[] = [];
+    const client = createClient({
+      listJobsByTestId() {
+        return {
+          items: [
+            {
+              metadata: { name: config.jobName },
+              status: { active: 1, conditions: [] },
             },
           ],
         };
@@ -176,11 +244,10 @@ describe("direct Kubernetes Kueue surface", () => {
     expect(lifecycleEvents).toEqual(["submitted", "visible"]);
   });
 
-  test("hard-fails cron checks when workload is never admitted within the admission gate", () => {
+  test("does not treat a merely created Kueue Job as running", () => {
     const config = resolveRunConfig({
-      KUEUE_ADMISSION_GATE_SECONDS: "5",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "cron",
+      RUN_CLASS: "cron",
       SURFACE: "k8s-kueue",
       TESTID: "cron-kueue",
     });
@@ -251,23 +318,22 @@ describe("direct Kubernetes Kueue surface", () => {
     );
 
     expect(result.failure).toEqual({
-      category: "kueue-admission",
-      message: `Kueue Workload for Job ${config.jobName} was not admitted within ${config.kueue.admissionGateSeconds}s`,
-      stage: "admission",
+      category: "visibility",
+      message: `Kueue Job ${config.jobName} was not running within ${config.visibilityGateSeconds}s`,
+      stage: "job-visibility",
     });
-    expect(result.jobVisible).toBe(true);
-    expect(result.workloadVisible).toBe(true);
+    expect(result.jobVisible).toBe(false);
+    expect(result.workloadVisible).toBe(false);
     expect(result.admitted).toBe(false);
     expect(result.completed).toBe(false);
-    expect(lifecycleEvents).toEqual(["submitted", "visible", "failure:admission"]);
+    expect(lifecycleEvents).toEqual(["submitted", "failure:visibility"]);
   });
 
   test("accepts visible Workloads without requiring admission", () => {
     const config = resolveRunConfig({
-      CAMPAIGN_TYPE: "benchmark",
       LOGICAL_USERS: "1",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "campaign",
+      RUN_CLASS: "benchmark",
       SURFACE: "k8s-kueue",
       TESTID: "kueue-spot",
       TOTAL_JOBS: "100",
@@ -308,33 +374,39 @@ describe("direct Kubernetes Kueue surface", () => {
     expect(result.workloadVisible).toBe(true);
     expect(result.admitted).toBe(false);
     expect(result.completed).toBe(true);
-    expect(pollCount).toBe(3);
+    expect(pollCount).toBe(2);
   });
 
-  test("refreshes workload admission after visibility instead of using a stale workload snapshot", () => {
+  test("refreshes Job status until it is running instead of using a stale created snapshot", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       SURFACE: "k8s-kueue",
       TESTID: "kueue-spot",
     });
-    let workloadListCalls = 0;
+    let jobListCalls = 0;
     const client = createClient({
-      listWorkloadsByTestId() {
-        workloadListCalls += 1;
-        if (workloadListCalls === 1) {
+      listJobsByTestId() {
+        jobListCalls += 1;
+        if (jobListCalls === 1) {
           return {
             items: [
               {
-                metadata: {
-                  ownerReferences: [{ kind: "Job", name: config.jobName }],
-                },
-                status: {
-                  conditions: [{ status: "False", type: "Admitted" }],
-                },
+                metadata: { name: config.jobName },
+                status: { conditions: [] },
               },
             ],
           };
         }
+        return {
+          items: [
+            {
+              metadata: { name: config.jobName },
+              status: { active: 1, conditions: [] },
+            },
+          ],
+        };
+      },
+      listWorkloadsByTestId() {
         return {
           items: [
             {
@@ -352,9 +424,11 @@ describe("direct Kubernetes Kueue surface", () => {
     let pollCalls = 0;
     const poller: PollUntil = (_timeout, _interval, read, done) => {
       pollCalls += 1;
-      const value = read();
-      if (done(value)) {
-        return value;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const value = read();
+        if (done(value)) {
+          return value;
+        }
       }
       return undefined;
     };
@@ -369,8 +443,8 @@ describe("direct Kubernetes Kueue surface", () => {
 
     expect(result.failure).toBeUndefined();
     expect(result.admitted).toBe(true);
-    expect(result.completed).toBe(true);
-    expect(workloadListCalls).toBeGreaterThan(1);
+    expect(result.completed).toBe(false);
+    expect(jobListCalls).toBeGreaterThan(1);
   });
 
   test("emits a visibility failure callback when the Job never appears", () => {

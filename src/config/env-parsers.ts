@@ -1,12 +1,8 @@
 import { isScenario, isSurface, type Scenario, type Surface } from "../profiles";
 import {
-  CAMPAIGN_TYPES,
-  type CampaignType,
   type ClientMode,
   DEFAULT_SURFACE,
   type EnvSource,
-  PROFILES,
-  type Profile,
   RUN_CLASSES,
   type RunClass,
   type WorkloadConfig,
@@ -42,13 +38,6 @@ export function parseClientMode(value: string | undefined): ClientMode {
   throw new Error(`PERF_PULSE_CLIENT_MODE must be "noop" or "kubernetes", got "${value}"`);
 }
 
-export function parseProfile(value: string): Profile {
-  if (isProfileValue(value)) {
-    return value;
-  }
-  throw new Error(`PROFILE has unsupported value "${value}"`);
-}
-
 export function parseOptionalRunClass(value: string | undefined, fallback: RunClass): RunClass {
   if (value === undefined || value === "") {
     return fallback;
@@ -57,25 +46,6 @@ export function parseOptionalRunClass(value: string | undefined, fallback: RunCl
     return value;
   }
   throw new Error(`RUN_CLASS has unsupported value "${value}"`);
-}
-
-export function parseCampaignType(
-  value: string | undefined,
-  runClass: RunClass,
-): CampaignType | undefined {
-  if (runClass === "cron") {
-    if (value === undefined || value === "") {
-      return undefined;
-    }
-    throw new Error("CAMPAIGN_TYPE is only supported when RUN_CLASS/PROFILE is campaign");
-  }
-  if (value === undefined || value === "") {
-    throw new Error("Campaign runs require CAMPAIGN_TYPE benchmark or stress");
-  }
-  if (isCampaignTypeValue(value)) {
-    return value;
-  }
-  throw new Error(`CAMPAIGN_TYPE has unsupported value "${value}"`);
 }
 
 export function parseOptionalScenario(value: string | undefined, fallback: Scenario): Scenario {
@@ -88,14 +58,14 @@ export function parseOptionalScenario(value: string | undefined, fallback: Scena
   throw new Error(`SCENARIO has unsupported value "${value}"`);
 }
 
-export function resolveSurfaces(env: EnvSource, profile: Profile): Surface[] {
+export function resolveSurfaces(env: EnvSource, runClass: RunClass): Surface[] {
   if (env.SURFACE !== undefined && env.SURFACES !== undefined) {
     throw new Error("Use either SURFACE or SURFACES, not both");
   }
 
   const value = env.SURFACES ?? env.SURFACE;
   if (value === undefined || value === "") {
-    return profile === "campaign" ? ["k8s-kueue", "k8s-direct", "skaha"] : [DEFAULT_SURFACE];
+    return runClass === "benchmark" ? ["k8s-kueue", "k8s-direct", "skaha"] : [DEFAULT_SURFACE];
   }
 
   const surfaces = value.split(",").map((surface) => surface.trim());
@@ -218,14 +188,6 @@ export function defaultStressNgArgs(durationSeconds: number): string[] {
   ];
 }
 
-function isProfileValue(value: string): value is Profile {
-  return (PROFILES as readonly string[]).includes(value);
-}
-
 function isRunClassValue(value: string): value is RunClass {
   return (RUN_CLASSES as readonly string[]).includes(value);
-}
-
-function isCampaignTypeValue(value: string): value is CampaignType {
-  return (CAMPAIGN_TYPES as readonly string[]).includes(value);
 }

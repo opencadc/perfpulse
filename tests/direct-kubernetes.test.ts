@@ -83,6 +83,82 @@ describe("direct Kubernetes Test surface", () => {
     expect(createdManifests[0]?.metadata.labels["kueue.x-k8s.io/queue-name"]).toBeUndefined();
   });
 
+  test("succeeds for cron once the Job is running without waiting for completion", () => {
+    const config = resolveRunConfig({
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      TESTID: "kind-smoke",
+    });
+    const lifecycleEvents: string[] = [];
+    const client = createClient({
+      listJobsByTestId() {
+        return {
+          items: [
+            {
+              metadata: { name: "perfpulse-kind-smoke-direct-0" },
+              status: { active: 1, conditions: [] },
+            },
+          ],
+        };
+      },
+    });
+    const poller: PollUntil = (_timeout, _interval, read, done) => {
+      const value = read();
+      return done(value) ? value : undefined;
+    };
+
+    const result = runDirectKubernetesSurface(config, client, poller, () => 10, {
+      recordCompleted() {
+        lifecycleEvents.push("completed");
+      },
+      recordFailure(stage) {
+        lifecycleEvents.push(`failure:${stage}`);
+      },
+      recordSubmitted() {
+        lifecycleEvents.push("submitted");
+      },
+      recordVisible() {
+        lifecycleEvents.push("visible");
+      },
+    });
+
+    expect(result.failure).toBeUndefined();
+    expect(result.visible).toBe(true);
+    expect(result.completed).toBe(false);
+    expect(lifecycleEvents).toEqual(["submitted", "visible"]);
+  });
+
+  test("does not treat a merely created Job as running", () => {
+    const config = resolveRunConfig({
+      PERF_PULSE_CLIENT_MODE: "kubernetes",
+      TESTID: "kind-smoke",
+    });
+    const client = createClient({
+      listJobsByTestId() {
+        return {
+          items: [
+            {
+              metadata: { name: "perfpulse-kind-smoke-direct-0" },
+              status: { conditions: [] },
+            },
+          ],
+        };
+      },
+    });
+    const poller: PollUntil = (_timeout, _interval, read, done) => {
+      const value = read();
+      return done(value) ? value : undefined;
+    };
+
+    const result = runDirectKubernetesSurface(config, client, poller, () => 10);
+
+    expect(result.failure).toEqual({
+      message: "Kubernetes Job perfpulse-kind-smoke-direct-0 was not running within 60s",
+      stage: "visibility",
+    });
+    expect(result.visible).toBe(false);
+    expect(result.completed).toBe(false);
+  });
+
   test("stops before polling when Job submission fails", () => {
     const config = resolveRunConfig({ PERF_PULSE_CLIENT_MODE: "kubernetes" });
     const client = createClient({
@@ -104,7 +180,7 @@ describe("direct Kubernetes Test surface", () => {
     expect(result.completed).toBe(false);
   });
 
-  test("fails when a visible Job reaches Failed", () => {
+  test("does not treat a failed Job as running", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       TESTID: "kind-smoke",
@@ -126,24 +202,22 @@ describe("direct Kubernetes Test surface", () => {
     const result = runDirectKubernetesSurface(config, client, poller, () => 10);
 
     expect(result.failure).toEqual({
-      message: "Kubernetes Job perfpulse-kind-smoke-direct-0 reached Failed",
-      stage: "completion",
+      message: "Kubernetes Job perfpulse-kind-smoke-direct-0 was not running within 60s",
+      stage: "visibility",
     });
-    expect(result.visible).toBe(true);
+    expect(result.visible).toBe(false);
     expect(result.completed).toBe(false);
   });
 
-  test("succeeds after visibility for stress without require completion", () => {
+  test("succeeds after running for benchmark without require completion", () => {
     const config = resolveRunConfig({
-      CAMPAIGN_TYPE: "stress",
       CONFIRM_HIGH_USERS: "true",
-      CONFIRM_STRESS: "true",
       LOGICAL_USERS: "100",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "campaign",
+      RUN_CLASS: "benchmark",
       SURFACE: "k8s-direct",
       TOTAL_JOBS: "10000",
-      TESTID: "stress-direct",
+      TESTID: "benchmark-direct",
     });
     const lifecycleEvents: string[] = [];
     const client = createClient({
@@ -151,8 +225,8 @@ describe("direct Kubernetes Test surface", () => {
         return {
           items: [
             {
-              metadata: { name: "perfpulse-stress-direct-direct-0" },
-              status: { conditions: [{ status: "True", type: "Failed" }] },
+              metadata: { name: "perfpulse-benchmark-direct-direct-0" },
+              status: { active: 1, conditions: [] },
             },
           ],
         };
@@ -181,7 +255,7 @@ describe("direct Kubernetes Test surface", () => {
     expect(lifecycleEvents).toEqual(["submitted", "visible"]);
   });
 
-  test("refreshes Job status after visibility instead of using a stale list snapshot", () => {
+  test("refreshes Job status until it is running instead of using a stale created snapshot", () => {
     const config = resolveRunConfig({
       PERF_PULSE_CLIENT_MODE: "kubernetes",
       TESTID: "kind-smoke",
@@ -204,25 +278,26 @@ describe("direct Kubernetes Test surface", () => {
           items: [
             {
               metadata: { name: "perfpulse-kind-smoke-direct-0" },
-              status: { conditions: [{ status: "True", type: "Complete" }] },
+              status: { active: 1, conditions: [] },
             },
           ],
         };
       },
     });
-    let pollCalls = 0;
     const poller: PollUntil = (_timeout, _interval, read, done) => {
-      pollCalls += 1;
-      const state = read();
-      if (done(state)) {
-        return state;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const state = read();
+        if (done(state)) {
+          return state;
+        }
       }
       return undefined;
     };
 
-    const result = runDirectKubernetesSurface(config, client, poller, () => pollCalls * 100);
+    const result = runDirectKubernetesSurface(config, client, poller, () => listCalls * 100);
 
-    expect(result.completed).toBe(true);
+    expect(result.completed).toBe(false);
+    expect(result.visible).toBe(true);
     expect(result.failure).toBeUndefined();
     expect(listCalls).toBeGreaterThan(1);
   });

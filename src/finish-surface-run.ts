@@ -2,7 +2,6 @@ import { check, fail } from "k6";
 import type { CleanupAdapter } from "./cleanup";
 import { shouldCleanupAfterFailure } from "./cleanup-policy";
 import type { RunConfig } from "./config";
-import type { SkahaBulkStressSessionResult } from "./skaha";
 
 export interface SurfaceRunFailure {
   message: string;
@@ -46,28 +45,6 @@ export function executeSurfaceRun(
   finishSurfaceRun(config, cleanup, result, binding.createChecks, (adapter) =>
     binding.cleanupWith(adapter, result),
   );
-}
-
-export interface BulkSkahaStressRunResult extends SurfaceRunResult {
-  sessions: SkahaBulkStressSessionResult[];
-}
-
-export function executeBulkSkahaStressRun(
-  config: RunConfig,
-  cleanup: CleanupAdapter,
-  binding: { execute(): BulkSkahaStressRunResult },
-): void {
-  const result = binding.execute();
-  if (result.failure !== undefined) {
-    if (shouldCleanupAfterFailure(config, result.failure.stage)) {
-      for (const session of result.sessions) {
-        if (session.sessionId !== undefined && !session.cleanedUp) {
-          cleanup.cleanupSkahaSession(session.sessionId);
-        }
-      }
-    }
-    fail(result.failure.message);
-  }
 }
 
 export function finishSurfaceRun(

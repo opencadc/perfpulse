@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 const dashboardFilters =
-  'testid=~"$testid",run_class=~"$runClass",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",namespace=~"$namespace",campaign_type=~"$campaignType"';
+  'testid=~"$testid",run_class=~"$runClass",surface=~"$surface",scenario=~"$scenario",namespace=~"$namespace"';
 
 describe("split Grafana dashboard artifacts", () => {
   test("ships a cron health dashboard without campaign testid drilldown", async () => {
@@ -29,8 +29,9 @@ describe("split Grafana dashboard artifacts", () => {
     expect(dashboard.uid).toBe("perfpulse-campaign");
     expect(dashboard.title).toContain("Campaign");
     expect(variableNames(dashboard)).toEqual(
-      expect.arrayContaining(["testid", "campaignType", "surface"]),
+      expect.arrayContaining(["testid", "runClass", "surface"]),
     );
+    expect(variableNames(dashboard)).not.toContain("campaignType");
     expect(panelTitles(dashboard)).toEqual(
       expect.arrayContaining(["Expected Jobs", "Surface Lifecycle Trend", "Target State Reached"]),
     );

@@ -102,7 +102,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "100 * count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",surface=\"k8s-direct\"}[15m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",surface=\"k8s-direct\"}[15m])) >= 1), 1)",
+          "expr": "100 * count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{run_class=\"cron\",surface=\"k8s-direct\"}[15m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{run_class=\"cron\",surface=\"k8s-direct\"}[15m])) >= 1), 1)",
           "legendFormat": "Cron Direct OK",
           "refId": "A"
         }
@@ -173,7 +173,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "100 * count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",surface=\"k8s-kueue\"}[15m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",surface=\"k8s-kueue\"}[15m])) >= 1), 1)",
+          "expr": "100 * count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{run_class=\"cron\",surface=\"k8s-kueue\"}[15m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{run_class=\"cron\",surface=\"k8s-kueue\"}[15m])) >= 1), 1)",
           "legendFormat": "Cron Kueue OK",
           "refId": "A"
         }
@@ -244,7 +244,7 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "100 * count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",surface=\"skaha\"}[15m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",surface=\"skaha\"}[15m])) >= 1), 1)",
+          "expr": "100 * count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{run_class=\"cron\",surface=\"skaha\"}[15m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{run_class=\"cron\",surface=\"skaha\"}[15m])) >= 1), 1)",
           "legendFormat": "Cron Skaha OK",
           "refId": "A"
         }
@@ -354,25 +354,25 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "max by (testid, surface) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",testid=~\"cron-.*\"}[$__range]))",
+          "expr": "max by (testid, surface) (last_over_time(k6_perfpulse_jobs_expected{run_class=\"cron\",testid=~\"cron-.*\"}[$__range]))",
           "format": "table",
           "instant": true,
           "refId": "A"
         },
         {
-          "expr": "max by (testid, surface) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",testid=~\"cron-.*\"}[$__range]))",
+          "expr": "max by (testid, surface) (last_over_time(k6_perfpulse_jobs_completed_total{run_class=\"cron\",testid=~\"cron-.*\"}[$__range]))",
           "format": "table",
           "instant": true,
           "refId": "B"
         },
         {
-          "expr": "max by (testid, surface) (last_over_time(k6_perfpulse_jobs_completion_failed_total{profile=\"cron\",testid=~\"cron-.*\"}[$__range]))",
+          "expr": "max by (testid, surface) (last_over_time(k6_perfpulse_jobs_completion_failed_total{run_class=\"cron\",testid=~\"cron-.*\"}[$__range]))",
           "format": "table",
           "instant": true,
           "refId": "C"
         },
         {
-          "expr": "max by (testid, surface) (last_over_time(k6_perfpulse_cleanup_failed_total{profile=\"cron\",testid=~\"cron-.*\"}[$__range]))",
+          "expr": "max by (testid, surface) (last_over_time(k6_perfpulse_cleanup_failed_total{run_class=\"cron\",testid=~\"cron-.*\"}[$__range]))",
           "format": "table",
           "instant": true,
           "refId": "D"
@@ -456,17 +456,17 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "expr": "count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",surface=\"k8s-direct\"}[5m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",surface=\"k8s-direct\"}[5m])) >= 1), 1)",
+          "expr": "count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{run_class=\"cron\",surface=\"k8s-direct\"}[5m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{run_class=\"cron\",surface=\"k8s-direct\"}[5m])) >= 1), 1)",
           "legendFormat": "k8s-direct",
           "refId": "A"
         },
         {
-          "expr": "count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",surface=\"k8s-kueue\"}[5m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",surface=\"k8s-kueue\"}[5m])) >= 1), 1)",
+          "expr": "count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{run_class=\"cron\",surface=\"k8s-kueue\"}[5m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{run_class=\"cron\",surface=\"k8s-kueue\"}[5m])) >= 1), 1)",
           "legendFormat": "k8s-kueue",
           "refId": "B"
         },
         {
-          "expr": "count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{profile=\"cron\",surface=\"skaha\"}[5m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{profile=\"cron\",surface=\"skaha\"}[5m])) >= 1), 1)",
+          "expr": "count(sum by (testid) (last_over_time(k6_perfpulse_jobs_completed_total{run_class=\"cron\",surface=\"skaha\"}[5m])) >= 1) / clamp_min(count(sum by (testid) (last_over_time(k6_perfpulse_jobs_expected{run_class=\"cron\",surface=\"skaha\"}[5m])) >= 1), 1)",
           "legendFormat": "skaha",
           "refId": "C"
         }

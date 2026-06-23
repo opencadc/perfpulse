@@ -34,5 +34,7 @@ describe("CI workflow contract", () => {
     expect(kindWorkflow).toContain("workflow_dispatch:");
     expect(kindWorkflow).not.toContain("pull_request:");
     expect(kindWorkflow).not.toContain("push:");
+    expect(kindWorkflow).not.toContain("k6-operator");
+    expect(kindWorkflow).not.toContain("testruns.k6.io");
   });
 });

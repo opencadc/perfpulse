@@ -28,22 +28,21 @@ describe("metrics contract", () => {
     expect(tags.surface).toBe("k8s-direct");
   });
 
-  test("emits low-cardinality campaign type for campaigns only", () => {
+  test("uses run class as the benchmark metric dimension", () => {
     const cronTags = metricTags(resolveRunConfig({}));
-    const campaignTags = metricTags(
+    const benchmarkTags = metricTags(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "benchmark",
         LOGICAL_USERS: "10",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TOTAL_JOBS: "100",
       }),
     );
 
     expect(cronTags).not.toHaveProperty("campaign_type");
-    expect(campaignTags).toMatchObject({
-      campaign_type: "benchmark",
-      profile: "campaign",
-      run_class: "campaign",
+    expect(benchmarkTags).toMatchObject({
+      run_class: "benchmark",
     });
+    expect(benchmarkTags).not.toHaveProperty("campaign_type");
+    expect(benchmarkTags).not.toHaveProperty("profile");
   });
 });

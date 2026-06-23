@@ -11,13 +11,7 @@ workload:
   kubernetesImage: ""
   image: images.canfar.net/skaha/stress-ng:latest
   ttlSecondsAfterFinished: 3600
-schedule: '*/5 * * * *'
-cronGate:
-  # skip: do not create a TestRun while runner jobs are active for this surface
-  # preempt: delete active runner jobs for this surface, then continue
-  policy: skip
-  maxActiveRunnerJobs: 1
-  pruneTestRuns: true
+schedule: '*/10 * * * *'
 observeSeconds: 600
 completionTimeoutSeconds: 900
 submissionJitterMaxMs: 1000

@@ -14,9 +14,7 @@ describe("PerfPulse runbooks", () => {
     expect(runbook).toContain("## Preflight Checks");
     expect(runbook).toContain("helm list --namespace canfar-perfpulse");
     expect(runbook).toContain("kubectl auth can-i list secrets --namespace canfar-perfpulse");
-    expect(runbook).toContain(
-      "kubectl auth can-i create testruns.k6.io --namespace canfar-perfpulse",
-    );
+    expect(runbook).not.toContain("testruns.k6.io");
     expect(runbook).toContain("Each `kubectl auth can-i` check should return `yes`.");
     expect(runbook).toContain("## Set Up Skaha Auth");
     expect(runbook).toContain("bun run skaha-auth-setup");
@@ -33,15 +31,9 @@ describe("PerfPulse runbooks", () => {
       "kubectl describe rolebinding perfpulse-cron-workload-writer --namespace canfar-workloads",
     );
     expect(runbook).toContain("## Run Cron Check Manually");
-    expect(runbook).toContain("for SURFACE in direct kueue skaha; do");
-    expect(runbook).toContain("perfpulse-cron-direct");
-    expect(runbook).toContain("perfpulse-cron-kueue");
-    expect(runbook).toContain("perfpulse-cron-skaha");
-    expect(runbook).toContain(
-      'kubectl create job "perfpulse-cron-$' + "{SURFACE}-manual-$" + '{RUN_ID}"',
-    );
-    expect(runbook).toContain('--from="cronjob/perfpulse-cron-$' + '{SURFACE}"');
-    expect(runbook).not.toContain('--from="cronjob/perfpulse-cron"');
+    expect(runbook).toContain('kubectl create job "perfpulse-cron-manual-$' + '{RUN_ID}"');
+    expect(runbook).toContain('--from="cronjob/perfpulse-cron"');
+    expect(runbook).not.toContain("for SURFACE in direct kueue skaha; do");
     expect(runbook).not.toContain("--dry-run=client");
     expect(runbook).not.toContain("kubectl patch --local -f -");
     expect(runbook).not.toContain("ownerReferences");
@@ -50,14 +42,14 @@ describe("PerfPulse runbooks", () => {
     expect(runbook).toContain("perfpulse_jobs_expected");
     expect(runbook).toContain("helm upgrade --install perfpulse-benchmark");
     expect(runbook).toContain("## Select Campaign Surfaces");
-    expect(runbook).toContain("run concurrently");
+    expect(runbook).toContain("run sequentially");
     expect(runbook).toContain("`campaign.totalJobs` is per selected surface");
     expect(runbook).toContain("percentage panels divide by expected jobs");
     expect(runbook).toContain("--set-json 'surfaces=[\"skaha\"]'");
     expect(runbook).toContain("--set-json 'surfaces=[\"k8s-direct\"]'");
     expect(runbook).toContain("--set-json 'surfaces=[\"k8s-kueue\"]'");
-    expect(runbook).toContain("helm upgrade --install perfpulse-stress");
-    expect(runbook).toContain("--set campaign.type=benchmark");
+    expect(runbook).not.toContain("helm upgrade --install perfpulse-stress");
+    expect(runbook).not.toContain("--set campaign.type=benchmark");
     expect(runbook).toContain("--set campaign.testid=");
     expect(runbook).toContain("--set campaign.totalJobs=1000");
     expect(runbook).toContain("--set campaign.logicalUsers=100");
@@ -70,13 +62,13 @@ describe("PerfPulse runbooks", () => {
       runbook.indexOf("## Select Campaign Surfaces"),
     );
     expect(smallBenchmarkSection).not.toContain("--set campaign.type=benchmark");
-    expect(runbook).toContain("--set campaign.type=stress");
-    expect(runbook).toContain("--set campaign.confirmStress=true");
-    expect(runbook).not.toContain("--set campaignType=");
+    expect(runbook).not.toContain("--set campaign.type=stress");
+    expect(runbook).not.toContain("--set campaign.confirmStress=true");
+    expect(runbook).not.toContain("campaignType");
     expect(runbook).not.toContain("--set totalJobs=");
     expect(runbook).not.toContain("--set logicalUsers=");
     expect(runbook).toContain("helm uninstall perfpulse-benchmark");
-    expect(runbook).toContain("Completion is part of the success gate.");
+    expect(runbook).toContain("Completion is diagnostic, not part of the default success gate.");
     expect(runbook).toContain("Dashboard evidence");
     expect(runbook).toContain("Expected Jobs");
     expect(normalizedRunbook).toContain("Target State Reached");
@@ -94,8 +86,6 @@ describe("PerfPulse runbooks", () => {
       "--namespace",
       "canfar-perfpulse",
       "--set",
-      "campaign.type=benchmark",
-      "--set",
       "campaign.testid=benchmark-20260511",
       "--set",
       "campaign.totalJobs=1000",
@@ -103,24 +93,6 @@ describe("PerfPulse runbooks", () => {
       "campaign.logicalUsers=100",
       "--set",
       "campaign.confirmHighUsers=true",
-    ]);
-    expectHelmTemplate([
-      "perfpulse-stress",
-      "./charts/campaign",
-      "--namespace",
-      "canfar-perfpulse",
-      "--set",
-      "campaign.type=stress",
-      "--set",
-      "campaign.testid=stress-20260511",
-      "--set",
-      "campaign.totalJobs=10000",
-      "--set",
-      "campaign.logicalUsers=100",
-      "--set",
-      "campaign.confirmHighUsers=true",
-      "--set",
-      "campaign.confirmStress=true",
     ]);
   });
 });

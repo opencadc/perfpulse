@@ -29,7 +29,6 @@ describe("k6 options contract", () => {
       "http_req_duration",
       "http_req_failed",
       "perfpulse_cleanup_failed",
-      "perfpulse_jobs_completion_failed",
       "perfpulse_jobs_submission_failed",
       "perfpulse_jobs_visibility_failed",
     ]);
@@ -46,10 +45,9 @@ describe("k6 options contract", () => {
   test("does not add HTTP duration thresholds to benchmark campaigns", () => {
     const options = createOptions(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "benchmark",
         CONFIRM_HIGH_USERS: "true",
         LOGICAL_USERS: "100",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TOTAL_JOBS: "100",
       }),
     );
@@ -60,10 +58,9 @@ describe("k6 options contract", () => {
   test("keeps benchmark campaigns on slightly relaxed HTTP and check thresholds", () => {
     const options = createOptions(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "benchmark",
         CONFIRM_HIGH_USERS: "true",
         LOGICAL_USERS: "100",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TOTAL_JOBS: "100",
       }),
     );
@@ -72,13 +69,12 @@ describe("k6 options contract", () => {
     expect(options.thresholds?.http_req_failed).toEqual(["rate<0.01"]);
   });
 
-  test("adds campaign completion failure gates", () => {
+  test("keeps benchmark thresholds on submission, visibility, cleanup, and HTTP health", () => {
     const options = createOptions(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "benchmark",
         CONFIRM_HIGH_USERS: "true",
         LOGICAL_USERS: "100",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TOTAL_JOBS: "100",
       }),
     );
@@ -87,75 +83,49 @@ describe("k6 options contract", () => {
       "checks",
       "http_req_failed",
       "perfpulse_cleanup_failed",
-      "perfpulse_jobs_completion_failed",
       "perfpulse_jobs_submission_failed",
       "perfpulse_jobs_visibility_failed",
     ]);
   });
 
-  test("uses exact-job shared iterations for stress campaigns", () => {
+  test("uses exact-job shared iterations for large benchmarks", () => {
     const options = createOptions(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "stress",
         CONFIRM_HIGH_USERS: "true",
-        CONFIRM_STRESS: "true",
         LOGICAL_USERS: "100",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TOTAL_JOBS: "10000",
         VISIBILITY_GATE_SECONDS: "120",
       }),
     );
-    const scenario = options.scenarios?.campaign;
+    const scenario = options.scenarios?.benchmark;
 
     expect(scenario).toMatchObject({
       executor: "shared-iterations",
-      iterations: 10000,
-      maxDuration: "54300s",
+      iterations: 30000,
+      maxDuration: "162300s",
       vus: 100,
     });
   });
 
-  test("omits completion-failed threshold for bulk Skaha stress campaigns", () => {
+  test("keeps Skaha benchmarks on the same threshold contract", () => {
     const options = createOptions(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "stress",
         CONFIRM_HIGH_USERS: "true",
-        CONFIRM_STRESS: "true",
         LOGICAL_USERS: "20",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         SURFACE: "skaha",
         TOTAL_JOBS: "10000",
       }),
     );
 
     expect(Object.keys(options.thresholds ?? {}).sort()).toEqual([
+      "checks",
       "http_req_failed",
       "perfpulse_cleanup_failed",
       "perfpulse_jobs_submission_failed",
       "perfpulse_jobs_visibility_failed",
     ]);
-  });
-
-  test("keeps stress campaign thresholds on lifecycle failures and zero HTTP errors", () => {
-    const options = createOptions(
-      resolveRunConfig({
-        CAMPAIGN_TYPE: "stress",
-        CONFIRM_HIGH_USERS: "true",
-        CONFIRM_STRESS: "true",
-        LOGICAL_USERS: "100",
-        PROFILE: "campaign",
-        TOTAL_JOBS: "10000",
-      }),
-    );
-
-    expect(Object.keys(options.thresholds ?? {}).sort()).toEqual([
-      "http_req_failed",
-      "perfpulse_cleanup_failed",
-      "perfpulse_jobs_completion_failed",
-      "perfpulse_jobs_submission_failed",
-      "perfpulse_jobs_visibility_failed",
-    ]);
-    expect(options.thresholds?.http_req_failed).toEqual(["rate==0"]);
   });
 
   test("keeps k6 system tags low-cardinality", () => {
@@ -167,10 +137,9 @@ describe("k6 options contract", () => {
   test("adds low-cardinality run tags to built-in k6 metrics", () => {
     const options = createOptions(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "benchmark",
         CONFIRM_HIGH_USERS: "true",
         LOGICAL_USERS: "100",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         SCENARIO: "many-small-users",
         SURFACE: "k8s-kueue",
         TESTID: "Benchmark Small Manual",
@@ -179,10 +148,8 @@ describe("k6 options contract", () => {
     );
 
     expect(options.tags).toEqual({
-      campaign_type: "benchmark",
       namespace: "canfar-workloads",
-      profile: "campaign",
-      run_class: "campaign",
+      run_class: "benchmark",
       scenario: "many-small-users",
       surface: "k8s-kueue",
       testid: "benchmark-small-manual",
@@ -193,15 +160,14 @@ describe("k6 options contract", () => {
   test("keeps Skaha benchmark campaigns on totalJobs iterations", () => {
     const options = createOptions(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "benchmark",
         CONFIRM_HIGH_USERS: "true",
         LOGICAL_USERS: "100",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         SURFACE: "skaha",
         TOTAL_JOBS: "100",
       }),
     );
-    const scenario = options.scenarios?.campaign;
+    const scenario = options.scenarios?.benchmark;
 
     expect(scenario).toMatchObject({
       executor: "shared-iterations",
@@ -210,19 +176,17 @@ describe("k6 options contract", () => {
     });
   });
 
-  test("keeps direct stress campaigns on totalJobs iterations", () => {
+  test("keeps direct benchmarks on totalJobs iterations", () => {
     const options = createOptions(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "stress",
         CONFIRM_HIGH_USERS: "true",
-        CONFIRM_STRESS: "true",
         LOGICAL_USERS: "100",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         SURFACE: "k8s-direct",
         TOTAL_JOBS: "10000",
       }),
     );
-    const scenario = options.scenarios?.campaign;
+    const scenario = options.scenarios?.benchmark;
 
     expect(scenario).toMatchObject({
       executor: "shared-iterations",
@@ -231,24 +195,22 @@ describe("k6 options contract", () => {
     });
   });
 
-  test("uses logical-user shared iterations for Skaha stress campaigns", () => {
+  test("keeps Skaha benchmarks on totalJobs iterations", () => {
     const options = createOptions(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "stress",
         CONFIRM_HIGH_USERS: "true",
-        CONFIRM_STRESS: "true",
         LOGICAL_USERS: "100",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         SURFACE: "skaha",
         TOTAL_JOBS: "10000",
         VISIBILITY_GATE_SECONDS: "120",
       }),
     );
-    const scenario = options.scenarios?.campaign;
+    const scenario = options.scenarios?.benchmark;
 
     expect(scenario).toMatchObject({
       executor: "shared-iterations",
-      iterations: 100,
+      iterations: 10000,
       vus: 100,
     });
   });

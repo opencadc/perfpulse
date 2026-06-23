@@ -3,7 +3,6 @@ import {
   defaultStressNgArgs,
   defaultWorkloadCommand,
   parseBoolean,
-  parseCampaignType,
   parseClientMode,
   parseImagePullPolicy,
   parseNonNegativeInteger,
@@ -11,21 +10,18 @@ import {
   parseOptionalScenario,
   parseOptionalStringArray,
   parsePositiveInteger,
-  parseProfile,
   parseStringArray,
   rejectRemovedEnv,
   resolveSurfaces,
 } from "./env-parsers";
 import {
-  DEFAULT_CAMPAIGN_COMPLETION_TIMEOUT_SECONDS,
+  DEFAULT_BENCHMARK_COMPLETION_TIMEOUT_SECONDS,
   DEFAULT_CRON_COMPLETION_TIMEOUT_SECONDS,
   DEFAULT_JITTER_MAX_MS,
   DEFAULT_JOBS_PER_VU_CAP,
-  DEFAULT_PROFILE,
+  DEFAULT_RUN_CLASS,
   DEFAULT_SCENARIO,
   DEFAULT_SKAHA_API_URL,
-  DEFAULT_SKAHA_BULK_POLL_CYCLE_SECONDS,
-  DEFAULT_SKAHA_BULK_POLL_MIN_SECONDS,
   DEFAULT_SKAHA_LOGIN_URL,
   DEFAULT_SKAHA_PASSWORD_PATH,
   DEFAULT_SKAHA_REQUEST_TIMEOUT_SECONDS,
@@ -49,7 +45,6 @@ import {
 
 export {
   defaultTestId,
-  deriveBulkSkahaStressBatch,
   deriveRunConfigForJob,
   deriveRunConfigForSurface,
   makeJobName,
@@ -57,12 +52,10 @@ export {
   sanitizeLabelValue,
 } from "./derive-job";
 export type {
-  CampaignType,
   ClientMode,
   EnvSource,
   KubernetesConfig,
   KueueConfig,
-  Profile,
   RunClass,
   RunConfig,
   Scenario,
@@ -71,8 +64,6 @@ export type {
   WorkloadConfig,
 } from "./profile-defaults";
 export {
-  CAMPAIGN_TYPES,
-  DEFAULT_PROFILE,
   DEFAULT_RUN_CLASS,
   DEFAULT_SCENARIO,
   DEFAULT_SKAHA_API_URL,
@@ -81,13 +72,11 @@ export {
   DEFAULT_SURFACE,
   DEFAULT_WORKLOAD_IMAGE,
   DEFAULT_WORKLOAD_NAMESPACE,
-  PROFILES,
   RUN_CLASSES,
 } from "./profile-defaults";
 export type { CampaignExecutionLifecycle, CampaignExecutionShape } from "./run-policy";
 export {
   FIXED_WORKLOAD_DURATION_SECONDS,
-  isBulkSkahaStressSurface,
   resolveCampaignExecutionShape,
   resolveRequireCompletion,
   resolveSequentialSurfaces,
@@ -96,19 +85,15 @@ export {
 export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   rejectRemovedEnv(env);
   const clientMode = parseClientMode(env.PERF_PULSE_CLIENT_MODE ?? env.PERFPULSE_CLIENT_MODE);
-  const profile = parseProfile(env.PROFILE ?? DEFAULT_PROFILE);
-  const runClass = parseOptionalRunClass(env.RUN_CLASS, profile);
-  if (runClass !== profile) {
-    throw new Error(
-      `RUN_CLASS "${runClass}" does not match profile "${profile}" run_class "${profile}"`,
-    );
+  if (env.PROFILE !== undefined && env.RUN_CLASS !== undefined && env.PROFILE !== env.RUN_CLASS) {
+    throw new Error(`RUN_CLASS "${env.RUN_CLASS}" does not match legacy PROFILE "${env.PROFILE}"`);
   }
-  const campaignType = parseCampaignType(env.CAMPAIGN_TYPE, runClass);
-  if (campaignType === "stress" && env.CONFIRM_STRESS !== "true") {
-    throw new Error("Stress campaigns require CONFIRM_STRESS=true before workloads are created");
+  const runClass = parseOptionalRunClass(env.RUN_CLASS ?? env.PROFILE, DEFAULT_RUN_CLASS);
+  if (env.CAMPAIGN_TYPE !== undefined && env.CAMPAIGN_TYPE !== "") {
+    throw new Error("CAMPAIGN_TYPE has been removed; use RUN_CLASS=benchmark");
   }
 
-  const surfaces = resolveSurfaces(env, profile);
+  const surfaces = resolveSurfaces(env, runClass);
   const surface = surfaces[0] ?? DEFAULT_SURFACE;
   const scenario = parseOptionalScenario(env.SCENARIO, DEFAULT_SCENARIO);
   const testid = sanitizeLabelValue(
@@ -116,10 +101,10 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     defaultTestId(clientMode),
   );
   if (
-    runClass === "campaign" &&
+    runClass === "benchmark" &&
     (env.TOTAL_JOBS === undefined || env.LOGICAL_USERS === undefined)
   ) {
-    throw new Error("Campaign runs require TOTAL_JOBS and LOGICAL_USERS");
+    throw new Error("Benchmark runs require TOTAL_JOBS and LOGICAL_USERS");
   }
   const logicalUsers = parsePositiveInteger(env.LOGICAL_USERS, 1, "LOGICAL_USERS");
   const jobsPerSurface = parsePositiveInteger(
@@ -127,11 +112,8 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     1,
     env.TOTAL_JOBS === undefined ? "JOBS_PER_SURFACE" : "TOTAL_JOBS",
   );
-  if (runClass === "campaign" && logicalUsers > 25 && env.CONFIRM_HIGH_USERS !== "true") {
-    throw new Error("Campaigns with more than 25 logical users require CONFIRM_HIGH_USERS=true");
-  }
-  if (runClass === "campaign" && jobsPerSurface > 10000 && campaignType !== "stress") {
-    throw new Error("Campaigns with more than 10000 jobs per surface require CAMPAIGN_TYPE=stress");
+  if (runClass === "benchmark" && logicalUsers > 25 && env.CONFIRM_HIGH_USERS !== "true") {
+    throw new Error("Benchmarks with more than 25 logical users require CONFIRM_HIGH_USERS=true");
   }
   const jobsPerVuCap = parsePositiveInteger(
     env.JOBS_PER_VU_CAP,
@@ -142,16 +124,6 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   const jobsPerLogicalUser = Math.ceil(jobsPerSurface / logicalUsers);
   const skahaConfig: SkahaConfig = {
     apiUrl: env.SKAHA_API_URL ?? DEFAULT_SKAHA_API_URL,
-    bulkPollCycleSeconds: parsePositiveInteger(
-      env.SKAHA_BULK_POLL_CYCLE_SECONDS,
-      DEFAULT_SKAHA_BULK_POLL_CYCLE_SECONDS,
-      "SKAHA_BULK_POLL_CYCLE_SECONDS",
-    ),
-    bulkPollMinSeconds: parsePositiveInteger(
-      env.SKAHA_BULK_POLL_MIN_SECONDS,
-      DEFAULT_SKAHA_BULK_POLL_MIN_SECONDS,
-      "SKAHA_BULK_POLL_MIN_SECONDS",
-    ),
     loginUrl: env.SKAHA_LOGIN_URL ?? DEFAULT_SKAHA_LOGIN_URL,
     passwordPath: env.SKAHA_PASSWORD_PATH ?? DEFAULT_SKAHA_PASSWORD_PATH,
     requestTimeoutSeconds: parsePositiveInteger(
@@ -205,18 +177,17 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
   }
   const completionTimeoutSeconds = parsePositiveInteger(
     env.COMPLETION_TIMEOUT_SECONDS,
-    runClass === "campaign"
-      ? DEFAULT_CAMPAIGN_COMPLETION_TIMEOUT_SECONDS
+    runClass === "benchmark"
+      ? DEFAULT_BENCHMARK_COMPLETION_TIMEOUT_SECONDS
       : DEFAULT_CRON_COMPLETION_TIMEOUT_SECONDS,
     "COMPLETION_TIMEOUT_SECONDS",
   );
 
   return {
-    ...(campaignType === undefined ? {} : { campaignType }),
     cleanup: parseBoolean(env.CLEANUP, true),
     clientMode,
     completionTimeoutSeconds,
-    expectedJobsEmission: profile === "campaign" ? "setup-once" : "per-iteration",
+    expectedJobsEmission: runClass === "benchmark" ? "setup-once" : "per-iteration",
     jobIndex: 0,
     jobName: makeJobName(testid, surface, 0),
     jobsPerLogicalUser,
@@ -253,11 +224,10 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
       "POLL_JITTER_MAX_MS",
     ),
     preserveOnFailure: parseBoolean(env.PRESERVE_ON_FAILURE, false),
-    profile,
-    requireCompletion: resolveRequireCompletion(env, runClass, campaignType),
+    requireCompletion: resolveRequireCompletion(env),
     runClass,
     scenario,
-    sequentialSurfaces: resolveSequentialSurfaces(env, runClass, campaignType),
+    sequentialSurfaces: resolveSequentialSurfaces(env, runClass),
     surface,
     surfaces,
     skaha: skahaConfig,

@@ -3,7 +3,6 @@ import {
   DEFAULT_SKAHA_API_URL,
   DEFAULT_SKAHA_WORKLOAD_IMAGE,
   DEFAULT_WORKLOAD_IMAGE,
-  deriveBulkSkahaStressBatch,
   deriveRunConfigForJob,
   makeJobName,
   resolveCampaignExecutionShape,
@@ -21,9 +20,7 @@ describe("resolveRunConfig", () => {
     const config = resolveRunConfig({});
 
     expect(config.clientMode).toBe("noop");
-    expect(config.profile).toBe("cron");
     expect(config.runClass).toBe("cron");
-    expect(config.campaignType).toBeUndefined();
     expect(config.surface).toBe("k8s-direct");
     expect(config.testid).toBe("local-noop");
     expect(config.jobName).toBe("perfpulse-local-noop-direct-0");
@@ -55,18 +52,15 @@ describe("resolveRunConfig", () => {
     ]);
   });
 
-  test("resolves explicit benchmark campaigns without changing the default client mode", () => {
+  test("resolves explicit benchmark runs without changing the default client mode", () => {
     const config = resolveRunConfig({
-      CAMPAIGN_TYPE: "benchmark",
       LOGICAL_USERS: "1",
-      PROFILE: "campaign",
+      RUN_CLASS: "benchmark",
       TOTAL_JOBS: "100",
     });
 
     expect(config.clientMode).toBe("noop");
-    expect(config.profile).toBe("campaign");
-    expect(config.runClass).toBe("campaign");
-    expect(config.campaignType).toBe("benchmark");
+    expect(config.runClass).toBe("benchmark");
     expect(config.surfaces).toEqual(["k8s-kueue", "k8s-direct", "skaha"]);
     expect(config.surface).toBe("k8s-kueue");
     expect(config.scenario).toBe("single-bulk-user");
@@ -79,114 +73,103 @@ describe("resolveRunConfig", () => {
   });
 
   test("resolves the runtime taxonomy through public configuration", () => {
-    const profileInputs = [
-      { env: { PROFILE: "cron" }, jobs: 1, runClass: "cron", surfaces: ["k8s-direct"] },
+    const runClassInputs = [
+      { env: { RUN_CLASS: "cron" }, jobs: 1, runClass: "cron", surfaces: ["k8s-direct"] },
       {
-        campaignType: "benchmark",
         env: {
-          CAMPAIGN_TYPE: "benchmark",
           CONFIRM_HIGH_USERS: "true",
           LOGICAL_USERS: "100",
-          PROFILE: "campaign",
+          RUN_CLASS: "benchmark",
           TOTAL_JOBS: "1000",
         },
         jobs: 1000,
-        runClass: "campaign",
-        surfaces: ["k8s-kueue", "k8s-direct", "skaha"],
-      },
-      {
-        campaignType: "stress",
-        env: {
-          CAMPAIGN_TYPE: "stress",
-          CONFIRM_HIGH_USERS: "true",
-          CONFIRM_STRESS: "true",
-          LOGICAL_USERS: "100",
-          PROFILE: "campaign",
-          TOTAL_JOBS: "10000",
-        },
-        jobs: 10000,
-        runClass: "campaign",
+        runClass: "benchmark",
         surfaces: ["k8s-kueue", "k8s-direct", "skaha"],
       },
     ] as const;
 
-    for (const input of profileInputs) {
+    for (const input of runClassInputs) {
       const config = resolveRunConfig(input.env);
 
       expect(config.runClass).toBe(input.runClass);
-      expect(config.campaignType).toBe("campaignType" in input ? input.campaignType : undefined);
       expect(config.surfaces).toEqual([...input.surfaces]);
       expect(config.jobsPerSurface).toBe(input.jobs);
     }
   });
 
-  test("rejects stress campaigns unless the operator confirms the campaign", () => {
+  test("accepts PROFILE only as a legacy run-class alias", () => {
+    expect(
+      resolveRunConfig({
+        LOGICAL_USERS: "1",
+        PROFILE: "benchmark",
+        TOTAL_JOBS: "100",
+      }).runClass,
+    ).toBe("benchmark");
     expect(() =>
       resolveRunConfig({
-        CAMPAIGN_TYPE: "stress",
-        LOGICAL_USERS: "100",
-        PROFILE: "campaign",
-        TOTAL_JOBS: "10000",
+        PROFILE: "cron",
+        RUN_CLASS: "benchmark",
       }),
-    ).toThrow("Stress campaigns require CONFIRM_STRESS=true before workloads are created");
+    ).toThrow('RUN_CLASS "benchmark" does not match legacy PROFILE "cron"');
   });
 
-  test("rejects campaigns without explicit total jobs and logical users", () => {
-    expect(() => resolveRunConfig({ CAMPAIGN_TYPE: "benchmark", PROFILE: "campaign" })).toThrow(
-      "Campaign runs require TOTAL_JOBS and LOGICAL_USERS",
+  test("rejects the removed CAMPAIGN_TYPE switch", () => {
+    expect(() =>
+      resolveRunConfig({
+        CAMPAIGN_TYPE: "benchmark",
+        LOGICAL_USERS: "100",
+        RUN_CLASS: "benchmark",
+        TOTAL_JOBS: "10000",
+      }),
+    ).toThrow("CAMPAIGN_TYPE has been removed; use RUN_CLASS=benchmark");
+  });
+
+  test("rejects benchmarks without explicit total jobs and logical users", () => {
+    expect(() => resolveRunConfig({ RUN_CLASS: "benchmark" })).toThrow(
+      "Benchmark runs require TOTAL_JOBS and LOGICAL_USERS",
     );
   });
 
-  test("derives require completion from run class and campaign type", () => {
-    expect(resolveRunConfig({}).requireCompletion).toBe(true);
+  test("does not require terminal workload completion by default", () => {
+    expect(resolveRunConfig({}).requireCompletion).toBe(false);
     expect(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "benchmark",
         LOGICAL_USERS: "10",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TOTAL_JOBS: "100",
       }).requireCompletion,
-    ).toBe(true);
+    ).toBe(false);
     expect(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "stress",
-        CONFIRM_STRESS: "true",
         LOGICAL_USERS: "20",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TOTAL_JOBS: "10000",
       }).requireCompletion,
     ).toBe(false);
     expect(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "stress",
-        CONFIRM_STRESS: "true",
         LOGICAL_USERS: "20",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         REQUIRE_COMPLETION: "true",
         TOTAL_JOBS: "10000",
       }).requireCompletion,
     ).toBe(true);
-    expect(() => resolveRunConfig({ REQUIRE_COMPLETION: "false" })).toThrow(
-      "REQUIRE_COMPLETION cannot be disabled for cron checks",
-    );
   });
 
-  test("rejects campaigns when logical users are below the jobs-per-VU cap", () => {
+  test("rejects benchmarks when logical users are below the jobs-per-VU cap", () => {
     expect(() =>
       resolveRunConfig({
-        CAMPAIGN_TYPE: "benchmark",
         LOGICAL_USERS: "5",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TOTAL_JOBS: "10000",
       }),
     ).toThrow(/raise LOGICAL_USERS or JOBS_PER_VU_CAP/);
   });
 
-  test("accepts campaigns when logical users meet the jobs-per-VU cap", () => {
+  test("accepts benchmarks when logical users meet the jobs-per-VU cap", () => {
     const config = resolveRunConfig({
-      CAMPAIGN_TYPE: "benchmark",
       LOGICAL_USERS: "20",
-      PROFILE: "campaign",
+      RUN_CLASS: "benchmark",
       TOTAL_JOBS: "10000",
     });
 
@@ -195,60 +178,19 @@ describe("resolveRunConfig", () => {
     expect(config.totalJobs).toBe(10000);
   });
 
-  test("resolves bulk Skaha stress execution shape from run config", () => {
-    const skahaStress = resolveRunConfig({
-      CAMPAIGN_TYPE: "stress",
+  test("resolves per-job execution shape for benchmark runs", () => {
+    const directBenchmark = resolveRunConfig({
       CONFIRM_HIGH_USERS: "true",
-      CONFIRM_STRESS: "true",
-      LOGICAL_USERS: "20",
-      PROFILE: "campaign",
-      SURFACE: "skaha",
-      TOTAL_JOBS: "10000",
-    });
-
-    expect(resolveCampaignExecutionShape(skahaStress)).toEqual({
-      lifecycle: "bulk-skaha-stress",
-      iterations: 20,
-      waves: 1,
-    });
-  });
-
-  test("resolves per-job execution shape for direct stress campaigns", () => {
-    const directStress = resolveRunConfig({
-      CAMPAIGN_TYPE: "stress",
-      CONFIRM_HIGH_USERS: "true",
-      CONFIRM_STRESS: "true",
       LOGICAL_USERS: "100",
-      PROFILE: "campaign",
+      RUN_CLASS: "benchmark",
       SURFACE: "k8s-direct",
       TOTAL_JOBS: "10000",
     });
 
-    expect(resolveCampaignExecutionShape(directStress)).toEqual({
+    expect(resolveCampaignExecutionShape(directBenchmark)).toEqual({
       lifecycle: "per-job",
       iterations: 10000,
       waves: 100,
-    });
-  });
-
-  test("derives bulk Skaha stress batch job range from logical user bucket", () => {
-    const config = resolveRunConfig({
-      CAMPAIGN_TYPE: "stress",
-      CONFIRM_HIGH_USERS: "true",
-      CONFIRM_STRESS: "true",
-      LOGICAL_USERS: "2",
-      PROFILE: "campaign",
-      SURFACE: "skaha",
-      TOTAL_JOBS: "7",
-    });
-
-    expect(deriveBulkSkahaStressBatch({ ...config, userBucketIndex: 0 })).toEqual({
-      baseJobIndex: 0,
-      sessionCount: 4,
-    });
-    expect(deriveBulkSkahaStressBatch({ ...config, userBucketIndex: 1 })).toEqual({
-      baseJobIndex: 4,
-      sessionCount: 3,
     });
   });
 
@@ -256,9 +198,8 @@ describe("resolveRunConfig", () => {
     expect(resolveRunConfig({}).workload.durationSeconds).toBe(60);
     expect(
       resolveRunConfig({
-        CAMPAIGN_TYPE: "benchmark",
         LOGICAL_USERS: "1",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TOTAL_JOBS: "100",
       }).workload.durationSeconds,
     ).toBe(60);
@@ -268,38 +209,34 @@ describe("resolveRunConfig", () => {
     );
   });
 
-  test("enforces campaign safety gates before work is created", () => {
+  test("enforces benchmark safety gates before work is created", () => {
     expect(() =>
       resolveRunConfig({
-        CAMPAIGN_TYPE: "benchmark",
         LOGICAL_USERS: "26",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TOTAL_JOBS: "260",
       }),
-    ).toThrow("Campaigns with more than 25 logical users require CONFIRM_HIGH_USERS=true");
+    ).toThrow("Benchmarks with more than 25 logical users require CONFIRM_HIGH_USERS=true");
     expect(() =>
       resolveRunConfig({
-        CAMPAIGN_TYPE: "benchmark",
         CONFIRM_HIGH_USERS: "true",
         LOGICAL_USERS: "26",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TOTAL_JOBS: "260",
       }),
     ).not.toThrow();
     expect(() =>
       resolveRunConfig({
-        CAMPAIGN_TYPE: "benchmark",
         LOGICAL_USERS: "1",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TOTAL_JOBS: "10001",
       }),
-    ).toThrow("Campaigns with more than 10000 jobs per surface require CAMPAIGN_TYPE=stress");
+    ).toThrow(/raise LOGICAL_USERS or JOBS_PER_VU_CAP/);
     expect(() =>
       resolveRunConfig({
-        CAMPAIGN_TYPE: "stress",
-        CONFIRM_STRESS: "true",
+        CONFIRM_HIGH_USERS: "true",
         LOGICAL_USERS: "21",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TOTAL_JOBS: "10001",
       }),
     ).not.toThrow();
@@ -340,8 +277,6 @@ describe("resolveRunConfig", () => {
     expect(DEFAULT_SKAHA_API_URL).toBe(EXPECTED_DEFAULT_SKAHA_API_URL);
     expect(config.skaha).toEqual({
       apiUrl: EXPECTED_DEFAULT_SKAHA_API_URL,
-      bulkPollCycleSeconds: 1,
-      bulkPollMinSeconds: 15,
       loginUrl: "https://ws-cadc.canfar.net/ac/login",
       passwordPath: "/var/run/secrets/perfpulse/skaha-auth/password",
       requestTimeoutSeconds: 600,
@@ -490,11 +425,10 @@ describe("resolveRunConfig", () => {
     const directConfig = deriveRunConfigForJob(
       resolveRunConfig({
         PERF_PULSE_CLIENT_MODE: "kubernetes",
-        CAMPAIGN_TYPE: "benchmark",
         CONFIRM_HIGH_USERS: "true",
         SURFACE: "k8s-direct",
         LOGICAL_USERS: "100",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         TESTID: "Shared Benchmark 01",
         TOTAL_JOBS: "100",
       }),
@@ -503,10 +437,9 @@ describe("resolveRunConfig", () => {
     const kueueConfig = deriveRunConfigForJob(
       resolveRunConfig({
         PERF_PULSE_CLIENT_MODE: "kubernetes",
-        CAMPAIGN_TYPE: "benchmark",
         CONFIRM_HIGH_USERS: "true",
         LOGICAL_USERS: "100",
-        PROFILE: "campaign",
+        RUN_CLASS: "benchmark",
         SURFACE: "k8s-kueue",
         TESTID: "Shared Benchmark 01",
         TOTAL_JOBS: "100",
@@ -533,7 +466,6 @@ describe("resolveRunConfig", () => {
 
     expect(metricTags(config)).toEqual({
       namespace: "canfar-workloads",
-      profile: "cron",
       run_class: "cron",
       scenario: "single-bulk-user",
       surface: "k8s-direct",

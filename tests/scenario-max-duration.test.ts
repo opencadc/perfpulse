@@ -27,26 +27,23 @@ describe("computeScenarioMaxDurationSeconds", () => {
     expect(computeScenarioMaxDurationSeconds(config)).toBe(1_200);
   });
 
-  test("scales campaign duration by iteration waves and queue backlog", () => {
+  test("scales benchmark duration by iteration waves and queue backlog", () => {
     const config = resolveRunConfig({
-      CAMPAIGN_TYPE: "stress",
       CONFIRM_HIGH_USERS: "true",
-      CONFIRM_STRESS: "true",
       LOGICAL_USERS: "100",
-      PROFILE: "campaign",
+      RUN_CLASS: "benchmark",
       TOTAL_JOBS: "10000",
       VISIBILITY_GATE_SECONDS: "120",
     });
 
-    expect(computeScenarioMaxDurationSeconds(config)).toBe(54_300);
+    expect(computeScenarioMaxDurationSeconds(config)).toBe(162_300);
   });
 
   test("respects a smaller core budget when supplied", () => {
     const config = resolveRunConfig({
-      CAMPAIGN_TYPE: "benchmark",
       CONFIRM_HIGH_USERS: "true",
       LOGICAL_USERS: "5",
-      PROFILE: "campaign",
+      RUN_CLASS: "benchmark",
       TOTAL_JOBS: "100",
       VISIBILITY_GATE_SECONDS: "120",
     });
@@ -57,43 +54,38 @@ describe("computeScenarioMaxDurationSeconds", () => {
     );
   });
 
-  test("budgets bulk Skaha stress maxDuration for sequential submit and batch poll", () => {
-    const bulkStress = resolveRunConfig({
-      CAMPAIGN_TYPE: "stress",
+  test("budgets Skaha benchmark maxDuration for per-job submit and visibility polling", () => {
+    const skahaBenchmark = resolveRunConfig({
       CONFIRM_HIGH_USERS: "true",
-      CONFIRM_STRESS: "true",
       LOGICAL_USERS: "20",
-      PROFILE: "campaign",
+      RUN_CLASS: "benchmark",
       SKAHA_REQUEST_TIMEOUT_SECONDS: "600",
       SURFACE: "skaha",
       TOTAL_JOBS: "10000",
     });
 
-    expect(computeScenarioMaxDurationSeconds(bulkStress)).toBeGreaterThan(12_000);
+    expect(computeScenarioMaxDurationSeconds(skahaBenchmark)).toBeGreaterThan(12_000);
   });
 
-  test("uses one k6 wave for bulk Skaha stress campaigns", () => {
-    const bulkStress = resolveRunConfig({
-      CAMPAIGN_TYPE: "stress",
+  test("uses per-job k6 waves for Skaha benchmarks", () => {
+    const skahaBenchmark = resolveRunConfig({
       CONFIRM_HIGH_USERS: "true",
-      CONFIRM_STRESS: "true",
       LOGICAL_USERS: "20",
-      PROFILE: "campaign",
+      RUN_CLASS: "benchmark",
       SURFACE: "skaha",
       TOTAL_JOBS: "10000",
     });
 
-    expect(resolveCampaignExecutionShape(bulkStress).waves).toBe(1);
-    expect(computeScenarioMaxDurationSeconds(bulkStress)).toBeGreaterThan(
-      bulkStress.completionTimeoutSeconds + bulkStress.skaha.requestTimeoutSeconds,
+    expect(resolveCampaignExecutionShape(skahaBenchmark).waves).toBe(500);
+    expect(computeScenarioMaxDurationSeconds(skahaBenchmark)).toBeGreaterThan(
+      skahaBenchmark.skaha.requestTimeoutSeconds * 100,
     );
   });
 
   test("extends scenario duration for Skaha submission timeouts", () => {
     const config = resolveRunConfig({
-      CAMPAIGN_TYPE: "benchmark",
       LOGICAL_USERS: "1",
-      PROFILE: "campaign",
+      RUN_CLASS: "benchmark",
       SURFACE: "skaha",
       TOTAL_JOBS: "1",
       SKAHA_REQUEST_TIMEOUT_SECONDS: "600",

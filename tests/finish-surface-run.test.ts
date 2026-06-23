@@ -3,13 +3,8 @@ import { shouldCleanupAfterFailure } from "../src/cleanup-policy";
 import { resolveRunConfig } from "../src/config";
 import { runtimeHarness } from "./helpers/k6-runtime-harness";
 
-const {
-  executeBulkSkahaStressRun,
-  executeSurfaceRun,
-  finishSurfaceRun,
-  kubernetesJobCreateChecks,
-  skahaSessionCreateChecks,
-} = await import("../src/finish-surface-run");
+const { executeSurfaceRun, finishSurfaceRun, kubernetesJobCreateChecks, skahaSessionCreateChecks } =
+  await import("../src/finish-surface-run");
 
 describe("shouldCleanupAfterFailure", () => {
   test("skips cleanup when preserve on failure is enabled for a failed run", () => {
@@ -126,82 +121,6 @@ describe("executeSurfaceRun", () => {
     ]);
     expect(cleanupAdapter).toBeDefined();
     expect(cleanupResult).toEqual({ createResponse });
-  });
-});
-
-describe("executeBulkSkahaStressRun", () => {
-  test("fails the iteration when the bulk batch reports a lifecycle failure", () => {
-    const config = resolveRunConfig({
-      CLEANUP: "true",
-      PERF_PULSE_CLIENT_MODE: "kubernetes",
-    });
-
-    expect(() =>
-      executeBulkSkahaStressRun(config, { cleanupSkahaSession: () => undefined } as never, {
-        execute: () => ({
-          createResponse: { accepted: true },
-          failure: {
-            message: "Skaha bulk stress batch did not complete within 120s",
-            stage: "completion",
-          },
-          sessions: [
-            {
-              cleanedUp: false,
-              completed: false,
-              sessionId: "session-0",
-              submitted: true,
-              terminalFailure: false,
-              visible: true,
-            },
-          ],
-        }),
-      }),
-    ).toThrow("Skaha bulk stress batch did not complete within 120s");
-  });
-
-  test("cleans up uncleaned sessions after a completion failure when cleanup is enabled", () => {
-    const config = resolveRunConfig({
-      CLEANUP: "true",
-      PERF_PULSE_CLIENT_MODE: "kubernetes",
-    });
-    const cleaned: string[] = [];
-
-    expect(() =>
-      executeBulkSkahaStressRun(
-        config,
-        {
-          cleanupSkahaSession: (sessionId: string | undefined) => {
-            cleaned.push(String(sessionId));
-          },
-        } as never,
-        {
-          execute: () => ({
-            createResponse: { accepted: true },
-            failure: { message: "batch timed out", stage: "completion" },
-            sessions: [
-              {
-                cleanedUp: true,
-                completed: true,
-                sessionId: "session-0",
-                submitted: true,
-                terminalFailure: false,
-                visible: true,
-              },
-              {
-                cleanedUp: false,
-                completed: false,
-                sessionId: "session-1",
-                submitted: true,
-                terminalFailure: false,
-                visible: true,
-              },
-            ],
-          }),
-        },
-      ),
-    ).toThrow("batch timed out");
-
-    expect(cleaned).toEqual(["session-1"]);
   });
 });
 

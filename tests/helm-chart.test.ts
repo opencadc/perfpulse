@@ -8,14 +8,15 @@ const dockerfile = readFileSync("Dockerfile", "utf8");
 const helmTestTimeoutMs = 30_000;
 
 describe("PerfPulse Helm charts", () => {
-  test("runtime image includes every binary required by k6 operator pods", () => {
+  test("runtime image includes k6 and the workload binary", () => {
     expect(dockerfile).toMatch(/^FROM alpine:3\.\d+$/m);
     expect(dockerfile).toContain("COPY --from=k6 /usr/bin/k6 /usr/bin/k6");
-    expect(dockerfile).toMatch(/apk add --no-cache .*ca-certificates.*curl.*kubectl.*stress-ng/u);
+    expect(dockerfile).toMatch(/apk add --no-cache .*ca-certificates.*stress-ng/u);
+    expect(dockerfile).not.toContain("kubectl");
   });
 
   test(
-    "cron chart renders one sequential 5-minute CronJob with a single TestRun template",
+    "cron chart renders one sequential 10-minute CronJob that runs k6 directly",
     () => {
       const manifest = helmTemplate("cron", ["--set", "image.tag=2026.05.04"]);
 
@@ -27,9 +28,9 @@ describe("PerfPulse Helm charts", () => {
       expect(manifest).not.toContain("docker.io/alexeiled/stress-ng");
       expect(manifest).toContain("name: perfpulse-cron");
       expect(manifest).not.toContain("name: perfpulse-cron-direct");
-      expect(count(manifest, 'image: "images.opencadc.org/platform/perfpulse:2026.05.04"')).toBe(4);
+      expect(count(manifest, 'image: "images.opencadc.org/platform/perfpulse:2026.05.04"')).toBe(1);
       expect(count(manifest, "kind: CronJob")).toBe(1);
-      expect(manifest).toContain('schedule: "*/5 * * * *"');
+      expect(manifest).toContain('schedule: "*/10 * * * *"');
       expect(manifest).toContain("concurrencyPolicy: Forbid");
       expect(manifest).toContain("activeDeadlineSeconds: 1560");
       expect(manifest).toContain('COMPLETION_TIMEOUT_SECONDS: "900"');
@@ -38,31 +39,28 @@ describe("PerfPulse Helm charts", () => {
       expect(manifest).toContain('WORKLOAD_TTL_SECONDS_AFTER_FINISHED: "3600"');
       expect(manifest).toContain('POLL_JITTER_MAX_MS: "1000"');
       expect(manifest).toContain('SUBMISSION_JITTER_MAX_MS: "1000"');
-      expect(manifest).toContain("PROFILE: cron");
       expect(manifest).toContain("RUN_CLASS: cron");
+      expect(manifest).toContain("perfpulse.opencadc.org/run-class: cron");
       expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
       expect(manifest).not.toContain("WORKLOAD_DURATION_SECONDS:");
       expect(manifest).toContain('"--timeout","60s"');
-      expect(manifest).toContain(
-        'WORKLOAD_IMAGE: "images.opencadc.org/platform/perfpulse:2026.05.04"',
-      );
       expect(manifest).not.toContain("K6_OTEL_SERVICE_NAME: perfpulse");
       expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "600"');
       expect(manifest).toContain("K6_OTEL_EXPORT_INTERVAL: 5s");
       expect(manifest).not.toContain("OBSERVE_SECONDS");
-      expect(manifest).toContain("kind: TestRun");
+      expect(manifest).not.toContain("kind: TestRun");
+      expect(manifest).toContain("exec k6 run -o opentelemetry /test/perfpulse.js");
       expect(manifest).toContain("secretName: perfpulse-skaha-auth");
       expect(manifest).toContain("name: perfpulse-otlp-credentials");
       expect(manifest).toMatch(/apiVersion: v1\nkind: ServiceAccount/u);
       expect(manifest).toContain("name: canfar-perfpulse");
       expect(manifest).toContain("kind: Role");
       expect(manifest).toContain("cron-workload-writer");
-      expect(manifest).toContain("cron-testrun-writer");
-      expect(manifest).toContain("cron-runner-gate");
+      expect(manifest).not.toContain("cron-testrun-writer");
+      expect(manifest).not.toContain("cron-runner-gate");
       expect(manifest).toContain("name: perfpulse-cron-config");
-      expect(manifest).toContain("Skipping cron TestRun");
       expect(manifest).toContain("K6_OTEL_SERVICE_NAME");
-      expect(manifest).toMatch(/value: perfpulse-\$\{TESTID\}/);
+      expect(manifest).toContain('export K6_OTEL_SERVICE_NAME="perfpulse-$' + '{TESTID}"');
       expect(manifest).not.toContain("name: perfpulse-workload-writer");
       expect(manifest).toContain("runAsNonRoot: true");
       expect(manifest).toContain("allowPrivilegeEscalation: false");
@@ -102,7 +100,6 @@ describe("PerfPulse Helm charts", () => {
     const config = resolveRunConfig({
       COMPLETION_TIMEOUT_SECONDS: "86400",
       PERF_PULSE_CLIENT_MODE: "kubernetes",
-      PROFILE: "cron",
       RUN_CLASS: "cron",
       SURFACE: "k8s-direct",
       TESTID: "cron-direct",
@@ -129,7 +126,7 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).not.toContain('"--timeout","30s"');
   });
 
-  test("campaign chart renders one sequential TestRun for benchmark campaigns", () => {
+  test("campaign chart renders one sequential Job for benchmark campaigns", () => {
     const manifest = helmTemplate("campaign", [
       "--set",
       "image.tag=2026.05.04",
@@ -147,17 +144,18 @@ describe("PerfPulse Helm charts", () => {
       "skaha.apiUrl=https://ws.example/skaha/v1",
     ]);
 
-    expect(count(manifest, "kind: TestRun")).toBe(1);
+    expect(count(manifest, "kind: Job")).toBe(1);
+    expect(count(manifest, "kind: TestRun")).toBe(0);
     expect(manifest).not.toContain("kind: Namespace");
-    expect(count(manifest, 'image: "images.opencadc.org/platform/perfpulse:2026.05.04"')).toBe(3);
+    expect(count(manifest, 'image: "images.opencadc.org/platform/perfpulse:2026.05.04"')).toBe(1);
     expect(manifest).toContain("name: campaign");
     expect(manifest).toContain("name: campaign-config");
     expect(manifest).not.toContain("name: campaign-direct");
     expect(manifest).toContain('SEQUENTIAL_SURFACES: "true"');
     expect(manifest).toContain('SURFACES: "k8s-direct,k8s-kueue,skaha"');
-    expect(manifest).toContain('PROFILE: "campaign"');
-    expect(manifest).toContain("RUN_CLASS: campaign");
-    expect(manifest).toContain("CAMPAIGN_TYPE: benchmark");
+    expect(manifest).toContain("RUN_CLASS: benchmark");
+    expect(manifest).toContain("perfpulse.opencadc.org/run-class: benchmark");
+    expect(manifest).not.toContain("CAMPAIGN_TYPE:");
     expect(manifest).toContain('TOTAL_JOBS: "12"');
     expect(manifest).toContain('LOGICAL_USERS: "3"');
     expect(manifest).toContain("WORKLOAD_COMMAND: '[\"stress-ng\"]'");
@@ -168,6 +166,7 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).toContain('SKAHA_API_URL: "https://ws.example/skaha/v1"');
     expect(manifest).toContain('value: "manual-20260507"');
     expect(manifest).toContain('value: "perfpulse-manual-20260507"');
+    expect(manifest).toContain('args: ["run", "-o", "opentelemetry", "/test/perfpulse.js"]');
     expect(manifest).toContain("secretName: perfpulse-skaha-auth");
     expect(manifest).toContain("name: perfpulse-otlp-credentials");
     expect(manifest).not.toMatch(/apiVersion: v1\nkind: ServiceAccount/u);
@@ -181,7 +180,7 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).not.toContain("CONFIRM_SEQUENTIAL:");
   });
 
-  test("campaign chart exposes jobs-per-VU cap and bulk Skaha poll overrides", () => {
+  test("campaign chart exposes jobs-per-VU cap and rejects removed bulk Skaha poll overrides", () => {
     const manifest = helmTemplate("campaign", [
       "--set",
       "image.tag=2026.05.04",
@@ -193,18 +192,26 @@ describe("PerfPulse Helm charts", () => {
       "campaign.testid=manual-20260507",
       "--set",
       "campaign.jobsPerVuCap=250",
-      "--set",
-      "skaha.bulkPollMinSeconds=30",
-      "--set",
-      "skaha.bulkPollCycleSeconds=2",
       "--set-json",
       'surfaces=["skaha"]',
     ]);
 
     expect(manifest).toContain('JOBS_PER_VU_CAP: "250"');
-    expect(manifest).toContain('SKAHA_BULK_POLL_MIN_SECONDS: "30"');
-    expect(manifest).toContain('SKAHA_BULK_POLL_CYCLE_SECONDS: "2"');
+    expect(manifest).not.toContain("SKAHA_BULK_POLL_MIN_SECONDS");
+    expect(manifest).not.toContain("SKAHA_BULK_POLL_CYCLE_SECONDS");
     expect(manifest).not.toContain("CONFIRM_SEQUENTIAL:");
+    expect(
+      expectHelmTemplateFailure("campaign", [
+        "--set",
+        "campaign.totalJobs=12",
+        "--set",
+        "campaign.logicalUsers=3",
+        "--set",
+        "campaign.testid=manual-20260507",
+        "--set",
+        "skaha.bulkPollMinSeconds=30",
+      ]),
+    ).toContain("skaha.bulkPollMinSeconds has been removed");
   });
 
   test("campaign chart allows selecting one surface and overriding credential secret names", () => {
@@ -216,20 +223,16 @@ describe("PerfPulse Helm charts", () => {
       "--set",
       "campaign.logicalUsers=2",
       "--set",
-      "campaign.testid=stress-skaha-20260507",
+      "campaign.testid=benchmark-skaha-20260507",
       "--set",
       "otlp.credentialsSecretName=otlp-custom",
       "--set",
       "skaha.credentialsSecretName=skaha-custom",
       "--set",
-      "campaign.type=stress",
-      "--set",
-      "campaign.confirmStress=true",
-      "--set",
       "campaign.confirmHighUsers=true",
     ]);
 
-    expect(count(manifest, "kind: TestRun")).toBe(1);
+    expect(count(manifest, "kind: Job")).toBe(1);
     expect(manifest).toContain("name: campaign");
     expect(manifest).toContain("name: campaign-config");
     expect(manifest).toContain('SURFACES: "skaha"');
@@ -237,8 +240,8 @@ describe("PerfPulse Helm charts", () => {
     expect(manifest).not.toContain("name: campaign-kueue");
     expect(manifest).toContain("name: otlp-custom");
     expect(manifest).toContain("secretName: skaha-custom");
-    expect(manifest).toContain("CAMPAIGN_TYPE: stress");
-    expect(manifest).toContain('CONFIRM_STRESS: "true"');
+    expect(manifest).not.toContain("CAMPAIGN_TYPE:");
+    expect(manifest).not.toContain("CONFIRM_STRESS");
   });
 
   test("campaign chart can create a dedicated ServiceAccount when requested", () => {
@@ -329,7 +332,7 @@ describe("PerfPulse Helm charts", () => {
         "--set",
         "campaign.type=stress",
       ]),
-    ).toContain("stress campaigns require campaign.confirmStress=true");
+    ).toContain("campaign.type has been removed");
     expect(
       expectHelmTemplateFailure("campaign", [
         "--set",
@@ -363,7 +366,7 @@ describe("PerfPulse Helm charts", () => {
         "--set",
         "campaign.testid=manual-20260507",
       ]),
-    ).toContain("campaign.totalJobs above 10000 requires campaign.type=stress");
+    ).toContain("raise campaign.logicalUsers or campaign.jobsPerVuCap");
   });
 });
 

@@ -219,7 +219,7 @@ describe("Skaha user-facing surface client", () => {
     ]);
   });
 
-  test("accepts pending or running status as visibility without requiring completion", () => {
+  test("accepts running status as visibility without requiring completion", () => {
     const config = skahaSurfaceConfig();
     const client: SkahaSurfaceClient = {
       createSession() {
@@ -250,11 +250,48 @@ describe("Skaha user-facing surface client", () => {
     expect(result.failure).toBeUndefined();
   });
 
+  test("does not treat a pending Skaha session as running", () => {
+    const config = skahaSurfaceConfig();
+    const client: SkahaSurfaceClient = {
+      createSession() {
+        return { accepted: true, sessionId: "session-abc", statusCode: 200 };
+      },
+      deleteSession() {
+        throw new Error("cleanup is not part of runSkahaSurface");
+      },
+      getSession() {
+        return {
+          found: true,
+          session: { id: "session-abc", status: "Pending" },
+          status: "Pending",
+          statusCode: 200,
+        };
+      },
+    };
+
+    const result = runSkahaSurface(
+      config,
+      client,
+      (_timeout, _interval, read, done) => {
+        const value = read();
+        return done(value) ? value : undefined;
+      },
+      () => 10,
+    );
+
+    expect(result.failure).toEqual({
+      message: "Skaha session was not running within 60s",
+      stage: "visibility",
+    });
+    expect(result.visible).toBe(false);
+    expect(result.completed).toBe(false);
+  });
+
   test("emits lifecycle stage callbacks through Skaha completion", () => {
     const config = skahaSurfaceConfig();
     config.requireCompletion = true;
     const lifecycleEvents: Array<[string, number | string | undefined]> = [];
-    const statuses: Array<"Pending" | "Succeeded"> = ["Pending", "Succeeded"];
+    const statuses: Array<"Running" | "Succeeded"> = ["Running", "Succeeded"];
     const client: SkahaSurfaceClient = {
       createSession() {
         return { accepted: true, sessionId: "session-abc", statusCode: 200 };
@@ -305,6 +342,7 @@ describe("Skaha user-facing surface client", () => {
   test("reports terminal session status when completion poll exits on Failed", () => {
     const config = skahaSurfaceConfig();
     config.requireCompletion = true;
+    const statuses: Array<"Running" | "Failed"> = ["Running", "Failed"];
     const client: SkahaSurfaceClient = {
       createSession() {
         return { accepted: true, sessionId: "session-abc", statusCode: 200 };
@@ -313,10 +351,11 @@ describe("Skaha user-facing surface client", () => {
         throw new Error("cleanup is not part of runSkahaSurface");
       },
       getSession() {
+        const status = statuses.shift() ?? "Failed";
         return {
           found: true,
-          session: { id: "session-abc", status: "Failed" },
-          status: "Failed",
+          session: { id: "session-abc", status },
+          status,
           statusCode: 200,
         };
       },
@@ -340,6 +379,7 @@ describe("Skaha user-facing surface client", () => {
     const config = skahaSurfaceConfig();
     config.requireCompletion = true;
     const lifecycleEvents: Array<[string, number | string | undefined]> = [];
+    const statuses: Array<"Running" | "Failed"> = ["Running", "Failed"];
     const client: SkahaSurfaceClient = {
       createSession() {
         return { accepted: true, sessionId: "session-abc", statusCode: 200 };
@@ -348,10 +388,11 @@ describe("Skaha user-facing surface client", () => {
         throw new Error("cleanup is not part of runSkahaSurface");
       },
       getSession() {
+        const status = statuses.shift() ?? "Failed";
         return {
           found: true,
-          session: { id: "session-abc", status: "Failed" },
-          status: "Failed",
+          session: { id: "session-abc", status },
+          status,
           statusCode: 200,
         };
       },
@@ -389,6 +430,7 @@ describe("Skaha user-facing surface client", () => {
   test("reports terminal session status when completion poll exits on Error", () => {
     const config = skahaSurfaceConfig();
     config.requireCompletion = true;
+    const statuses: Array<"Running" | "Error"> = ["Running", "Error"];
     const client: SkahaSurfaceClient = {
       createSession() {
         return { accepted: true, sessionId: "session-abc", statusCode: 200 };
@@ -397,10 +439,11 @@ describe("Skaha user-facing surface client", () => {
         throw new Error("cleanup is not part of runSkahaSurface");
       },
       getSession() {
+        const status = statuses.shift() ?? "Error";
         return {
           found: true,
-          session: { id: "session-abc", status: "Error" },
-          status: "Error",
+          session: { id: "session-abc", status },
+          status,
           statusCode: 200,
         };
       },
@@ -464,7 +507,7 @@ describe("Skaha user-facing surface client", () => {
   test("succeeds when a visible session reaches Succeeded within the completion timeout", () => {
     const config = skahaSurfaceConfig();
     config.requireCompletion = true;
-    const statuses: Array<"Pending" | "Succeeded"> = ["Pending", "Succeeded"];
+    const statuses: Array<"Running" | "Succeeded"> = ["Running", "Succeeded"];
     const client: SkahaSurfaceClient = {
       createSession() {
         return { accepted: true, sessionId: "session-abc", statusCode: 200 };

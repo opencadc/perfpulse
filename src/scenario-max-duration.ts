@@ -16,7 +16,6 @@ function perIterationOverheadSeconds(config: Pick<RunConfig, "skaha" | "surface"
 export function computeScenarioMaxDurationSeconds(
   config: Pick<
     RunConfig,
-    | "campaignType"
     | "completionTimeoutSeconds"
     | "logicalUsers"
     | "runClass"
@@ -41,17 +40,6 @@ export function computeScenarioMaxDurationSeconds(
   }
 
   const executionShape = resolveCampaignExecutionShape(config);
-  if (executionShape.lifecycle === "bulk-skaha-stress") {
-    const jobsPerLogicalUser = Math.ceil(config.totalJobs / Math.max(config.logicalUsers, 1));
-    const submitBudgetSeconds = jobsPerLogicalUser * config.skaha.requestTimeoutSeconds;
-    return (
-      submitBudgetSeconds +
-      config.completionTimeoutSeconds +
-      perIterationOverheadSeconds(config) +
-      SETUP_BUFFER_SECONDS
-    );
-  }
-
   if (config.totalJobs <= config.logicalUsers) {
     const perIterationSeconds =
       config.completionTimeoutSeconds +

@@ -4,16 +4,12 @@ import * as exec from "k6/execution";
 import http from "k6/http";
 import { createCleanupAdapter } from "./cleanup";
 import {
-  deriveBulkSkahaStressBatch,
   deriveRunConfigForJob,
   deriveRunConfigForSurface,
-  isBulkSkahaStressSurface,
   type RunConfig,
-  resolveCampaignExecutionShape,
   resolveRunConfig,
 } from "./config";
 import {
-  executeBulkSkahaStressRun,
   executeSurfaceRun,
   kubernetesJobCreateChecks,
   skahaSessionCreateChecks,
@@ -24,7 +20,7 @@ import { runKueueKubernetesSurface } from "./kubernetes/kueue";
 import { createLifecycleRecorder, type LifecycleRecorder } from "./metrics";
 import { metricTags } from "./metrics-contract";
 import { createOptions } from "./options";
-import { createSkahaClient, runBulkSkahaStressSurface, runSkahaSurface } from "./skaha";
+import { createSkahaClient, runSkahaSurface } from "./skaha";
 
 interface RuntimeData {
   config: RunConfig;
@@ -56,11 +52,9 @@ export const options = createOptions(config);
 
 export function setup(): RuntimeData {
   console.log(
-    `PerfPulse ${config.profile}: mode=${config.clientMode} surface=${config.surface} testid=${config.testid}`,
+    `PerfPulse ${config.runClass}: mode=${config.clientMode} surface=${config.surface} testid=${config.testid}`,
   );
-  console.log(
-    "Executor rationale: closed model for cron acceptance checks; campaigns select explicit workload shape.",
-  );
+  console.log("Executor rationale: closed model for cron checks and benchmark workload deposits.");
   const setupConfig = resolveRunConfig(__ENV);
   if (setupConfig.expectedJobsEmission === "setup-once") {
     const expectedJobs =
@@ -207,12 +201,6 @@ function runSkaha(runtimeData: RuntimeData, data: RunConfig, recorder: Lifecycle
     token: resolveSkahaBearerToken(runtimeData, data),
   });
 
-  const executionShape = resolveCampaignExecutionShape(data);
-  if (isBulkSkahaStressSurface(data.surface, executionShape)) {
-    runSkahaBulkStress(runtimeData, data, client, recorder);
-    return;
-  }
-
   const cleanup = createCleanupAdapter(data, recorder, { skaha: client });
   executeSurfaceRun(data, cleanup, {
     execute: () =>
@@ -234,58 +222,6 @@ function runSkaha(runtimeData: RuntimeData, data: RunConfig, recorder: Lifecycle
     createChecks: skahaSessionCreateChecks(),
     cleanupWith: (adapter, result) =>
       adapter.cleanupSkahaSession((result.createResponse as { sessionId: string }).sessionId),
-  });
-}
-
-function runSkahaBulkStress(
-  _runtimeData: RuntimeData,
-  data: RunConfig,
-  client: ReturnType<typeof createSkahaClient>,
-  recorder: LifecycleRecorder,
-): void {
-  const cleanup = createCleanupAdapter(data, recorder, { skaha: client });
-  const { baseJobIndex, sessionCount } = deriveBulkSkahaStressBatch(data);
-
-  executeBulkSkahaStressRun(data, cleanup, {
-    execute: () => {
-      const bulkResult = runBulkSkahaStressSurface(
-        {
-          completionTimeoutSeconds: data.completionTimeoutSeconds,
-          pollCycleSeconds: data.skaha.bulkPollCycleSeconds,
-          pollMinSeconds: data.skaha.bulkPollMinSeconds,
-          session: (index) => {
-            const jobConfig = deriveRunConfigForJob(
-              data,
-              baseJobIndex + index,
-              data.userBucketIndex,
-            );
-            return skahaSessionParams(jobConfig);
-          },
-          sessionCount,
-        },
-        client,
-        recorder,
-        {
-          cleanupSession: (sessionId) => {
-            if (data.cleanup) {
-              cleanup.cleanupSkahaSession(sessionId);
-              return true;
-            }
-            return client.deleteSession(sessionId).cleanupSucceeded;
-          },
-          sleep: (seconds) => {
-            sleep(seconds);
-          },
-        },
-        group,
-      );
-
-      return {
-        createResponse: { accepted: bulkResult.succeeded },
-        ...(bulkResult.failure === undefined ? {} : { failure: bulkResult.failure }),
-        sessions: bulkResult.sessions,
-      };
-    },
   });
 }
 
@@ -396,12 +332,7 @@ function deriveRuntimeConfig(data: RunConfig): RunConfig {
     return data;
   }
   const vuIdInTest = (exec as { vu?: { idInTest?: number } }).vu?.idInTest ?? 1;
-  if (
-    data.sequentialSurfaces &&
-    data.surfaces.length > 1 &&
-    data.runClass === "campaign" &&
-    !isBulkSkahaStressSurface(data.surface, resolveCampaignExecutionShape(data))
-  ) {
+  if (data.sequentialSurfaces && data.surfaces.length > 1 && data.runClass === "benchmark") {
     const iterationInTest = exec.scenario.iterationInTest;
     const surfaceIndex = Math.min(
       data.surfaces.length - 1,

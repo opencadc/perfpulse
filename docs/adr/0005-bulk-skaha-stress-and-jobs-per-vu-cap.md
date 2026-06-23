@@ -1,52 +1,24 @@
-# Bulk Skaha stress lifecycle and jobs-per-VU cap
+# Superseded: bulk Skaha stress lifecycle and jobs-per-VU cap
 
-Stress campaigns need to model a logical user submitting hundreds or thousands of Skaha sessions
-without one k6 iteration per session. Operators also need a controllable limit on how many workloads
-each VU owns so direct, Kueue, and Skaha campaigns scale VU count with job count.
+Status: Superseded by ADR-0006.
 
-## Learnings (from staging validation)
+This ADR originally introduced a Skaha-only bulk stress lifecycle and a public benchmark/stress
+campaign split. That design is no longer the active architecture. PerfPulse now has only two run
+classes, `cron` and `benchmark`, and every surface uses the same per-job lifecycle:
 
-See ADR-0004 for Skaha HTTP contract, `stress-ng` args, registry auth, and image requirements.
-Bulk stress builds on that contract: consecutive session POSTs, session-id poll list, inline DELETE.
+1. submit the workload,
+2. prove it is running-visible on the target surface,
+3. delete it,
+4. record terminal completion only when completion was explicitly required or already observed.
 
-## Decision
+The retained part of this ADR is **Jobs per VU cap**. `jobsPerVuCap` still rejects benchmark
+runs where `logicalUsers < ceil(totalJobs / jobsPerVuCap)`, so large campaigns must choose enough
+logical users instead of silently overloading a single VU.
 
-### Jobs per VU cap (all campaign surfaces)
+The removed parts are:
 
-- Introduce `jobsPerVuCap` (env `JOBS_PER_VU_CAP`, default **500**).
-- Reject config when `logicalUsers < ceil(totalJobs / jobsPerVuCap)` with a message to raise
-  `LOGICAL_USERS` or `JOBS_PER_VU_CAP`.
-- Applies to **Routine benchmark** and **Stress campaign** on all **Test surfaces**.
-- Remove `CONFIRM_SEQUENTIAL` and `SEQUENTIAL_CAMPAIGN_THRESHOLD` entirely.
-
-### Bulk Skaha stress lifecycle (Skaha stress only)
-
-- k6 options: `iterations = logicalUsers`, `vus = logicalUsers` (not `iterations = totalJobs`).
-- Each VU in one iteration:
-  1. **Submit phase** — consecutive `POST /session?…` for `jobsPerLogicalUser` sessions.
-  2. **Poll phase** — round-robin `GET /session/{id}` with **1s** global tick and **≥15s** minimum
-     between GETs for the same session id (`SKAHA_BULK_POLL_MIN_SECONDS`, default 15).
-  3. **Cleanup** — `DELETE /session/{id}` immediately when a session reaches a terminal state.
-  4. **Exit** — iteration ends when every session is terminal or the **Completion gate** expires.
-- Terminal `Failed` / `Error` sessions record failure metrics but do not abort the batch.
-- Direct and Kueue stress keep **Per-job lifecycle** with `iterations = totalJobs`; only the
-  **Jobs per VU cap** validation applies.
-
-### Metrics
-
-- Per-session: submitted, visible (first `Pending`/`Running` on poll), completed (terminal),
-  completion latency from accept time, cleanup success/failure.
-- Batch stragglers past **Completion gate** fail the VU iteration.
-
-## Considered options
-
-- Keep `CONFIRM_SEQUENTIAL` alongside the cap. Rejected; cap + `CONFIRM_STRESS` is sufficient.
-- Auto-raise `logicalUsers` when under minimum. Rejected; explicit operator VU count.
-- Apply bulk lifecycle to direct/Kueue stress. Rejected for v1; different visibility models.
-
-## Consequences
-
-- New Skaha bulk runner module (or surface adapter) separate from `runWorkLifecycle` per-job path.
-- `options.ts` branches on `surface === "skaha" && campaignType === "stress"`.
-- Helm campaign chart exposes `JOBS_PER_VU_CAP`; remove `CONFIRM_SEQUENTIAL` from docs and values.
-- ADR-0001 per-job lifecycle remains default; this ADR documents the Skaha stress exception.
+- Skaha-only bulk submit/poll/delete batches.
+- `campaignType=benchmark|stress`.
+- `CONFIRM_STRESS`.
+- Skaha bulk poll environment knobs.
+- Target-state success based on mere Skaha `Pending` visibility.

@@ -5,7 +5,7 @@ CLUSTER_NAME="${CLUSTER_NAME:-perfpulse}"
 CONTROL_NAMESPACE="${CONTROL_NAMESPACE:-canfar-perfpulse}"
 WORKLOAD_NAMESPACE="${WORKLOAD_NAMESPACE:-canfar-workloads}"
 IMAGE="${IMAGE:-perfpulse:kind-smoke}"
-TESTRUN_NAME="${TESTRUN_NAME:-perfpulse-kind-smoke}"
+RUNNER_JOB_NAME="${RUNNER_JOB_NAME:-perfpulse-kind-smoke}"
 TESTID="${TESTID:-kind-smoke-$(date -u +%Y%m%d%H%M%S)}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-artifacts/kind-smoke/${TESTID}}"
 K6_WEB_DASHBOARD_FORWARD="${K6_WEB_DASHBOARD_FORWARD:-false}"
@@ -48,10 +48,6 @@ if ! kind get clusters | grep -qx "${CLUSTER_NAME}"; then
   exit 1
 fi
 kubectl config use-context "kind-${CLUSTER_NAME}"
-kubectl get crd testruns.k6.io >/dev/null
-kubectl rollout status deployment/k6-operator-controller-manager \
-  -n k6-operator-system \
-  --timeout=30s
 
 bun run build
 docker build -t "${IMAGE}" .
@@ -101,66 +97,62 @@ subjects:
     namespace: ${CONTROL_NAMESPACE}
 YAML
 
-cat >"${tmp_dir}/testrun.yaml" <<YAML
-apiVersion: k6.io/v1alpha1
-kind: TestRun
+cat >"${tmp_dir}/runner-job.yaml" <<YAML
+apiVersion: batch/v1
+kind: Job
 metadata:
-  name: ${TESTRUN_NAME}
+  name: ${RUNNER_JOB_NAME}
   namespace: ${CONTROL_NAMESPACE}
   labels:
     ${LABEL_APP_NAME}: perfpulse
     ${LABEL_TESTID}: ${TESTID}
 spec:
-  parallelism: 1
-  script:
-    localFile: /test/perfpulse.js
-  initializer:
-    image: ${IMAGE}
-    imagePullPolicy: IfNotPresent
-    serviceAccountName: canfar-perfpulse
-  runner:
-    image: ${IMAGE}
-    imagePullPolicy: IfNotPresent
-    serviceAccountName: canfar-perfpulse
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 300
+  template:
     metadata:
       labels:
         ${LABEL_APP_NAME}: perfpulse
         ${LABEL_TESTID}: ${TESTID}
-    env:
-      - name: PERF_PULSE_CLIENT_MODE
-        value: kubernetes
-      - name: TESTID
-        value: ${TESTID}
-      - name: WORKLOAD_NAMESPACE
-        value: ${WORKLOAD_NAMESPACE}
-      - name: WORKLOAD_IMAGE
-        value: ${IMAGE}
-      - name: WORKLOAD_COMMAND
-        value: '["stress-ng"]'
-      - name: K8S_INSECURE_SKIP_TLS_VERIFY
-        value: "true"
-      - name: K6_WEB_DASHBOARD
-        value: "true"
-      - name: K6_WEB_DASHBOARD_PERIOD
-        value: 1s
-  starter:
-    image: ${IMAGE}
-    imagePullPolicy: IfNotPresent
-    serviceAccountName: canfar-perfpulse
+    spec:
+      serviceAccountName: canfar-perfpulse
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: ${IMAGE}
+          imagePullPolicy: IfNotPresent
+          args: ["run", "/test/perfpulse.js"]
+          env:
+            - name: PERF_PULSE_CLIENT_MODE
+              value: kubernetes
+            - name: RUN_CLASS
+              value: cron
+            - name: TESTID
+              value: ${TESTID}
+            - name: WORKLOAD_NAMESPACE
+              value: ${WORKLOAD_NAMESPACE}
+            - name: WORKLOAD_IMAGE
+              value: ${IMAGE}
+            - name: WORKLOAD_COMMAND
+              value: '["stress-ng"]'
+            - name: K8S_INSECURE_SKIP_TLS_VERIFY
+              value: "true"
+            - name: K6_WEB_DASHBOARD
+              value: "true"
+            - name: K6_WEB_DASHBOARD_PERIOD
+              value: 1s
 YAML
 
 kubectl apply -f "${tmp_dir}/namespaces.yaml"
 kubectl apply -f "${tmp_dir}/rbac.yaml"
-kubectl delete testrun "${TESTRUN_NAME}" -n "${CONTROL_NAMESPACE}" --ignore-not-found
-kubectl apply -f "${tmp_dir}/testrun.yaml"
+kubectl delete job "${RUNNER_JOB_NAME}" -n "${CONTROL_NAMESPACE}" --ignore-not-found
+kubectl apply -f "${tmp_dir}/runner-job.yaml"
 
 runner_pod=""
 for _ in $(seq 1 120); do
   runner_pod="$(kubectl get pods -n "${CONTROL_NAMESPACE}" \
     -l "${TESTID_SELECTOR}" \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null \
-    | grep -v -- "-initializer-" \
-    | grep -v -- "-starter-" \
     | head -n 1 || true)"
   if [[ -n "${runner_pod}" ]]; then
     break
@@ -169,7 +161,7 @@ for _ in $(seq 1 120); do
 done
 
 if [[ -z "${runner_pod}" ]]; then
-  kubectl describe testrun "${TESTRUN_NAME}" -n "${CONTROL_NAMESPACE}" >"${ARTIFACT_DIR}/testrun.describe.txt" || true
+  kubectl describe job "${RUNNER_JOB_NAME}" -n "${CONTROL_NAMESPACE}" >"${ARTIFACT_DIR}/runner-job.describe.txt" || true
   echo "Timed out waiting for a k6 runner pod" >&2
   exit 1
 fi
@@ -187,13 +179,13 @@ if ! kubectl wait pod "${runner_pod}" -n "${CONTROL_NAMESPACE}" \
   --timeout=300s; then
   kubectl logs -n "${CONTROL_NAMESPACE}" "${runner_pod}" >"${ARTIFACT_DIR}/runner.log" || true
   kubectl describe pod "${runner_pod}" -n "${CONTROL_NAMESPACE}" >"${ARTIFACT_DIR}/runner.describe.txt" || true
-  kubectl describe testrun "${TESTRUN_NAME}" -n "${CONTROL_NAMESPACE}" >"${ARTIFACT_DIR}/testrun.describe.txt" || true
+  kubectl describe job "${RUNNER_JOB_NAME}" -n "${CONTROL_NAMESPACE}" >"${ARTIFACT_DIR}/runner-job.describe.txt" || true
   echo "k6 runner did not complete successfully; see ${ARTIFACT_DIR}" >&2
   exit 1
 fi
 
 kubectl logs -n "${CONTROL_NAMESPACE}" "${runner_pod}" >"${ARTIFACT_DIR}/runner.log"
-kubectl describe testrun "${TESTRUN_NAME}" -n "${CONTROL_NAMESPACE}" >"${ARTIFACT_DIR}/testrun.describe.txt"
+kubectl describe job "${RUNNER_JOB_NAME}" -n "${CONTROL_NAMESPACE}" >"${ARTIFACT_DIR}/runner-job.describe.txt"
 kubectl get jobs -n "${WORKLOAD_NAMESPACE}" \
   -l "${TESTID_SELECTOR}" \
   -o yaml >"${ARTIFACT_DIR}/workload-jobs.after.yaml"
@@ -205,7 +197,7 @@ if kubectl get jobs -n "${WORKLOAD_NAMESPACE}" \
   exit 1
 fi
 
-kubectl delete testrun "${TESTRUN_NAME}" -n "${CONTROL_NAMESPACE}" --ignore-not-found
+kubectl delete job "${RUNNER_JOB_NAME}" -n "${CONTROL_NAMESPACE}" --ignore-not-found
 
 PERF_PULSE_CLIENT_MODE=noop \
   TESTID="${TESTID}" \

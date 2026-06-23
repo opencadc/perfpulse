@@ -33,6 +33,7 @@ export const runtimeHarness = {
   groupCalls: [] as string[],
   httpRequests: [] as HttpRequest[],
   iterationInTest: 0,
+  jobActive: 0,
   jobConditionType: "Complete" as "Complete" | "Failed" | undefined,
   listJobsStatus: undefined as number | undefined,
   listJobsReturnEmpty: false,
@@ -67,6 +68,7 @@ export function resetK6RuntimeHarness(): void {
   runtimeHarness.listJobsStatus = undefined;
   runtimeHarness.listJobsReturnEmpty = false;
   runtimeHarness.iterationInTest = 0;
+  runtimeHarness.jobActive = 0;
   runtimeHarness.vuIdInTest = 1;
   runtimeHarness.workloadAdmitted = true;
   runtimeHarness.jobConditionType = "Complete";
@@ -76,7 +78,7 @@ export function resetK6RuntimeHarness(): void {
 
 Reflect.set(globalThis, "__ENV", {
   PERF_PULSE_CLIENT_MODE: "kubernetes",
-  PROFILE: "cron",
+  RUN_CLASS: "cron",
   SKAHA_API_URL: "https://ws.example/skaha/v1",
   SKAHA_PASSWORD_PATH: "/var/run/secrets/perfpulse/skaha-auth/password",
   SKAHA_USERNAME_PATH: "/var/run/secrets/perfpulse/skaha-auth/username",
@@ -211,6 +213,7 @@ mock.module("k6/http", () => ({
           items: jobs.map((job) => ({
             metadata: { labels: job.labels, name: job.name },
             status: {
+              ...(runtimeHarness.jobActive > 0 ? { active: runtimeHarness.jobActive } : {}),
               conditions:
                 runtimeHarness.jobConditionType === undefined
                   ? []

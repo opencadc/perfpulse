@@ -13,7 +13,6 @@ describe("PerfPulse Kubernetes labels", () => {
       [KUBERNETES_LABEL_KEYS.appName]: "perfpulse",
       [KUBERNETES_LABEL_KEYS.managedBy]: "k6",
       [KUBERNETES_LABEL_KEYS.testid]: "kind-smoke-01",
-      [KUBERNETES_LABEL_KEYS.profile]: "cron",
       [KUBERNETES_LABEL_KEYS.runClass]: "cron",
       [KUBERNETES_LABEL_KEYS.surface]: "k8s-direct",
       [KUBERNETES_LABEL_KEYS.scenario]: "single-bulk-user",
@@ -21,18 +20,15 @@ describe("PerfPulse Kubernetes labels", () => {
     });
   });
 
-  test("adds campaign type label only for campaign workloads", () => {
+  test("labels benchmark workloads by run class", () => {
     const config = resolveRunConfig({
-      CAMPAIGN_TYPE: "benchmark",
       LOGICAL_USERS: "10",
-      PROFILE: "campaign",
+      RUN_CLASS: "benchmark",
       TOTAL_JOBS: "100",
     });
 
     expect(workloadLabels(config)).toMatchObject({
-      [KUBERNETES_LABEL_KEYS.campaignType]: "benchmark",
-      [KUBERNETES_LABEL_KEYS.profile]: "campaign",
-      [KUBERNETES_LABEL_KEYS.runClass]: "campaign",
+      [KUBERNETES_LABEL_KEYS.runClass]: "benchmark",
     });
   });
 

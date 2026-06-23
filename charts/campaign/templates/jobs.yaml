@@ -1,0 +1,53 @@
+{{ include "perfpulse.validateCampaign" . }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.controlNamespace }}
+  labels:
+{{ include "perfpulse.labels" . | indent 4 }}
+    perfpulse.opencadc.org/run-class: benchmark
+    perfpulse.opencadc.org/testid: {{ .Values.campaign.testid | quote }}
+spec:
+  activeDeadlineSeconds: {{ add (int .Values.campaign.completionTimeoutSeconds) (int .Values.skaha.requestTimeoutSeconds) 600 }}
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 900
+  template:
+    metadata:
+      labels:
+{{ include "perfpulse.labels" . | indent 8 }}
+        perfpulse.opencadc.org/run-class: benchmark
+        perfpulse.opencadc.org/testid: {{ .Values.campaign.testid | quote }}
+    spec:
+      serviceAccountName: {{ include "perfpulse.serviceAccountName" . }}
+      restartPolicy: Never
+      securityContext:
+{{ include "perfpulse.podSecurityContext" . | indent 8 }}
+      containers:
+        - name: k6
+          image: {{ include "perfpulse.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["run", "-o", "opentelemetry", "/test/perfpulse.js"]
+          env:
+            - name: TESTID
+              value: {{ .Values.campaign.testid | quote }}
+            - name: K6_OTEL_SERVICE_NAME
+              value: {{ printf "perfpulse-%s" .Values.campaign.testid | quote }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-config
+            - secretRef:
+                name: {{ .Values.otlp.credentialsSecretName }}
+                optional: true
+          volumeMounts:
+            - mountPath: /var/run/secrets/perfpulse/skaha-auth
+              name: skaha-auth-credentials
+              readOnly: true
+          securityContext:
+{{ include "perfpulse.containerSecurityContext" . | indent 12 }}
+      volumes:
+        - name: skaha-auth-credentials
+          secret:
+            secretName: {{ .Values.skaha.credentialsSecretName }}
+            optional: true

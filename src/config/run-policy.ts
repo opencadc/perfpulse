@@ -1,9 +1,9 @@
 import { parseBoolean } from "./env-parsers";
-import type { CampaignType, EnvSource, RunClass, RunConfig, Surface } from "./profile-defaults";
+import type { EnvSource, RunClass, RunConfig } from "./profile-defaults";
 
 export const FIXED_WORKLOAD_DURATION_SECONDS = 60;
 
-export type CampaignExecutionLifecycle = "per-job" | "bulk-skaha-stress";
+export type CampaignExecutionLifecycle = "per-job";
 
 export interface CampaignExecutionShape {
   lifecycle: CampaignExecutionLifecycle;
@@ -11,19 +11,12 @@ export interface CampaignExecutionShape {
   waves: number;
 }
 
-export function resolveSequentialSurfaces(
-  env: EnvSource,
-  runClass: RunClass,
-  campaignType: CampaignType | undefined,
-): boolean {
+export function resolveSequentialSurfaces(env: EnvSource, runClass: RunClass): boolean {
   if (env.SEQUENTIAL_SURFACES !== undefined && env.SEQUENTIAL_SURFACES !== "") {
     return parseBoolean(env.SEQUENTIAL_SURFACES, true);
   }
   if (runClass === "cron") {
     return true;
-  }
-  if (campaignType === "stress") {
-    return false;
   }
   return true;
 }
@@ -31,28 +24,9 @@ export function resolveSequentialSurfaces(
 export function resolveCampaignExecutionShape(
   config: Pick<
     RunConfig,
-    | "campaignType"
-    | "logicalUsers"
-    | "runClass"
-    | "sequentialSurfaces"
-    | "surface"
-    | "surfaces"
-    | "totalJobs"
+    "logicalUsers" | "runClass" | "sequentialSurfaces" | "surfaces" | "totalJobs"
   >,
 ): CampaignExecutionShape {
-  const isBulkSkahaStress =
-    config.runClass === "campaign" &&
-    config.surface === "skaha" &&
-    config.campaignType === "stress";
-
-  if (isBulkSkahaStress) {
-    return {
-      lifecycle: "bulk-skaha-stress",
-      iterations: config.logicalUsers,
-      waves: 1,
-    };
-  }
-
   if (config.runClass === "cron") {
     return {
       lifecycle: "per-job",
@@ -72,25 +46,8 @@ export function resolveCampaignExecutionShape(
   };
 }
 
-export function isBulkSkahaStressSurface(surface: Surface, shape: CampaignExecutionShape): boolean {
-  return surface === "skaha" && shape.lifecycle === "bulk-skaha-stress";
-}
-
-export function resolveRequireCompletion(
-  env: EnvSource,
-  runClass: RunClass,
-  campaignType: CampaignType | undefined,
-): boolean {
-  if (runClass === "cron") {
-    if (env.REQUIRE_COMPLETION === "false") {
-      throw new Error("REQUIRE_COMPLETION cannot be disabled for cron checks");
-    }
-    return true;
-  }
-  if (campaignType === "stress") {
-    return parseBoolean(env.REQUIRE_COMPLETION, false);
-  }
-  return parseBoolean(env.REQUIRE_COMPLETION, true);
+export function resolveRequireCompletion(env: EnvSource): boolean {
+  return parseBoolean(env.REQUIRE_COMPLETION, false);
 }
 
 export function validateJobsPerVuCap(
@@ -99,7 +56,7 @@ export function validateJobsPerVuCap(
   totalJobs: number,
   jobsPerVuCap: number,
 ): void {
-  if (runClass !== "campaign") {
+  if (runClass !== "benchmark") {
     return;
   }
   const minLogicalUsers = Math.ceil(totalJobs / jobsPerVuCap);

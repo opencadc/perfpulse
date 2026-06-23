@@ -108,7 +108,7 @@ export function runKueueKubernetesSurface(
     {
       admissionGateSeconds: options.admissionGateSeconds,
       completionTimeoutSeconds: config.completionTimeoutSeconds,
-      enforceAdmission: config.runClass === "cron",
+      enforceAdmission: false,
       pollIntervalSeconds: config.kubernetes.pollIntervalSeconds,
       pollJitterMaxMs: config.pollJitterMaxMs,
       requireCompletion: config.requireCompletion,
@@ -117,7 +117,7 @@ export function runKueueKubernetesSurface(
     {
       pollVisibility() {
         latestJobList = client.listJobsByTestId();
-        return findJobByName(latestJobList, config.jobName) !== undefined;
+        return hasJobStarted(findJobByName(latestJobList, config.jobName));
       },
       pollWorkloadVisibility() {
         latestWorkloadList = client.listWorkloadsByTestId();
@@ -230,7 +230,7 @@ function mapKueueFailure(
     case "visibility":
       return {
         category: "visibility",
-        message: `Kueue Job ${config.jobName} was not visible within ${config.visibilityGateSeconds}s`,
+        message: `Kueue Job ${config.jobName} was not running within ${config.visibilityGateSeconds}s`,
         stage: "job-visibility",
       };
     case "workload-visibility":
@@ -296,4 +296,8 @@ function readJobTerminalState(job: JobLike | undefined): "failed" | "succeeded" 
     return "failed";
   }
   return undefined;
+}
+
+function hasJobStarted(job: JobLike | undefined): boolean {
+  return job !== undefined && ((job.status?.active ?? 0) > 0 || isJobComplete(job));
 }

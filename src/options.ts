@@ -18,7 +18,7 @@ export function createOptions(config: RunConfig): Options {
 }
 
 function createScenarios(config: RunConfig): NonNullable<Options["scenarios"]> {
-  const scenarioName = config.profile.replace(/-/gu, "_");
+  const scenarioName = config.runClass.replace(/-/gu, "_");
   const iterations = scenarioIterations(config);
   return {
     [scenarioName]: {
@@ -40,28 +40,9 @@ export const CRON_HTTP_REQ_DURATION_P95_MS = 500;
 function createThresholds(config: RunConfig): NonNullable<Options["thresholds"]> {
   const lifecycleThresholds = {
     [METRIC_NAMES.cleanupFailed]: ["count==0"],
-    [METRIC_NAMES.jobsCompletionFailed]: ["count==0"],
     [METRIC_NAMES.jobsSubmissionFailed]: ["count==0"],
     [METRIC_NAMES.jobsVisibilityFailed]: ["count==0"],
   };
-
-  if (config.campaignType === "stress") {
-    const stressThresholds =
-      resolveCampaignExecutionShape(config).lifecycle === "bulk-skaha-stress"
-        ? {
-            [METRIC_NAMES.cleanupFailed]: lifecycleThresholds[METRIC_NAMES.cleanupFailed],
-            [METRIC_NAMES.jobsSubmissionFailed]:
-              lifecycleThresholds[METRIC_NAMES.jobsSubmissionFailed],
-            [METRIC_NAMES.jobsVisibilityFailed]:
-              lifecycleThresholds[METRIC_NAMES.jobsVisibilityFailed],
-          }
-        : lifecycleThresholds;
-
-    return {
-      ...stressThresholds,
-      http_req_failed: ["rate==0"],
-    };
-  }
 
   return {
     checks: config.runClass === "cron" ? ["rate==1"] : ["rate>0.99"],

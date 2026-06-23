@@ -1,10 +1,10 @@
-# PerfPulse Campaign Evidence
+# PerfPulse Benchmark Evidence
 
-Benchmark and stress campaigns are manual evidence activities. They are not scheduled cron
-checks and they are not the source of official SLO or SLA gates.
+Benchmark campaigns are manual evidence activities. They are not scheduled cron checks and they are
+not the source of official SLO or SLA gates.
 
 Use the **campaign Grafana dashboard** (`docs/dashboards/perfpulse-campaign.json`) as the primary
-evidence surface. Filter by `testid`, `surface`, and `campaign_type`.
+evidence surface. Filter by `testid`, `runClass`, `surface`, `scenario`, and `namespace`.
 
 ## Benchmark Campaigns
 
@@ -13,8 +13,10 @@ Compare each selected surface in Grafana by:
 - expected work (`k6_perfpulse_jobs_expected`)
 - accepted work (`k6_perfpulse_jobs_submitted_total`)
 - visible work (`k6_perfpulse_jobs_visible_total`)
-- completed work (`k6_perfpulse_jobs_completed_total`)
-- submission, visibility, and completion latency histograms
+- completed work (`k6_perfpulse_jobs_completed_total`) when observed
+- submission and visibility latency histograms
+- completion latency histograms when `REQUIRE_COMPLETION=true` or completion is observed during
+  visibility polling
 - dropped k6 iterations
 - cleanup counters
 
@@ -24,12 +26,7 @@ percentage panels use it as the denominator.
 Benchmark thresholds are evidence only until baselines exist. Do not describe guessed thresholds
 as official SLO or SLA gates.
 
-## Stress Campaigns
-
-Stress campaigns require both:
-
-- explicit stress profile selection (`campaign.type=stress`)
-- `CONFIRM_STRESS=true`
+## Large Benchmarks
 
 Campaign sizing must satisfy the jobs-per-VU cap (default `JOBS_PER_VU_CAP=500`):
 
@@ -37,16 +34,11 @@ Campaign sizing must satisfy the jobs-per-VU cap (default `JOBS_PER_VU_CAP=500`)
 logicalUsers >= ceil(totalJobs / JOBS_PER_VU_CAP)
 ```
 
-On Skaha stress, each VU submits a batch of sessions in one iteration, polls them with bulk pacing
-(`SKAHA_BULK_POLL_MIN_SECONDS`, `SKAHA_BULK_POLL_CYCLE_SECONDS`), and deletes each session inline
-when it reaches a terminal state. Direct and Kueue stress keep the per-job lifecycle with
-`iterations = totalJobs`.
-
-Stress success evidence focuses on acceptance, visibility, observability, control-plane behavior,
-and cleanup. Completion may be optional when `requireCompletion` is disabled for stress; use
-`campaign_type=stress` panels that do not treat missing completion as failure.
+Large benchmark success evidence focuses on acceptance, running visibility, observability,
+control-plane behavior, and cleanup. Completion is diagnostic by default because PerfPulse deletes
+workloads after target-state visibility.
 
 ## Preserve On Failure
 
-When `PRESERVE_ON_FAILURE=true`, failed workloads may remain labeled with `testid`, `profile`, and
+When `PRESERVE_ON_FAILURE=true`, failed workloads may remain labeled with `testid`, `runClass`, and
 `surface` for manual follow-up. Scheduled cron checks still delete by default.

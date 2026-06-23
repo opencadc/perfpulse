@@ -17,7 +17,6 @@ data:
   K6_OTEL_EXPORT_INTERVAL: 5s
   PERF_PULSE_CLIENT_MODE: kubernetes
   POLL_JITTER_MAX_MS: {{ .Values.pollJitterMaxMs | quote }}
-  PROFILE: cron
   RUN_CLASS: cron
   SEQUENTIAL_SURFACES: "true"
   SUBMISSION_JITTER_MAX_MS: {{ .Values.submissionJitterMaxMs | quote }}

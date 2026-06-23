@@ -9,6 +9,7 @@ export interface JobLike {
     name?: string;
   };
   status?: {
+    active?: number;
     conditions?: JobCondition[];
   };
 }

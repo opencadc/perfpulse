@@ -77,7 +77,8 @@ export function runDirectKubernetesSurface(
     {
       pollVisibility() {
         latestJobList = client.listJobsByTestId();
-        const visible = findJobByName(latestJobList, config.jobName) !== undefined;
+        const job = findJobByName(latestJobList, config.jobName);
+        const visible = hasJobStarted(job);
         if (visible) {
           jobWasVisible = true;
         }
@@ -194,7 +195,7 @@ function mapDirectFailure(
       return failure;
     case "visibility":
       return {
-        message: `Kubernetes Job ${config.jobName} was not visible within ${config.visibilityGateSeconds}s`,
+        message: `Kubernetes Job ${config.jobName} was not running within ${config.visibilityGateSeconds}s`,
         stage: failure.stage,
       };
     case "completion":
@@ -209,4 +210,8 @@ function mapDirectFailure(
         stage: failure.stage,
       };
   }
+}
+
+function hasJobStarted(job: JobLike | undefined): boolean {
+  return job !== undefined && ((job.status?.active ?? 0) > 0 || isJobComplete(job));
 }

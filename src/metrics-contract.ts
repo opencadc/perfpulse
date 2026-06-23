@@ -52,8 +52,6 @@ export const CUSTOM_TRENDS = [
 export const ALLOWED_METRIC_TAGS = [
   "testid",
   "run_class",
-  "campaign_type",
-  "profile",
   "surface",
   "scenario",
   "namespace",
@@ -61,14 +59,11 @@ export const ALLOWED_METRIC_TAGS = [
 ] as const;
 
 export type AllowedMetricTag = (typeof ALLOWED_METRIC_TAGS)[number];
-export type MetricTags = Partial<Record<AllowedMetricTag, string>> &
-  Record<Exclude<AllowedMetricTag, "campaign_type">, string>;
+export type MetricTags = Record<AllowedMetricTag, string>;
 
 export function metricTags(config: RunConfig): MetricTags {
   return {
-    ...(config.campaignType === undefined ? {} : { campaign_type: config.campaignType }),
     namespace: config.kubernetes.namespace,
-    profile: config.profile,
     run_class: config.runClass,
     scenario: config.scenario,
     surface: config.surface,

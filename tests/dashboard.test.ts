@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 const campaignDashboardPath = "docs/dashboards/perfpulse-campaign.json";
 const cronDashboardPath = "docs/dashboards/perfpulse-cron.json";
 const dashboardFilters =
-  'testid=~"$testid",run_class=~"$runClass",profile=~"$profile",surface=~"$surface",scenario=~"$scenario",namespace=~"$namespace",campaign_type=~"$campaignType"';
+  'testid=~"$testid",run_class=~"$runClass",surface=~"$surface",scenario=~"$scenario",namespace=~"$namespace"';
 
 describe("Grafana dashboard contracts", () => {
   test("ships import-ready cron and campaign dashboard shapes", async () => {
@@ -47,7 +47,7 @@ describe("Grafana dashboard contracts", () => {
     expect(panelTitles).not.toContain("Diagnosis Matrix");
     expect(panelTitles).not.toContain("HTTP Analytics");
     expect(dashboard.panels[0]?.title).toBe("Operator Health");
-    expect(promQl).toContain('profile="cron"');
+    expect(promQl).toContain('run_class="cron"');
     expect(promQl).toContain("last_over_time(");
     expect(promQl).not.toContain('testid=~"$testid"');
   });
@@ -62,8 +62,6 @@ describe("Grafana dashboard contracts", () => {
     expect(dashboard.templating.list.map((variable) => variable.name)).toEqual([
       "testid",
       "runClass",
-      "profile",
-      "campaignType",
       "surface",
       "scenario",
       "namespace",
@@ -94,7 +92,7 @@ describe("Grafana dashboard contracts", () => {
     );
   });
 
-  test("uses durable range selectors for campaign stat panels and stress-aware target state", async () => {
+  test("uses durable range selectors for campaign stat panels and visibility target state", async () => {
     const dashboard = await loadDashboard(campaignDashboardPath);
     const statExpressions = Object.fromEntries(
       dashboard.panels
@@ -116,9 +114,9 @@ describe("Grafana dashboard contracts", () => {
 
     const targetStateOkExpression = statExpressions["Target State OK"] ?? "";
     expect(targetStateOkExpression).toContain("100 *");
-    expect(targetStateOkExpression).toContain("k6_perfpulse_jobs_completed_total");
     expect(targetStateOkExpression).toContain("k6_perfpulse_jobs_visible_total");
-    expect(targetStateOkExpression).toContain('campaign_type="stress"');
+    expect(targetStateOkExpression).not.toContain("k6_perfpulse_jobs_completed_total");
+    expect(targetStateOkExpression).not.toContain("campaign_type");
     expect(targetStateOkExpression).toContain("/ clamp_min(");
   });
 
@@ -171,8 +169,6 @@ describe("Grafana dashboard contracts", () => {
     expect(multiIncludeAllVariables.map((variable) => variable.name)).toEqual([
       "testid",
       "runClass",
-      "profile",
-      "campaignType",
       "surface",
       "scenario",
       "namespace",
@@ -192,12 +188,12 @@ describe("Grafana dashboard contracts", () => {
     expect(campaignDashboard.templating.list.map((variable) => variable.name)).toContain(
       "runClass",
     );
-    expect(campaignDashboard.templating.list.map((variable) => variable.name)).toContain(
+    expect(campaignDashboard.templating.list.map((variable) => variable.name)).not.toContain(
       "campaignType",
     );
     expect(campaignPromQl).toContain('run_class=~"$runClass"');
-    expect(campaignPromQl).toContain('campaign_type=~"$campaignType"');
-    expect(campaignPromQl).toContain('profile=~"$profile"');
+    expect(campaignPromQl).not.toContain("campaign_type");
+    expect(campaignPromQl).not.toContain('profile=~"$profile"');
     expect(campaignJson).not.toMatch(/cohort|job_profile/u);
     expect(campaignJson).not.toContain('run_class=~"$run_class"');
     expect(JSON.stringify(cronDashboard)).not.toContain("cohort");
@@ -216,14 +212,14 @@ describe("Grafana dashboard contracts", () => {
     expect(cronDashboard.description).toContain("Operator Health");
     expect(cronDashboard.description).toContain("Recent Cron Runs");
     expect(campaignDashboard.description?.trim()).not.toBe("");
-    expect(campaignDashboard.description).toContain("benchmark and stress");
+    expect(campaignDashboard.description).toContain("benchmark runs");
     expect(campaignPanelDescriptions["Diagnosis Matrix"]).toContain("shown as one table");
     expect(campaignPanelDescriptions["Diagnosis Matrix"]).toContain("accepted create response");
     expect(campaignPanelDescriptions["Target State Reached"]).toContain(
-      "stress runs treat visibility",
+      "accepted and observed running",
     );
     expect(campaignPanelDescriptions["Target State Failures"]).toContain(
-      "completion failures only count",
+      "completion failures are diagnostic only",
     );
     expect(campaignPanelDescriptions["Submission Latency"]).toContain(
       "measured from request start until the create response returns",
@@ -350,14 +346,13 @@ describe("Grafana dashboard contracts", () => {
       "Target state",
       "Submit failed",
       "Visible failed",
-      "Target failed",
       "Cleanup failed",
     ]);
     expect(diagnosisExpressions).toContain("sum by (surface)");
     expect(diagnosisExpressions).toContain("clamp_min(");
     expect(diagnosisExpressions).toContain("k6_perfpulse_jobs_submitted_total");
     expect(diagnosisExpressions).toContain("k6_perfpulse_jobs_visibility_failed_total");
-    expect(diagnosisExpressions).toContain("k6_perfpulse_jobs_completion_failed_total");
+    expect(diagnosisExpressions).not.toContain("k6_perfpulse_jobs_completion_failed_total");
 
     expect(noDataPanel.type).toBe("stat");
     expect(noDataExpression).toContain("absent(");
@@ -375,8 +370,10 @@ describe("Grafana dashboard contracts", () => {
     expect(cleanupPanel.fieldConfig?.defaults.custom?.axisLabel).toBe("% of expected jobs");
 
     expect(targetStateFailureExpressions).toContain("k6_perfpulse_jobs_visibility_failed_total");
-    expect(targetStateFailureExpressions).toContain("k6_perfpulse_jobs_completion_failed_total");
-    expect(targetStateFailureExpressions).toContain('campaign_type="stress"');
+    expect(targetStateFailureExpressions).not.toContain(
+      "k6_perfpulse_jobs_completion_failed_total",
+    );
+    expect(targetStateFailureExpressions).not.toContain("campaign_type");
     expect(targetStateFailureExpressions).toContain("/ clamp_min(");
   });
 

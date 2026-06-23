@@ -10,7 +10,7 @@ row shows whether recent cron checks reached target state per surface without se
 ## Campaigns
 
 Use the **campaign Grafana dashboard** (`docs/dashboards/perfpulse-campaign.json`). Select
-`testid` to drill into a benchmark or stress run.
+`testid` to drill into a benchmark run.
 
 ## Canonical run identity
 
@@ -21,10 +21,9 @@ When documenting a run outside Grafana, record only low-cardinality fields:
 
 - `testid`
 - image tag or git SHA
-- profile (`cron` or `campaign`)
-- `campaign_type` when applicable
+- run class (`cron` or `benchmark`)
 - surfaces exercised
-- `TOTAL_JOBS` and `LOGICAL_USERS` for campaigns
+- `TOTAL_JOBS` and `LOGICAL_USERS` for benchmarks
 - links to the Grafana dashboard filtered by `testid`
 
 Do not paste bearer tokens, Skaha passwords, OTLP credentials, or raw exception text into operator
