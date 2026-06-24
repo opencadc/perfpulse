@@ -1,0 +1,1148 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Target State",
+      "description": "Percent of expected workloads that were accepted and observed running-visible. Completion is diagnostic by default.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * sum(last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range])) / clamp_min(sum(last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range])), 1)",
+          "legendFormat": "Target State"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 95
+              },
+              {
+                "color": "green",
+                "value": 99
+              }
+            ]
+          },
+          "custom": {},
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Expected",
+      "description": "Expected workloads for the selected run class, testid, surface, and namespace.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "Expected"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Submitted",
+      "description": "Accepted create responses or Skaha session ids.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "Submitted"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Running Visible",
+      "description": "Workloads observed as scheduled/running or terminal successful.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 14,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "Running Visible"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Cleanup Failed",
+      "description": "Cleanup failures after running visibility.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "Cleanup Failed"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "No Data",
+      "description": "Shows 1 when selected filters have no expected-job samples in range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 21,
+        "y": 0,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "absent(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"})",
+          "legendFormat": "No Data"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Lifecycle By Surface",
+      "description": "Expected, submitted, running-visible, and deleted workloads by surface.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 14,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval]))",
+          "legendFormat": "expected {{surface}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval]))",
+          "legendFormat": "submitted {{surface}}"
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval]))",
+          "legendFormat": "running {{surface}}"
+        },
+        {
+          "refId": "D",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_deleted_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval]))",
+          "legendFormat": "deleted {{surface}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "axisLabel": "jobs",
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Latency p95",
+      "description": "Submit, running visibility, Kueue admission, and optional completion latency.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 14,
+        "y": 4,
+        "w": 10,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (rate(k6_perfpulse_submission_duration_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__rate_interval])))",
+          "legendFormat": "submit {{surface}}"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (rate(k6_perfpulse_visibility_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__rate_interval])))",
+          "legendFormat": "running {{surface}}"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (rate(k6_perfpulse_kueue_admission_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__rate_interval])))",
+          "legendFormat": "kueue admit {{surface}}"
+        },
+        {
+          "refId": "D",
+          "expr": "histogram_quantile(0.95, sum by (le, surface) (rate(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__rate_interval])))",
+          "legendFormat": "completion {{surface}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "axisLabel": "milliseconds",
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Failure Table",
+      "description": "One row per surface. Submit and visibility deficits are calculated against expected jobs; completion failure is diagnostic.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "Expected"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "Submitted"
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "Running visible"
+        },
+        {
+          "refId": "D",
+          "expr": "clamp_min(sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range])) - sum by (surface) (last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range])), 0)",
+          "legendFormat": "Submit deficit"
+        },
+        {
+          "refId": "E",
+          "expr": "clamp_min(sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range])) - sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range])), 0)",
+          "legendFormat": "Visibility deficit"
+        },
+        {
+          "refId": "F",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "Cleanup failed"
+        },
+        {
+          "refId": "G",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_completion_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "Completion failed"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "HTTP And Checks",
+      "description": "Runner HTTP request rate plus HTTP and check failure percentages.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (name) (rate(k6_http_reqs_total{testid=~\"$testid\",run_class=~\"$runClass\",namespace=~\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "http {{name}}"
+        },
+        {
+          "refId": "B",
+          "expr": "100 * sum(rate(k6_http_req_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",namespace=~\"$namespace\"}[$__rate_interval])) / clamp_min(sum(rate(k6_http_reqs_total{testid=~\"$testid\",run_class=~\"$runClass\",namespace=~\"$namespace\"}[$__rate_interval])), 1)",
+          "legendFormat": "http failed %"
+        },
+        {
+          "refId": "C",
+          "expr": "100 * sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$runClass\",namespace=~\"$namespace\",condition=\"zero\"}[$__rate_interval])) / clamp_min(sum(rate(k6_checks_total{testid=~\"$testid\",run_class=~\"$runClass\",namespace=~\"$namespace\",condition=~\"zero|nonzero\"}[$__rate_interval])), 1)",
+          "legendFormat": "check failed %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "axisLabel": "rate / percent",
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Runner Load",
+      "description": "k6 iterations, VUs, and dropped iterations.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (run_class) (rate(k6_iterations_total{testid=~\"$testid\",run_class=~\"$runClass\",namespace=~\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "iterations {{run_class}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (run_class) (last_over_time(k6_vus{testid=~\"$testid\",run_class=~\"$runClass\",namespace=~\"$namespace\"}[$__interval]))",
+          "legendFormat": "vus {{run_class}}"
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (run_class) (rate(k6_dropped_iterations_total{testid=~\"$testid\",run_class=~\"$runClass\",namespace=~\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "dropped {{run_class}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "axisLabel": "count / second",
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Kueue Signals",
+      "description": "PerfPulse Kueue evidence plus best-effort cluster Kueue state when kube-state metrics are available.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_kueue_workloads_admitted_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "admitted {{surface}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_kueue_workloads_admission_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
+          "legendFormat": "admission failed {{surface}}"
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (cluster_queue) (kueue_admitted_workloads_total)",
+          "legendFormat": "cluster admitted {{cluster_queue}}"
+        },
+        {
+          "refId": "D",
+          "expr": "sum by (cluster_queue, status) (kueue_pending_workloads)",
+          "legendFormat": "cluster pending {{cluster_queue}} {{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "axisLabel": "workloads",
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Data IO",
+      "description": "k6 network traffic generated by the selected runs.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(k6_data_sent_bytes_total{testid=~\"$testid\",run_class=~\"$runClass\",namespace=~\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "sent"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(k6_data_received_bytes_total{testid=~\"$testid\",run_class=~\"$runClass\",namespace=~\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "received"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "Bps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "axisLabel": "bytes / second",
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "API Server p95",
+      "description": "Best-effort Kubernetes API latency when apiserver metrics are available.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 27,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, verb, resource) (rate(apiserver_request_duration_seconds_bucket{resource=~\"jobs|pods|workloads\"}[$__rate_interval])))",
+          "legendFormat": "{{verb}} {{resource}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "axisLabel": "seconds",
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 41,
+  "tags": [
+    "perfpulse",
+    "canfar",
+    "cron",
+    "benchmark"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_perfpulse_jobs_expected, run_class)",
+        "description": "Select cron, benchmark, or both.",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Run class",
+        "multi": true,
+        "name": "runClass",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_perfpulse_jobs_expected, run_class)",
+          "refId": "runClass-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_perfpulse_jobs_expected{run_class=~\"$runClass\"}, testid)",
+        "description": "Select one benchmark run, one cron tick, or all visible runs.",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Test ID",
+        "multi": true,
+        "name": "testid",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_perfpulse_jobs_expected{run_class=~\"$runClass\"}, testid)",
+          "refId": "testid-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_perfpulse_jobs_expected{run_class=~\"$runClass\",testid=~\"$testid\"}, surface)",
+        "description": "Direct Kubernetes, Kueue, Skaha, or all surfaces.",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Surface",
+        "multi": true,
+        "name": "surface",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_perfpulse_jobs_expected{run_class=~\"$runClass\",testid=~\"$testid\"}, surface)",
+          "refId": "surface-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(k6_perfpulse_jobs_expected{run_class=~\"$runClass\",testid=~\"$testid\",surface=~\"$surface\"}, namespace)",
+        "description": "Workload namespace emitted by PerfPulse metrics.",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Namespace",
+        "multi": true,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "query": "label_values(k6_perfpulse_jobs_expected{run_class=~\"$runClass\",testid=~\"$testid\",surface=~\"$surface\"}, namespace)",
+          "refId": "namespace-query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m",
+      "15m"
+    ]
+  },
+  "timezone": "browser",
+  "title": "PerfPulse",
+  "uid": "perfpulse",
+  "version": 1,
+  "weekStart": ""
+}

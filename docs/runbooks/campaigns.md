@@ -3,8 +3,8 @@
 Benchmark campaigns are manual evidence activities. They are not scheduled cron checks and they are
 not the source of official SLO or SLA gates.
 
-Use the **campaign Grafana dashboard** (`docs/dashboards/perfpulse-campaign.json`) as the primary
-evidence surface. Filter by `testid`, `runClass`, `surface`, `scenario`, and `namespace`.
+Use the **PerfPulse Grafana dashboard** (`docs/dashboards/perfpulse.json`) as the primary evidence
+surface. Filter by `testid`, `runClass`, `surface`, and `namespace`.
 
 ## Benchmark Campaigns
 

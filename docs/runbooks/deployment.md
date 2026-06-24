@@ -266,28 +266,26 @@ helm upgrade --install perfpulse-kueue ./charts/campaign \
 
 ## Dashboard Evidence
 
-See `docs/runbooks/run-evidence.md` for the dashboard entry points:
+See `docs/runbooks/run-evidence.md` for the dashboard entry point:
 
-- cron checks use `docs/dashboards/perfpulse-cron.json`
-- benchmark drilldown uses `docs/dashboards/perfpulse-campaign.json`
+- cron and benchmark evidence use `docs/dashboards/perfpulse.json`
 
-For campaign evidence, use the campaign dashboard and filter by:
+For benchmark evidence, use the PerfPulse dashboard and filter by:
 
 - `testid`
 - `runClass`
 - `surface`
-- `scenario`
 - `namespace`
 
 Dashboard evidence is complete when operators can show accepted work, running-visible work, dropped
 iterations, data I/O, HTTP request rate, HTTP p95, Kubernetes API request rate, Kubernetes API p95,
 and cleanup status for selected run labels.
 
-Use the top-row `Expected Jobs` panel and the diagnosis matrix to confirm the denominator. `Target
-State Reached`, `Target State Failures`, and `Cleanup` are percentages of expected jobs per
-surface. Counts remain available in the diagnosis matrix. In the diagnosis matrix, `Submit failed`
-is the submission deficit, `expected - submitted`, so a run that exits after submitting only part of
-the expected work is visible even when no explicit submit-failed counter was emitted.
+Use the top-row `Expected`, `Submitted`, `Running Visible`, and `Target State` panels to confirm
+the denominator. `Target State` is the percentage of expected jobs that became running-visible.
+Counts remain available in `Failure Table`. In that table, `Submit deficit` is
+`expected - submitted`, so a run that exits after submitting only part of the expected work is
+visible even when no explicit submit-failed counter was emitted.
 
 `Data IO` uses k6 byte counter metrics:
 

@@ -2,15 +2,11 @@
 
 Grafana is the primary run evidence surface for PerfPulse.
 
-## Cron checks
+## Dashboard
 
-Use the **cron Grafana dashboard** (`docs/dashboards/perfpulse-cron.json`). The Operator Health
-row shows whether recent cron checks reached target state per surface without selecting a `testid`.
-
-## Campaigns
-
-Use the **campaign Grafana dashboard** (`docs/dashboards/perfpulse-campaign.json`). Select
-`testid` to drill into a benchmark run.
+Use the **PerfPulse Grafana dashboard** (`docs/dashboards/perfpulse.json`) for cron checks and
+benchmark campaigns. Select `runClass=cron` for scheduled checks or `runClass=benchmark` plus a
+specific `testid` for a benchmark run.
 
 ## Canonical run identity
 

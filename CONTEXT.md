@@ -130,9 +130,9 @@ _Avoid_: submitted jobs, visible jobs, completed jobs
 
 **Dashboard evidence surface**:
 Grafana dashboards backed by Prometheus metrics ingested from k6 OTLP export. This is the primary
-operator-facing PerfPulse output. Two repo-managed dashboard artifacts serve operators: one for
-**Cron check** steady-state health and one for **Benchmark campaign** drilldown by `testid`.
-_Avoid_: local run artifact as primary output, single monolithic dashboard
+operator-facing PerfPulse output. One repo-managed dashboard serves both **Cron check**
+steady-state health and **Benchmark campaign** drilldown by `testid`.
+_Avoid_: local run artifact as primary output, split dashboards
 
 ## Relationships
 
@@ -145,8 +145,7 @@ _Avoid_: local run artifact as primary output, single monolithic dashboard
   **Skaha user-facing surface**.
 - **Dashboard evidence surface** is the primary output; run logs and artifacts are diagnostic
   support.
-- Two Grafana dashboard artifacts replace the monolithic overview: cron health and benchmark
-  drilldown.
+- One Grafana dashboard artifact covers cron health and benchmark drilldown.
 - Every **Test surface** uses the same **Fixed workload footprint** and **Fixed workload runtime**
   so comparisons isolate path behavior.
 - Offline markdown report generators are out of scope; Grafana is the reporting surface.

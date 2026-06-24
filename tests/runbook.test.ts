@@ -70,8 +70,8 @@ describe("PerfPulse runbooks", () => {
     expect(runbook).toContain("helm uninstall perfpulse-benchmark");
     expect(runbook).toContain("Completion is diagnostic, not part of the default success gate.");
     expect(runbook).toContain("Dashboard evidence");
-    expect(runbook).toContain("Expected Jobs");
-    expect(normalizedRunbook).toContain("Target State Reached");
+    expect(runbook).toContain("Expected");
+    expect(normalizedRunbook).toContain("Target State");
     expect(runbook).toContain("k6_data_sent_bytes_total");
     expect(runbook).toContain("k6_data_received_bytes_total");
     expect(runbook).not.toContain("kubectl apply -f docs/manifests");

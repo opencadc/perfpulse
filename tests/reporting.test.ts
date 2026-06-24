@@ -14,11 +14,12 @@ describe("Grafana-only reporting", () => {
     const runEvidenceRunbook = await Bun.file("docs/runbooks/run-evidence.md").text();
     const deploymentRunbook = await Bun.file("docs/runbooks/deployment.md").text();
 
-    expect(campaignsRunbook).toContain("perfpulse-campaign.json");
+    expect(campaignsRunbook).toContain("perfpulse.json");
     expect(campaignsRunbook).not.toContain("campaign-report");
-    expect(runEvidenceRunbook).toContain("perfpulse-cron.json");
-    expect(runEvidenceRunbook).toContain("perfpulse-campaign.json");
-    expect(deploymentRunbook).toContain("perfpulse-campaign.json");
+    expect(runEvidenceRunbook).toContain("perfpulse.json");
+    expect(runEvidenceRunbook).not.toContain("perfpulse-cron.json");
+    expect(runEvidenceRunbook).not.toContain("perfpulse-campaign.json");
+    expect(deploymentRunbook).toContain("perfpulse.json");
     expect(deploymentRunbook).toContain("run-evidence.md");
     expect(deploymentRunbook).not.toContain("PerfPulse Overview");
   });
