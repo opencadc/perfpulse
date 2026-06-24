@@ -103,9 +103,13 @@ describe("Skaha user-facing surface client", () => {
   });
 
   test("does not expose a cleanup session id when session creation fails", () => {
+    const recordedErrors: Array<{ body: unknown; operation: string; statusCode: number }> = [];
     const client = createSkahaClient({
       apiUrl: "https://ws.example/skaha/v1",
       http: recordRequests([], { postBody: "backend rejected session", postStatus: 500 }),
+      recordHttpError: (operation, statusCode, body) => {
+        recordedErrors.push({ body, operation, statusCode });
+      },
       runConfig: skahaRunConfig(),
       token: "runtime-token",
     });
@@ -119,6 +123,13 @@ describe("Skaha user-facing surface client", () => {
 
     expect(result).toEqual({ accepted: false, statusCode: 500 });
     expect(JSON.stringify(result)).not.toContain("backend rejected session");
+    expect(recordedErrors).toEqual([
+      {
+        body: "backend rejected session",
+        operation: "create_session",
+        statusCode: 500,
+      },
+    ]);
   });
 
   test("uses the configured Skaha request timeout for create, read, and cleanup calls", () => {
@@ -565,9 +576,13 @@ describe("Skaha user-facing surface client", () => {
   });
 
   test("returns a bounded cleanup failure without raw identifiers", () => {
+    const recordedErrors: Array<{ body: unknown; operation: string; statusCode: number }> = [];
     const client = createSkahaClient({
       apiUrl: "https://ws.example/skaha/v1",
       http: recordRequests([], { deleteStatus: 500 }),
+      recordHttpError: (operation, statusCode, body) => {
+        recordedErrors.push({ body, operation, statusCode });
+      },
       runConfig: skahaRunConfig(),
       token: "runtime-token",
     });
@@ -581,6 +596,13 @@ describe("Skaha user-facing surface client", () => {
       statusCode: 500,
     });
     expect(JSON.stringify(result)).not.toContain("raw-session-id");
+    expect(recordedErrors).toEqual([
+      {
+        body: "",
+        operation: "delete_session",
+        statusCode: 500,
+      },
+    ]);
   });
 });
 

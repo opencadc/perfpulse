@@ -1,6 +1,7 @@
 import type { RunConfig } from "./config";
 import type { LifecycleRecorder } from "./metrics";
 import { type MetricTags, metricTags } from "./metrics-contract";
+import type { SkahaHttpErrorOperation } from "./skaha-http-error-report";
 import {
   isCoreWorkLifecycleFailureStage,
   type LifecycleGroupFn,
@@ -27,6 +28,7 @@ export interface SkahaHttpClientLike {
 export interface SkahaClientConfig {
   apiUrl: string;
   http: SkahaHttpClientLike;
+  recordHttpError?: (operation: SkahaHttpErrorOperation, statusCode: number, body: unknown) => void;
   registryAuthHeader?: string | undefined;
   runConfig: RunConfig;
   token: string;
@@ -142,6 +144,7 @@ export function createSkahaClient(config: SkahaClientConfig): SkahaClient {
   if (registryAuthHeader !== undefined && registryAuthHeader.length > 0) {
     headers["X-Skaha-Registry-Auth"] = registryAuthHeader;
   }
+  const recordHttpError = config.recordHttpError;
 
   return {
     createSession(params) {
@@ -152,6 +155,9 @@ export function createSkahaClient(config: SkahaClientConfig): SkahaClient {
       });
       const sessionId = String(response.body ?? "").trim();
       const accepted = response.status >= 200 && response.status < 300 && sessionId.length > 0;
+      if (!accepted) {
+        recordHttpError?.("create_session", response.status, response.body);
+      }
       return {
         accepted,
         ...(accepted ? { sessionId } : {}),
@@ -175,6 +181,7 @@ export function createSkahaClient(config: SkahaClientConfig): SkahaClient {
         statusCode: response.status,
       };
       if (!cleanupSucceeded) {
+        recordHttpError?.("delete_session", response.status, response.body);
         result.failure = "cleanup_failed";
       }
       return result;
@@ -186,6 +193,7 @@ export function createSkahaClient(config: SkahaClientConfig): SkahaClient {
         timeout,
       });
       if (response.status !== 200) {
+        recordHttpError?.("get_session", response.status, response.body);
         return { found: false, statusCode: response.status };
       }
       const session = parseSessionBody(response.body);

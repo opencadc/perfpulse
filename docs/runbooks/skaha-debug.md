@@ -30,6 +30,9 @@ DELETE 200.
 kubectl logs --since 5m deployments/canfar-skaha-staging-skaha-tomcat -n canfar-system-staging
 ```
 
+Failed session-create HTTP bodies are not in Tomcat access logs — use k6
+`handleSummary` output in benchmark job logs or `bash scripts/skaha-session-smoke.sh`.
+
 ## Common failures
 
 | Symptom | Likely cause |

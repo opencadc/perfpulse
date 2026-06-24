@@ -21,6 +21,9 @@ import { createLifecycleRecorder, type LifecycleRecorder } from "./metrics";
 import { metricTags } from "./metrics-contract";
 import { createOptions } from "./options";
 import { createSkahaClient, runSkahaSurface } from "./skaha";
+import { handleSummary, recordSkahaHttpError } from "./skaha-http-errors";
+
+export { handleSummary };
 
 interface RuntimeData {
   config: RunConfig;
@@ -196,6 +199,7 @@ function runSkaha(runtimeData: RuntimeData, data: RunConfig, recorder: Lifecycle
   const client = createSkahaClient({
     apiUrl: data.skaha.apiUrl,
     http,
+    recordHttpError: recordSkahaHttpError,
     registryAuthHeader: runtimeData.skahaRegistryAuthHeader,
     runConfig: data,
     token: resolveSkahaBearerToken(runtimeData, data),
