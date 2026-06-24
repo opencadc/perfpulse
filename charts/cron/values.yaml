@@ -12,8 +12,16 @@ workload:
   image: images.canfar.net/skaha/stress-ng:latest
   ttlSecondsAfterFinished: 3600
 schedule: '*/10 * * * *'
+startingDeadlineSeconds: 300
 observeSeconds: 600
 completionTimeoutSeconds: 900
+cronGate:
+  policy: preempt
+  migrateLegacyTestRuns: true
+  kubectlImage: bitnami/kubectl:1.32.3
+grafanaDashboard:
+  enabled: true
+  folder: CADC
 submissionJitterMaxMs: 1000
 pollJitterMaxMs: 1000
 otlp:

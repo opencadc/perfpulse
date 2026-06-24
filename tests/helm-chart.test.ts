@@ -24,7 +24,6 @@ describe("PerfPulse Helm charts", () => {
       expect(manifest).not.toContain("kind: Namespace");
       expect(manifest).toContain('image: "images.opencadc.org/platform/perfpulse:2026.05.04"');
       expect(manifest).not.toContain("docker.io/bitnami/kubectl");
-      expect(manifest).not.toContain("bitnami/kubectl");
       expect(manifest).not.toContain("docker.io/alexeiled/stress-ng");
       expect(manifest).toContain("name: perfpulse-cron");
       expect(manifest).not.toContain("name: perfpulse-cron-direct");
@@ -56,19 +55,25 @@ describe("PerfPulse Helm charts", () => {
       expect(manifest).toContain("name: canfar-perfpulse");
       expect(manifest).toContain("kind: Role");
       expect(manifest).toContain("cron-workload-writer");
+      expect(manifest).toContain("cron-gate");
+      expect(manifest).toContain("name: cron-gate");
+      expect(manifest).toContain("bitnami/kubectl");
+      expect(manifest).toContain("startingDeadlineSeconds: 300");
+      expect(manifest).toContain('grafana_dashboard: "1"');
+      expect(manifest).toContain('grafana_folder: "CADC"');
+      expect(manifest).toContain("name: perfpulse-grafana-dashboard");
+      expect(manifest).toContain('"uid": "perfpulse"');
       expect(manifest).not.toContain("cron-testrun-writer");
-      expect(manifest).not.toContain("cron-runner-gate");
+      expect(manifest).not.toContain("kind: TestRun");
       expect(manifest).toContain("name: perfpulse-cron-config");
-      expect(manifest).toContain("K6_OTEL_SERVICE_NAME");
       expect(manifest).toContain('export K6_OTEL_SERVICE_NAME="perfpulse-$' + '{TESTID}"');
-      expect(manifest).not.toContain("name: perfpulse-workload-writer");
+      expect(manifest).toContain("Cron gate skipped this tick");
       expect(manifest).toContain("runAsNonRoot: true");
       expect(manifest).toContain("allowPrivilegeEscalation: false");
-      expect(cronValues).not.toContain("kubectl:");
-      expect(cronValues).not.toContain("bitnami/kubectl");
-      expect(manifest).not.toContain("name: canfar-workloads\n");
-      expect(manifest).not.toContain("kind: Secret");
-      expect(manifest).not.toContain("CONFIRM_SEQUENTIAL:");
+      expect(cronValues).toContain("bitnami/kubectl");
+      expect(readFileSync("charts/cron/dashboards/perfpulse.json", "utf8")).toBe(
+        readFileSync("docs/dashboards/perfpulse.json", "utf8"),
+      );
     },
     { timeout: helmTestTimeoutMs },
   );

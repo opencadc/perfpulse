@@ -10,6 +10,7 @@ metadata:
 spec:
   schedule: {{ .Values.schedule | quote }}
   concurrencyPolicy: Forbid
+  startingDeadlineSeconds: {{ .Values.startingDeadlineSeconds }}
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 3
   jobTemplate:
@@ -27,6 +28,68 @@ spec:
           restartPolicy: Never
           securityContext:
 {{ include "perfpulse.podSecurityContext" . | indent 12 }}
+          {{- if .Values.cronGate }}
+          initContainers:
+            - name: cron-gate
+              image: {{ .Values.cronGate.kubectlImage | quote }}
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-c"]
+              args:
+                - |-
+                  set -eu
+                  NS="{{ .Values.controlNamespace }}"
+                  POLICY="{{ .Values.cronGate.policy }}"
+                  CURRENT_JOB="${CRON_JOB_NAME:-}"
+
+                  delete_legacy_testruns() {
+                    {{- if .Values.cronGate.migrateLegacyTestRuns }}
+                    echo "Removing legacy k6 operator cron TestRuns"
+                    kubectl delete testruns.k6.io -n "$NS" \
+                      -l "app.kubernetes.io/name=perfpulse,perfpulse.opencadc.org/profile=cron" \
+                      --ignore-not-found --wait=false
+                    kubectl get jobs -n "$NS" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+                      | { grep '^perfpulse-cron-cron-' || true; } \
+                      | xargs -r kubectl delete job -n "$NS" --ignore-not-found --wait=false
+                    {{- end }}
+                  }
+
+                  count_other_active_jobs() {
+                    kubectl get jobs -n "$NS" -o jsonpath='{range .items[?(@.status.active)]}{.metadata.name}{"\n"}{end}' \
+                      | { grep -E '^perfpulse-cron-' || true; } \
+                      | { grep -v "^${CURRENT_JOB}$" || true; } \
+                      | wc -l | tr -d ' '
+                  }
+
+                  delete_other_active_jobs() {
+                    kubectl get jobs -n "$NS" -o jsonpath='{range .items[?(@.status.active)]}{.metadata.name}{"\n"}{end}' \
+                      | { grep -E '^perfpulse-cron-' || true; } \
+                      | { grep -v "^${CURRENT_JOB}$" || true; } \
+                      | xargs -r kubectl delete job -n "$NS" --ignore-not-found --wait=false
+                  }
+
+                  delete_legacy_testruns
+                  ACTIVE="$(count_other_active_jobs)"
+                  if [ "$ACTIVE" -ge 1 ]; then
+                    if [ "$POLICY" = "preempt" ]; then
+                      echo "Preempting ${ACTIVE} active cron job(s) before starting ${CURRENT_JOB}"
+                      delete_other_active_jobs
+                    else
+                      echo "Skipping cron tick: ${ACTIVE} active cron job(s) (policy=${POLICY})"
+                      touch /gate/skip
+                      exit 0
+                    fi
+                  fi
+              env:
+                - name: CRON_JOB_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.labels['batch.kubernetes.io/job-name']
+              volumeMounts:
+                - name: cron-gate
+                  mountPath: /gate
+              securityContext:
+{{ include "perfpulse.containerSecurityContext" . | indent 16 }}
+          {{- end }}
           containers:
             - name: k6
               image: {{ include "perfpulse.image" . | quote }}
@@ -35,6 +98,10 @@ spec:
               args:
                 - |-
                   set -eu
+                  if [ -f /gate/skip ]; then
+                    echo "Cron gate skipped this tick"
+                    exit 0
+                  fi
                   TESTID="cron-$(date -u +%Y%m%d%H%M%S)"
                   export TESTID
                   export K6_OTEL_SERVICE_NAME="perfpulse-${TESTID}"
@@ -46,12 +113,21 @@ spec:
                     name: {{ .Values.otlp.credentialsSecretName }}
                     optional: true
               volumeMounts:
+                {{- if .Values.cronGate }}
+                - name: cron-gate
+                  mountPath: /gate
+                  readOnly: true
+                {{- end }}
                 - mountPath: /var/run/secrets/perfpulse/skaha-auth
                   name: skaha-auth-credentials
                   readOnly: true
               securityContext:
 {{ include "perfpulse.containerSecurityContext" . | indent 16 }}
           volumes:
+            {{- if .Values.cronGate }}
+            - name: cron-gate
+              emptyDir: {}
+            {{- end }}
             - name: skaha-auth-credentials
               secret:
                 secretName: {{ .Values.skaha.credentialsSecretName }}

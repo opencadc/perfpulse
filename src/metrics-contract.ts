@@ -7,7 +7,7 @@ import type { RunConfig } from "./config";
  * - sequential SURFACES share one OTLP writer; surface remains a metric tag for Grafana drilldown
  * - counters are not zero-seeded at startup; only recordExpected sets jobs_expected
  * - failure counters increment only on real failures via recordFailure, never speculatively
- * - k6 has no env to cap OTLP export retries; overlap prevention lives in the cron gate chart
+ * - k6 has no env to cap OTLP export retries; overlap prevention lives in the cron gate init container
  */
 export const METRIC_NAMES = {
   cleanupDeleted: "perfpulse_cleanup_deleted",
