@@ -57,7 +57,7 @@ describe("PerfPulse Helm charts", () => {
       expect(manifest).toContain("cron-workload-writer");
       expect(manifest).toContain("cron-gate");
       expect(manifest).toContain("name: cron-gate");
-      expect(manifest).toContain("bitnami/kubectl");
+      expect(manifest).toContain("bitnamilegacy/kubectl");
       expect(manifest).toContain("startingDeadlineSeconds: 300");
       expect(manifest).toContain('grafana_dashboard: "1"');
       expect(manifest).toContain('grafana_folder: "CADC"');
@@ -70,7 +70,7 @@ describe("PerfPulse Helm charts", () => {
       expect(manifest).toContain("Cron gate skipped this tick");
       expect(manifest).toContain("runAsNonRoot: true");
       expect(manifest).toContain("allowPrivilegeEscalation: false");
-      expect(cronValues).toContain("bitnami/kubectl");
+      expect(cronValues).toContain("bitnamilegacy/kubectl");
       expect(readFileSync("charts/cron/dashboards/perfpulse.json", "utf8")).toBe(
         readFileSync("docs/dashboards/perfpulse.json", "utf8"),
       );

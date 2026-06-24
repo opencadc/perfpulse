@@ -18,7 +18,7 @@ completionTimeoutSeconds: 900
 cronGate:
   policy: preempt
   migrateLegacyTestRuns: true
-  kubectlImage: bitnami/kubectl:1.32.3
+  kubectlImage: bitnamilegacy/kubectl:1.32.3
 grafanaDashboard:
   enabled: true
   folder: CADC
