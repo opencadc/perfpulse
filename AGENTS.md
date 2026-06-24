@@ -34,10 +34,10 @@ Single-context repo: read root `CONTEXT.md` and `docs/adr/` when present. See `d
 - Default per-job lifecycle lives in `src/work-lifecycle.ts` with surface adapters under `kubernetes/` (including Kueue) and `skaha.ts`. Observation for each workload begins at accept time.
 - Removed from runtime: `evidence.ts`, `campaign-report.ts`, `cohort` label, `testRunGrouping`, `metricProfile`, and `job_profile`.
 - Fixed workload footprint per ADR-0002: 1 CPU, 1 GiB RAM, 60s runtime — not operator-tunable in v1.
-- Completion is optional by default; cron and benchmark success is accepted plus running-visible plus cleanup.
-- Admission evidence is diagnostic; Kueue target state is the Job becoming running-visible.
-- Production validation on keel-prod deploys to `canfar-perfpulse` (`perfpulse-cron`, `perfpulse-benchmark` Helm releases).
-- Cron chart runs one native k6 CronJob every 10 minutes.
+- Completion is optional by default; cron and benchmark success is accepted plus running-visible plus cleanup; admission evidence is diagnostic and Kueue target state is the Job becoming running-visible.
+- Production validation on keel-prod deploys to `canfar-perfpulse` (`perfpulse-cron`, `perfpulse-benchmark`); cron chart runs one native k6 CronJob every 10 minutes (`concurrencyPolicy: Forbid`, `startingDeadlineSeconds: 300`) with cron-gate init (preempt, legacy TestRun cleanup) and optional Grafana dashboard ConfigMap.
+- Default HTTP request timeout is 30s (`DEFAULT_HTTP_REQUEST_TIMEOUT_SECONDS`); cron P95 threshold `CRON_HTTP_REQ_DURATION_P95_MS=30000`.
+- Skaha bearer token does not expire; intermittent session-create HTTP 404 with GMS `resource-caps` registry lookup failure is platform-side, not auth expiry.
 - Runner pods set `K6_OTEL_SERVICE_NAME=perfpulse-${TESTID}`; OTLP export to `kube-prometheus-stack-prometheus.monitoring:9090`; overlapping exporters cause Prometheus out-of-order-sample rejections; k6 has no env to cap export retries.
 - `canfar-workloads` node selector `skaha.opencadc.org/node-pool=cadc` constrains direct and Kueue scheduling; Kueue cron uses low priority and admission can exceed long completion timeouts on busy clusters.
 - Helm must not emit removed runtime env vars (for example `WORKLOAD_DURATION_SECONDS`); `rejectRemovedEnv()` fails fast on boot. Skaha session `ram` whole GiB integer per ADR-0003; workload image `images.canfar.net/skaha/stress-ng:latest` from `docker/stress-ng/Dockerfile` (README: plain local `docker build` / `docker push` only); integration ADR-0004.
