@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.23](https://github.com/opencadc/perfpulse/compare/v0.1.22...v0.1.23) (2026-06-24)
+
+
+### Bug Fixes
+
+* **helm:** use bitnamilegacy/kubectl for cron gate init image ([18490b2](https://github.com/opencadc/perfpulse/commit/18490b24cd83bddfbaf50ae85ba6b59339515a78))
+
 ## [0.1.22](https://github.com/opencadc/perfpulse/compare/v0.1.21...v0.1.22) (2026-06-24)
 
 
