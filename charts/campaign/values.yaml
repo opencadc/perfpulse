@@ -18,17 +18,19 @@ campaign:
   logicalUsers: null
   visibilityGateSeconds: 120
   completionTimeoutSeconds: 259200
-  submissionJitterMaxMs: 1000
   pollJitterMaxMs: 1000
+  submissionJitterMaxMs: 1000
   jobsPerVuCap: 500
   scenario: many-small-users
+http:
+  requestTimeoutSeconds: 30
 otlp:
   credentialsSecretName: perfpulse-otlp-credentials
   endpoint: kube-prometheus-stack-prometheus.monitoring:9090
   urlPath: /api/v1/otlp/v1/metrics
 skaha:
   credentialsSecretName: perfpulse-skaha-auth
-  requestTimeoutSeconds: 600
+  requestTimeoutSeconds: 30
   apiUrl: >-
     http://canfar-skaha-staging-skaha-tomcat-svc.canfar-system-staging.svc.keel-prod.local:8080/skaha/v1
   loginUrl: https://ws-cadc.canfar.net/ac/login

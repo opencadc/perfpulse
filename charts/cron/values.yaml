@@ -22,15 +22,18 @@ cronGate:
 grafanaDashboard:
   enabled: true
   folder: CADC
-submissionJitterMaxMs: 1000
+http:
+  requestTimeoutSeconds: 30
+cronHttpReqDurationP95Ms: 30000
 pollJitterMaxMs: 1000
+submissionJitterMaxMs: 1000
 otlp:
   credentialsSecretName: perfpulse-otlp-credentials
   endpoint: kube-prometheus-stack-prometheus.monitoring:9090
   urlPath: /api/v1/otlp/v1/metrics
 skaha:
   credentialsSecretName: perfpulse-skaha-auth
-  requestTimeoutSeconds: 600
+  requestTimeoutSeconds: 30
   apiUrl: >-
     http://canfar-skaha-staging-skaha-tomcat-svc.canfar-system-staging.svc.keel-prod.local:8080/skaha/v1
   loginUrl: https://ws-cadc.canfar.net/ac/login

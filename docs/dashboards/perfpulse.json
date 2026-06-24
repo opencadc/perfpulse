@@ -456,8 +456,8 @@
     {
       "id": 8,
       "type": "timeseries",
-      "title": "Latency p95",
-      "description": "Submit, running visibility, Kueue admission, and optional completion latency.",
+      "title": "Latency",
+      "description": "Weighted mean latency per surface from OTLP histogram sum/count. Ephemeral cron runs export cumulative histograms per testid, so rate() is unreliable.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -471,23 +471,28 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, surface) (rate(k6_perfpulse_submission_duration_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__rate_interval])))",
-          "legendFormat": "submit {{surface}}"
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_submission_duration_ms_sum{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval])) / clamp_min(sum by (surface) (last_over_time(k6_perfpulse_submission_duration_ms_count{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval])), 1)",
+          "legendFormat": "submit avg {{surface}}"
         },
         {
           "refId": "B",
-          "expr": "histogram_quantile(0.95, sum by (le, surface) (rate(k6_perfpulse_visibility_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__rate_interval])))",
-          "legendFormat": "running {{surface}}"
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_visibility_latency_ms_sum{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval])) / clamp_min(sum by (surface) (last_over_time(k6_perfpulse_visibility_latency_ms_count{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval])), 1)",
+          "legendFormat": "running avg {{surface}}"
         },
         {
           "refId": "C",
-          "expr": "histogram_quantile(0.95, sum by (le, surface) (rate(k6_perfpulse_kueue_admission_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__rate_interval])))",
-          "legendFormat": "kueue admit {{surface}}"
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_kueue_admission_latency_ms_sum{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval])) / clamp_min(sum by (surface) (last_over_time(k6_perfpulse_kueue_admission_latency_ms_count{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval])), 1)",
+          "legendFormat": "kueue admit avg {{surface}}"
         },
         {
           "refId": "D",
-          "expr": "histogram_quantile(0.95, sum by (le, surface) (rate(k6_perfpulse_completion_latency_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__rate_interval])))",
-          "legendFormat": "completion {{surface}}"
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_completion_latency_ms_sum{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval])) / clamp_min(sum by (surface) (last_over_time(k6_perfpulse_completion_latency_ms_count{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval])), 1)",
+          "legendFormat": "completion avg {{surface}}"
+        },
+        {
+          "refId": "E",
+          "expr": "histogram_quantile(0.95, sum by (le, surface, testid) (last_over_time(k6_perfpulse_submission_duration_ms_bucket{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval])))",
+          "legendFormat": "submit p95 {{surface}} {{testid}}"
         }
       ],
       "fieldConfig": {
@@ -536,9 +541,9 @@
     },
     {
       "id": 9,
-      "type": "table",
-      "title": "Failure Table",
-      "description": "One row per surface. Submit and visibility deficits are calculated against expected jobs; completion failure is diagnostic.",
+      "type": "timeseries",
+      "title": "Failures By Surface",
+      "description": "Submit and visibility deficits plus failure counters over time. Deficits compare expected jobs to submitted or running-visible counts.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -552,81 +557,81 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
-          "legendFormat": "Expected"
+          "expr": "clamp_min(sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval])) - sum by (surface) (last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval])), 0)",
+          "legendFormat": "submit deficit {{surface}}"
         },
         {
           "refId": "B",
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
-          "legendFormat": "Submitted"
+          "expr": "clamp_min(sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval])) - sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval])), 0)",
+          "legendFormat": "visibility deficit {{surface}}"
         },
         {
           "refId": "C",
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
-          "legendFormat": "Running visible"
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_submission_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval]))",
+          "legendFormat": "submission failed {{surface}}"
         },
         {
           "refId": "D",
-          "expr": "clamp_min(sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range])) - sum by (surface) (last_over_time(k6_perfpulse_jobs_submitted_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range])), 0)",
-          "legendFormat": "Submit deficit"
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_visibility_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval]))",
+          "legendFormat": "visibility failed {{surface}}"
         },
         {
           "refId": "E",
-          "expr": "clamp_min(sum by (surface) (last_over_time(k6_perfpulse_jobs_expected{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range])) - sum by (surface) (last_over_time(k6_perfpulse_jobs_visible_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range])), 0)",
-          "legendFormat": "Visibility deficit"
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval]))",
+          "legendFormat": "cleanup failed {{surface}}"
         },
         {
           "refId": "F",
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_cleanup_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
-          "legendFormat": "Cleanup failed"
-        },
-        {
-          "refId": "G",
-          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_completion_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__range]))",
-          "legendFormat": "Completion failed"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
+          "expr": "sum by (surface) (last_over_time(k6_perfpulse_jobs_completion_failed_total{testid=~\"$testid\",run_class=~\"$runClass\",surface=~\"$surface\",namespace=~\"$namespace\"}[$__interval]))",
+          "legendFormat": "completion failed {{surface}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
+          "unit": "short",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
               }
             ]
+          },
+          "custom": {
+            "axisLabel": "failures",
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "showPoints": "never",
+            "spanNulls": true
           }
         },
         "overrides": []
       },
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
           ],
-          "show": false
+          "displayMode": "table",
+          "placement": "bottom"
         },
-        "showHeader": true
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       }
     },
     {
@@ -1143,6 +1148,6 @@
   "timezone": "browser",
   "title": "PerfPulse",
   "uid": "perfpulse",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

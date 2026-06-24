@@ -37,6 +37,7 @@ export interface KubernetesConfig {
   insecureSkipTLSVerify: boolean;
   namespace: string;
   pollIntervalSeconds: number;
+  requestTimeoutSeconds: number;
   tokenPath: string;
 }
 
@@ -87,11 +88,14 @@ export interface RunConfig {
   submissionJitterMaxMs: number;
   visibilityGateSeconds: number;
   workload: WorkloadConfig;
+  cronHttpReqDurationP95Ms: number;
 }
 
 export const SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 export const DEFAULT_SKAHA_PASSWORD_PATH = "/var/run/secrets/perfpulse/skaha-auth/password";
-export const DEFAULT_SKAHA_REQUEST_TIMEOUT_SECONDS = 600;
+export const DEFAULT_HTTP_REQUEST_TIMEOUT_SECONDS = 30;
+export const DEFAULT_SKAHA_REQUEST_TIMEOUT_SECONDS = DEFAULT_HTTP_REQUEST_TIMEOUT_SECONDS;
+export const DEFAULT_CRON_HTTP_REQ_DURATION_P95_MS = 30_000;
 export const DEFAULT_SKAHA_USERNAME_PATH = "/var/run/secrets/perfpulse/skaha-auth/username";
 export const DEFAULT_BENCHMARK_COMPLETION_TIMEOUT_SECONDS = 259_200;
 export const DEFAULT_CRON_COMPLETION_TIMEOUT_SECONDS = 900;

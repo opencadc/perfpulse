@@ -45,6 +45,10 @@ describe("PerfPulse Helm charts", () => {
       expect(manifest).toContain('"--timeout","60s"');
       expect(manifest).not.toContain("K6_OTEL_SERVICE_NAME: perfpulse");
       expect(manifest).toContain('VISIBILITY_GATE_SECONDS: "600"');
+      expect(manifest).toContain('HTTP_REQUEST_TIMEOUT_SECONDS: "30"');
+      expect(manifest).toContain('KUBERNETES_REQUEST_TIMEOUT_SECONDS: "30"');
+      expect(manifest).toContain('SKAHA_REQUEST_TIMEOUT_SECONDS: "30"');
+      expect(manifest).toContain('CRON_HTTP_REQ_DURATION_P95_MS: "30000"');
       expect(manifest).toContain("K6_OTEL_EXPORT_INTERVAL: 5s");
       expect(manifest).not.toContain("OBSERVE_SECONDS");
       expect(manifest).not.toContain("kind: TestRun");

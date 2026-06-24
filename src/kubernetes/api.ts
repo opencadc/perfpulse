@@ -24,6 +24,7 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
   };
+  const requestTimeout = `${config.kubernetes.requestTimeoutSeconds}s`;
   const namespace = encodeURIComponent(config.kubernetes.namespace);
   const jobsUrl = `${config.kubernetes.apiServer}/apis/batch/v1/namespaces/${namespace}/jobs`;
   const workloadsUrl = `${config.kubernetes.apiServer}/apis/kueue.x-k8s.io/v1beta2/namespaces/${namespace}/workloads`;
@@ -33,7 +34,7 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
       return http.post(jobsUrl, JSON.stringify(manifest), {
         headers,
         tags: requestTags("k8s_create_job", tags),
-        timeout: "30s",
+        timeout: requestTimeout,
       });
     },
     deleteJob(name: string): JsonResponse {
@@ -41,7 +42,7 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
       return http.del(deleteUrl, null, {
         headers,
         tags: requestTags("k8s_delete_job", tags),
-        timeout: "30s",
+        timeout: requestTimeout,
       });
     },
     getJob(name: string): JsonResponse {
@@ -49,7 +50,7 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
       return http.get(getUrl, {
         headers,
         tags: requestTags("k8s_get_job", tags),
-        timeout: "30s",
+        timeout: requestTimeout,
       });
     },
     listJobsByTestId(): JobListLike {
@@ -57,7 +58,7 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
       const response = http.get(`${jobsUrl}?labelSelector=${selector}`, {
         headers,
         tags: requestTags("k8s_list_jobs", tags),
-        timeout: "30s",
+        timeout: requestTimeout,
       });
       if (response.status !== 200) {
         throw new Error(
@@ -70,7 +71,7 @@ export function createKubernetesClient(config: RunConfig, token: string): Kubern
       const response = http.get(workloadsUrl, {
         headers,
         tags: requestTags("k8s_list_workloads", tags),
-        timeout: "30s",
+        timeout: requestTimeout,
       });
       if (response.status !== 200) {
         throw new Error(

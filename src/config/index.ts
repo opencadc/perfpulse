@@ -17,6 +17,8 @@ import {
 import {
   DEFAULT_BENCHMARK_COMPLETION_TIMEOUT_SECONDS,
   DEFAULT_CRON_COMPLETION_TIMEOUT_SECONDS,
+  DEFAULT_CRON_HTTP_REQ_DURATION_P95_MS,
+  DEFAULT_HTTP_REQUEST_TIMEOUT_SECONDS,
   DEFAULT_JITTER_MAX_MS,
   DEFAULT_JOBS_PER_VU_CAP,
   DEFAULT_RUN_CLASS,
@@ -127,7 +129,7 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
     loginUrl: env.SKAHA_LOGIN_URL ?? DEFAULT_SKAHA_LOGIN_URL,
     passwordPath: env.SKAHA_PASSWORD_PATH ?? DEFAULT_SKAHA_PASSWORD_PATH,
     requestTimeoutSeconds: parsePositiveInteger(
-      env.SKAHA_REQUEST_TIMEOUT_SECONDS,
+      env.SKAHA_REQUEST_TIMEOUT_SECONDS ?? env.HTTP_REQUEST_TIMEOUT_SECONDS,
       DEFAULT_SKAHA_REQUEST_TIMEOUT_SECONDS,
       "SKAHA_REQUEST_TIMEOUT_SECONDS",
     ),
@@ -214,6 +216,11 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
         2,
         "POLL_INTERVAL_SECONDS",
       ),
+      requestTimeoutSeconds: parsePositiveInteger(
+        env.KUBERNETES_REQUEST_TIMEOUT_SECONDS ?? env.HTTP_REQUEST_TIMEOUT_SECONDS,
+        DEFAULT_HTTP_REQUEST_TIMEOUT_SECONDS,
+        "KUBERNETES_REQUEST_TIMEOUT_SECONDS",
+      ),
       tokenPath: env.K8S_TOKEN_PATH ?? SERVICE_ACCOUNT_TOKEN_PATH,
     },
     logicalUsers,
@@ -247,5 +254,10 @@ export function resolveRunConfig(env: EnvSource = {}): RunConfig {
       "VISIBILITY_GATE_SECONDS",
     ),
     workload,
+    cronHttpReqDurationP95Ms: parsePositiveInteger(
+      env.CRON_HTTP_REQ_DURATION_P95_MS,
+      DEFAULT_CRON_HTTP_REQ_DURATION_P95_MS,
+      "CRON_HTTP_REQ_DURATION_P95_MS",
+    ),
   };
 }

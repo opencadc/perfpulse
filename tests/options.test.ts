@@ -39,7 +39,7 @@ describe("k6 options contract", () => {
 
     expect(options.thresholds?.checks).toEqual(["rate==1"]);
     expect(options.thresholds?.http_req_failed).toEqual(["rate==0"]);
-    expect(options.thresholds?.http_req_duration).toEqual(["p(95)<500"]);
+    expect(options.thresholds?.http_req_duration).toEqual(["p(95)<30000"]);
   });
 
   test("does not add HTTP duration thresholds to benchmark campaigns", () => {

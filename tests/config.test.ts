@@ -279,7 +279,7 @@ describe("resolveRunConfig", () => {
       apiUrl: EXPECTED_DEFAULT_SKAHA_API_URL,
       loginUrl: "https://ws-cadc.canfar.net/ac/login",
       passwordPath: "/var/run/secrets/perfpulse/skaha-auth/password",
-      requestTimeoutSeconds: 600,
+      requestTimeoutSeconds: 30,
       usernamePath: "/var/run/secrets/perfpulse/skaha-auth/username",
     });
     expect(config.workload.image).toBe(DEFAULT_SKAHA_WORKLOAD_IMAGE);
@@ -327,6 +327,25 @@ describe("resolveRunConfig", () => {
     });
 
     expect(config.skaha.apiUrl).toBe("https://ws.example/skaha/v1");
+  });
+
+  test("defaults HTTP request timeouts and cron duration threshold to 30 seconds", () => {
+    const config = resolveRunConfig({});
+
+    expect(config.kubernetes.requestTimeoutSeconds).toBe(30);
+    expect(config.skaha.requestTimeoutSeconds).toBe(30);
+    expect(config.cronHttpReqDurationP95Ms).toBe(30_000);
+  });
+
+  test("accepts shared HTTP timeout and cron duration threshold overrides", () => {
+    const config = resolveRunConfig({
+      CRON_HTTP_REQ_DURATION_P95_MS: "45000",
+      HTTP_REQUEST_TIMEOUT_SECONDS: "45",
+    });
+
+    expect(config.kubernetes.requestTimeoutSeconds).toBe(45);
+    expect(config.skaha.requestTimeoutSeconds).toBe(45);
+    expect(config.cronHttpReqDurationP95Ms).toBe(45_000);
   });
 
   test("accepts Skaha request timeout and lifecycle jitter controls", () => {

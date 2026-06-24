@@ -9,6 +9,7 @@ metadata:
 data:
   CLEANUP: "true"
   COMPLETION_TIMEOUT_SECONDS: {{ .Values.completionTimeoutSeconds | quote }}
+  CRON_HTTP_REQ_DURATION_P95_MS: {{ .Values.cronHttpReqDurationP95Ms | quote }}
   K6_OTEL_EXPORTER_PROTOCOL: http/protobuf
   K6_OTEL_HTTP_EXPORTER_ENDPOINT: {{ .Values.otlp.endpoint | quote }}
   K6_OTEL_HTTP_EXPORTER_INSECURE: "true"
@@ -30,6 +31,8 @@ data:
   KUEUE_ADMISSION_GATE_SECONDS: {{ .Values.completionTimeoutSeconds | quote }}
   KUEUE_PRIORITY_CLASS: low
   KUEUE_QUEUE_NAME: cadc-default
+  HTTP_REQUEST_TIMEOUT_SECONDS: {{ .Values.http.requestTimeoutSeconds | quote }}
+  KUBERNETES_REQUEST_TIMEOUT_SECONDS: {{ .Values.http.requestTimeoutSeconds | quote }}
   SKAHA_API_URL: {{ .Values.skaha.apiUrl | quote }}
   SKAHA_LOGIN_URL: {{ .Values.skaha.loginUrl | quote }}
   SKAHA_PASSWORD_PATH: /var/run/secrets/perfpulse/skaha-auth/password

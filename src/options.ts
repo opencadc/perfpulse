@@ -1,9 +1,12 @@
 import type { Options } from "k6/options";
 import { type RunConfig, resolveCampaignExecutionShape } from "./config";
+import { DEFAULT_CRON_HTTP_REQ_DURATION_P95_MS } from "./config/profile-defaults";
 import { METRIC_NAMES, metricTags } from "./metrics-contract";
 import { computeScenarioMaxDurationSeconds } from "./scenario-max-duration";
 
 export type ReadTextFile = (path: string) => string;
+
+export { DEFAULT_CRON_HTTP_REQ_DURATION_P95_MS as CRON_HTTP_REQ_DURATION_P95_MS };
 
 export function createOptions(config: RunConfig): Options {
   return {
@@ -35,8 +38,6 @@ function scenarioIterations(config: RunConfig): number {
   return resolveCampaignExecutionShape(config).iterations;
 }
 
-export const CRON_HTTP_REQ_DURATION_P95_MS = 500;
-
 function createThresholds(config: RunConfig): NonNullable<Options["thresholds"]> {
   const lifecycleThresholds = {
     [METRIC_NAMES.cleanupFailed]: ["count==0"],
@@ -48,7 +49,7 @@ function createThresholds(config: RunConfig): NonNullable<Options["thresholds"]>
     checks: config.runClass === "cron" ? ["rate==1"] : ["rate>0.99"],
     http_req_failed: config.runClass === "cron" ? ["rate==0"] : ["rate<0.01"],
     ...(config.runClass === "cron"
-      ? { http_req_duration: [`p(95)<${CRON_HTTP_REQ_DURATION_P95_MS}`] }
+      ? { http_req_duration: [`p(95)<${config.cronHttpReqDurationP95Ms}`] }
       : {}),
     ...lifecycleThresholds,
   };

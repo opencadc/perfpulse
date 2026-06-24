@@ -30,8 +30,8 @@ describe("Grafana dashboard contract", () => {
       "Cleanup Failed",
       "No Data",
       "Lifecycle By Surface",
-      "Latency p95",
-      "Failure Table",
+      "Latency",
+      "Failures By Surface",
       "HTTP And Checks",
       "Runner Load",
       "Kueue Signals",
@@ -61,9 +61,11 @@ describe("Grafana dashboard contract", () => {
 
     expect(expressions["Target State"]).toContain("k6_perfpulse_jobs_visible_total");
     expect(expressions["Target State"]).not.toContain("k6_perfpulse_jobs_completed_total");
-    expect(expressions["Failure Table"]).toContain("k6_perfpulse_jobs_completion_failed_total");
-    expect(expressions["Failure Table"]).toContain("Submit deficit");
-    expect(expressions["Failure Table"]).toContain("Visibility deficit");
+    expect(expressions["Failures By Surface"]).toContain(
+      "k6_perfpulse_jobs_completion_failed_total",
+    );
+    expect(expressions["Failures By Surface"]).toContain("submit deficit");
+    expect(expressions["Failures By Surface"]).toContain("visibility deficit");
     expect(descriptionsByTitle(dashboard)["Target State"]).toContain("accepted and observed");
   });
 
@@ -75,8 +77,9 @@ describe("Grafana dashboard contract", () => {
     expect(expressions["Lifecycle By Surface"]).toContain("k6_perfpulse_jobs_submitted_total");
     expect(expressions["Lifecycle By Surface"]).toContain("k6_perfpulse_jobs_visible_total");
     expect(expressions["Lifecycle By Surface"]).toContain("k6_perfpulse_cleanup_deleted_total");
-    expect(expressions["Latency p95"]).toContain("k6_perfpulse_submission_duration_ms_bucket");
-    expect(expressions["Latency p95"]).toContain("k6_perfpulse_visibility_latency_ms_bucket");
+    expect(expressions["Latency"]).toContain("k6_perfpulse_submission_duration_ms_sum");
+    expect(expressions["Latency"]).toContain("k6_perfpulse_visibility_latency_ms_sum");
+    expect(expressions["Latency"]).toContain("last_over_time");
     expect(expressions["HTTP And Checks"]).toContain("k6_http_reqs_total");
     expect(expressions["HTTP And Checks"]).toContain("k6_checks_total");
     expect(expressions["Runner Load"]).toContain("k6_iterations_total");
