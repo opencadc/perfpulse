@@ -5,7 +5,7 @@ serviceAccount:
   name: canfar-perfpulse
 image:
   repository: images.opencadc.org/platform/perfpulse
-  tag: v0.1.22 # x-release-please-version
+  tag: v0.1.23 # x-release-please-version
   pullPolicy: Always
 workload:
   kubernetesImage: ""
