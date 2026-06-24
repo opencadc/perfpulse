@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.22](https://github.com/opencadc/perfpulse/compare/v0.1.21...v0.1.22) (2026-06-24)
+
+
+### Features
+
+* cron gate preempt, Grafana dashboard ConfigMap, and legacy TestRun cleanup ([c8d0c61](https://github.com/opencadc/perfpulse/commit/c8d0c6195da0300793ab1f0df5ac0fcc4fd97a93))
+
 ## [0.1.21](https://github.com/opencadc/perfpulse/compare/v0.1.20...v0.1.21) (2026-06-24)
 
 
