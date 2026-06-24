@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.24](https://github.com/opencadc/perfpulse/compare/v0.1.23...v0.1.24) (2026-06-24)
+
+
+### Features
+
+* 30s HTTP timeouts, cron duration threshold, and dashboard fixes ([1739dc9](https://github.com/opencadc/perfpulse/commit/1739dc901a774674328575e4f5d6e4d7ca891407))
+
 ## [0.1.23](https://github.com/opencadc/perfpulse/compare/v0.1.22...v0.1.23) (2026-06-24)
 
 
