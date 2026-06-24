@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.21](https://github.com/opencadc/perfpulse/compare/v0.1.20...v0.1.21) (2026-06-24)
+
+
+### Features
+
+* simplify benchmark lifecycle ([cb7060a](https://github.com/opencadc/perfpulse/commit/cb7060a481ab252f1da99971ee7cde94fd32471e))
+
 ## [0.1.20](https://github.com/opencadc/perfpulse/compare/v0.1.19...v0.1.20) (2026-06-18)
 
 
