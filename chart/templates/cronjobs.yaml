@@ -1,0 +1,131 @@
+{{- /*
+One CronJob per probe. Each tick runs `perfpulse <function>` once: one run, one OTLP push.
+Forbid keeps one writer per series, so Prometheus never sees out-of-order samples.
+*/ -}}
+{{- $installation := required "installation is required: the Skaha release name, e.g. canfar-skaha-prod" .Values.installation -}}
+{{- $grace := 20 -}}
+{{- range $key, $probe := .Values.probes }}
+{{- if $probe }}
+{{- if not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $key) }}
+{{- fail (printf "probes.%s: the key must be lowercase DNS-safe" $key) }}
+{{- end }}
+{{- $name := printf "%s-%s" $.Release.Name $key }}
+{{- if gt (len $name) 52 }}
+{{- fail (printf "probes.%s: CronJob name %q is longer than 52 characters" $key $name) }}
+{{- end }}
+{{- $function := required (printf "probes.%s.function is required" $key) $probe.function }}
+{{- $schedule := required (printf "probes.%s.schedule is required" $key) $probe.schedule }}
+{{- $timeout := int ($probe.timeout | default 300) }}
+{{- $nodes := int ($probe.nodes | default 0) }}
+{{- $workload := $probe.workload | default false }}
+{{- $w := $.Values.workload }}
+{{- if $workload }}
+{{- $_ := required (printf "probes.%s: workload.namespace is required for workload probes" $key) $w.namespace }}
+{{- $_ := required (printf "probes.%s: workload.queue is required for workload probes" $key) $w.queue }}
+{{- end }}
+{{- $image := merge (deepCopy ($probe.image | default dict)) $.Values.image }}
+{{- $labels := dict "app.kubernetes.io/name" "perfpulse" "app.kubernetes.io/instance" $.Release.Name "app.kubernetes.io/managed-by" $.Release.Service "perfpulse.opencadc.org/probe" $key }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $name }}
+  namespace: {{ ternary $w.namespace $.Release.Namespace $workload }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  schedule: {{ $schedule | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        {{- toYaml $labels | nindent 8 }}
+        {{- if $workload }}
+        kueue.x-k8s.io/queue-name: {{ $w.queue }}
+        {{- end }}
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: {{ add $timeout 90 }}
+      ttlSecondsAfterFinished: 3600
+      {{- if gt $nodes 0 }}
+      completions: {{ $nodes }}
+      parallelism: {{ $nodes }}
+      {{- end }}
+      template:
+        metadata:
+          labels:
+            {{- toYaml $labels | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          # The probe gets `grace` to clean up, then the push may retry for otlp.timeoutSeconds.
+          terminationGracePeriodSeconds: {{ add $grace $.Values.otlp.timeoutSeconds 15 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: {{ ternary $w.runAsUser 65532 $workload }}
+            runAsGroup: {{ ternary $w.runAsUser 65532 $workload }}
+            seccompProfile:
+              type: RuntimeDefault
+          {{- if and $workload $w.nodeSelector }}
+          nodeSelector:
+            {{- toYaml $w.nodeSelector | nindent 12 }}
+          {{- end }}
+          {{- if gt $nodes 0 }}
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      perfpulse.opencadc.org/probe: {{ $key }}
+          {{- end }}
+          containers:
+            - name: probe
+              image: "{{ $image.repository }}:{{ $image.tag }}"
+              imagePullPolicy: {{ $image.pullPolicy | default "IfNotPresent" }}
+              args: [{{ $function | quote }}]
+              env:
+                - {name: PERFPULSE_INSTALLATION, value: {{ $installation | quote }}}
+                - {name: PERFPULSE_PROBE, value: {{ $key | quote }}}
+                - {name: PERFPULSE_TIMEOUT, value: {{ $timeout | quote }}}
+                - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: {{ $.Values.otlp.endpoint | quote }}}
+                - {name: OTEL_EXPORTER_OTLP_TIMEOUT, value: {{ $.Values.otlp.timeoutSeconds | quote }}}
+                {{- if gt $nodes 0 }}
+                - name: PERFPULSE_NODE
+                  valueFrom:
+                    fieldRef: {fieldPath: spec.nodeName}
+                {{- end }}
+                {{- range $k, $v := merge (deepCopy ($probe.env | default dict)) ($.Values.env | default dict) }}
+                - {name: {{ $k }}, value: {{ $v | toString | quote }}}
+                {{- end }}
+              {{- if and $.Values.authSecret (not $workload) }}
+              envFrom:
+                - secretRef:
+                    name: {{ $.Values.authSecret }}
+              {{- end }}
+              resources:
+                {{- toYaml ($probe.resources | default (ternary $w.resources $.Values.resources $workload)) | nindent 16 }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - {name: scratch, mountPath: /scratch}
+                - {name: tmp, mountPath: /tmp}
+                {{- if and $workload $w.arcClaim }}
+                - {name: arc, mountPath: /arc, subPath: {{ $w.arcSubPath | quote }}}
+                {{- end }}
+          volumes:
+            - {name: scratch, emptyDir: {}}
+            - {name: tmp, emptyDir: {}}
+            {{- if and $workload $w.arcClaim }}
+            - name: arc
+              persistentVolumeClaim:
+                claimName: {{ $w.arcClaim }}
+            {{- end }}
+{{- end }}
+{{- end }}

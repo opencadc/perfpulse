@@ -1,6 +1,0 @@
-apiVersion: v2
-name: perfpulse-campaign
-description: Manual PerfPulse campaign runs
-type: application
-version: 0.1.24
-appVersion: 0.1.24
