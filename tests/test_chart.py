@@ -75,6 +75,13 @@ def test_one_cronjob_per_probe(tmp_path):
         assert container["securityContext"]["capabilities"]["drop"] == ["ALL"]
 
 
+def test_default_image_is_the_release_tag(tmp_path):
+    """Release tags and image tags carry a v prefix, so the default must name a real image."""
+    app_version = yaml.safe_load((CHART / "Chart.yaml").read_text())["appVersion"]
+    container = pod(render(tmp_path)["pp-spawn-notebook"])["containers"][0]
+    assert container["image"] == f"images.opencadc.org/platform/perfpulse:v{app_version}"
+
+
 def test_api_probe(tmp_path):
     cronjob = render(tmp_path)["pp-spawn-notebook"]
     assert cronjob["metadata"]["namespace"] == "canfar-system-production"
