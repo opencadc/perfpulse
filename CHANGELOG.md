@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/opencadc/perfpulse/compare/v0.1.24...v0.2.0) (2026-11-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* the k6 runner, both charts, the direct Kubernetes and Kueue surfaces, benchmark campaigns and the perfpulse dashboard are removed.
+
+### Features
+
+* rewrite perfpulse as a Python OpenTelemetry probe runner ([#34](https://github.com/opencadc/perfpulse/issues/34)) ([c725b21](https://github.com/opencadc/perfpulse/commit/c725b212d5f90cb7e1c1bfb0c62748ec8df7a0a3))
+
 ## [0.1.24](https://github.com/opencadc/perfpulse/compare/v0.1.23...v0.1.24) (2026-06-24)
 
 
