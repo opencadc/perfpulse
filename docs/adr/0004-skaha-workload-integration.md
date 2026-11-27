@@ -1,57 +1,35 @@
-# Skaha workload integration learnings
+# Skaha session probe contract
 
-Distilled from staging validation and local debugging on **2026-06-16** after replacing
-`images.canfar.net/skaha/stress-ng:latest`.
+The session probe (`perfpulse.probes.skaha:spawn_session`) must speak Skaha's HTTP API exactly as
+below. Learned on staging in 2026-06 and kept through the Python rewrite.
 
-## Learnings
+## Contract
 
-### Workload image
+- **Create:** `POST {SKAHA_URL}/session?name=&image=&type=&cores=1&ram=1[&cmd=&args=]` with an
+  **empty body** and these headers:
+  - `Authorization: Bearer <token>`;
+  - `X-Skaha-Authentication-Type: RUNTIME-TOKEN`;
+  - `Content-Type: application/x-www-form-urlencoded`.
 
-- Skaha headless sessions use `images.canfar.net/skaha/stress-ng:latest` (Ubuntu + `stress-ng`,
-  includes `/bin/sh` for init containers).
-- Cluster nodes on keel-prod are **linux/amd64**. The image must publish **amd64** (multi-arch
-  recommended). Single-arch arm64-only images fail init with `exec /bin/sh: exec format error`.
-- Build and push manually from the repo root (see README); no in-cluster image build.
-
-### `stress-ng` command args
-
-- PerfPulse fixed runtime args are: `--cpu 1 --temp-path /tmp --timeout 60s --metrics-brief`.
-- **`--stressors` is not a stressor selector** in stress-ng 0.17 — it lists available stress
-  tests and exits. Do not pass `--stressors cpu` before `--cpu`.
-- Kubernetes Job args and Skaha session `args=` must use the same working form.
-
-### Skaha session HTTP contract
-
-- **Create:** `POST /session?<query params>`, **empty body**, headers:
-  - `Authorization: Bearer <runtime token>`
-  - `X-Skaha-Authentication-Type: RUNTIME-TOKEN`
-  - `Content-Type: application/x-www-form-urlencoded`
-  - `X-Skaha-Registry-Auth: <base64(user:pass)>` when pulling `images.canfar.net/...`
-- **Create response:** plain-text session id (not JSON).
-- **Poll:** `GET /session/{id}` → JSON with `status` (`Pending` → `Running` → `Completed` / …).
-- **Delete:** `DELETE /session/{id}` after terminal state.
-- Login: `POST https://ws-cadc.canfar.net/ac/login` with form username/password.
-
-### Memory and CPU (Skaha API vs Kubernetes)
-
-- Send integer **`ram=1`** and **`cores=1`** on session create (ADR-0002 fixed footprint).
-- Skaha GET may still show fractional `requestedRAM` (for example `1.07`); that is server-side
-  display, not the client query value. See ADR-0003.
-
-### Operator debugging
-
-- Reproduce from **local bash + public staging URL** before touching cluster pods.
-- Use `scripts/skaha-session-smoke.sh` for a single 60s session with poll and cleanup.
-- Skaha Tomcat logs: `kubectl logs --since 5m deployments/canfar-skaha-staging-skaha-tomcat -n canfar-system-staging`
+  `ram` and `cores` are integers.
+- **Create response:** a plain-text session id, not JSON.
+- **Poll:** `GET /session/{id}` returns JSON whose `status` moves from `Pending` to `Running`,
+  then `Completed` or similar. A notebook's `connectURL` carries its token. The session is ready
+  when that URL answers HTTP 200.
+- **List:** `GET /session` returns the caller's sessions, with `name`.
+- **Delete:** `DELETE /session/{id}` always answers success; Skaha swallows errors.
+- **Names** match `[A-Za-z0-9-]+` and are lowercased.
+- **Images:**
+  - A public image needs no registry credential. A private one would need
+    `X-Skaha-Registry-Auth`, which the probe does not send.
+  - Cluster nodes are linux/amd64, so images must publish amd64.
 
 ## Decision
 
-PerfPulse Skaha integration must follow the HTTP contract, registry auth, integer `ram=1`,
-working `stress-ng` args, and multi-arch workload image rules above. Helm `WORKLOAD_ARGS`,
-`defaultStressNgArgs()`, and Skaha session create must stay aligned.
-
-## Consequences
-
-- Broken `--stressors cpu` args are removed from defaults and charts.
-- Skaha smoke/debug is documented in `docs/runbooks/skaha-debug.md`.
-- Campaign and cron Skaha paths use the same workload args as direct Kubernetes.
+- **Name and cleanup:** each probe key names its session `perfpulse-<probe key>`. Before
+  creating, the probe deletes any session of its user with that name, and it deletes its own
+  session in `finally`. A run killed before cleanup therefore leaks at most one session, which
+  the next run sweeps and counts in `swept_sessions`. This matters because Skaha allows a user
+  3 sessions, headless included.
+- **Timeouts:** HTTP calls may take up to `SKAHA_HTTP_TIMEOUT_SECONDS` (default 600), because a
+  slow submit is a measurement. The probe deadline bounds the whole run.

@@ -15,29 +15,20 @@ Single-context repo: read root `CONTEXT.md` and `docs/adr/` when present. See `d
 ## Learned User Preferences
 
 - Prefers ambitious structural simplification over accepting incidental complexity when tests pass.
-- Resolves design decisions via grill-with-docs-style Q&A; capture outcomes in `CONTEXT.md` and `docs/adr/`.
 - Implements changes with TDD vertical slices; tests exercise public interfaces, not implementation details.
-- Rejects campaigns where `logicalUsers < ceil(totalJobs / jobsPerVuCap)`; operator raises `LOGICAL_USERS` or `JOBS_PER_VU_CAP`.
 - Prefers deleting unused runtime config and orphan modules over keeping phantom switches.
-- Uses Grafana as the primary evidence surface; offline markdown campaign reports are out of scope.
-- Keeps keel-prod validation runs small (about 5–10 jobs per surface) while still tracking every job to completion.
-- Expects Skaha submission HTTP timeouts around 10 minutes because submissions can be slow.
-- After substantive work: transition Jira subtasks and ensure `bun run check` passes before handoff.
-- Do not deploy or run ad-hoc containers in the target cluster unless explicitly asked; validate workload images locally with docker and debug Skaha from local bash and server logs first.
+- Uses Grafana as the primary evidence surface; the CANFAR dashboards live in `opencadc/science-platform` under `helm/dashboards/`, not here.
+- Expects Skaha submission HTTP timeouts around 10 minutes because submissions can be slow (`SKAHA_HTTP_TIMEOUT_SECONDS`, default 600).
+- Do not deploy or run ad-hoc containers in the target cluster unless explicitly asked; validate locally first.
 - Prefers step-by-step cluster recovery with explicit approval between destructive or state-changing kubectl steps.
-- Wants preventive chart/repo backstops (cron overlap gate, per-testid OTLP service name)—not only one-off cluster cleanup.
 
 ## Learned Workspace Facts
 
-- Local verification: `bun run check` runs lint, typecheck, tests, and build.
-- Repo-managed Grafana dashboard: `docs/dashboards/perfpulse.json` covers cron health and benchmark drilldown.
-- Default per-job lifecycle lives in `src/work-lifecycle.ts` with surface adapters under `kubernetes/` (including Kueue) and `skaha.ts`. Observation for each workload begins at accept time.
-- Removed from runtime: `evidence.ts`, `campaign-report.ts`, `cohort` label, `testRunGrouping`, `metricProfile`, and `job_profile`.
-- Fixed workload footprint per ADR-0002: 1 CPU, 1 GiB RAM, 60s runtime — not operator-tunable in v1.
-- Completion is optional by default; cron and benchmark success is accepted plus running-visible plus cleanup.
-- Admission evidence is diagnostic; Kueue target state is the Job becoming running-visible.
-- Production validation on keel-prod deploys to `canfar-perfpulse` (`perfpulse-cron`, `perfpulse-benchmark` Helm releases).
-- Cron chart runs one native k6 CronJob every 10 minutes.
-- Runner pods set `K6_OTEL_SERVICE_NAME=perfpulse-${TESTID}`; OTLP export to `kube-prometheus-stack-prometheus.monitoring:9090`; overlapping exporters cause Prometheus out-of-order-sample rejections; k6 has no env to cap export retries.
-- `canfar-workloads` node selector `skaha.opencadc.org/node-pool=cadc` constrains direct and Kueue scheduling; Kueue cron uses low priority and admission can exceed long completion timeouts on busy clusters.
-- Helm must not emit removed runtime env vars (for example `WORKLOAD_DURATION_SECONDS`); `rejectRemovedEnv()` fails fast on boot. Skaha session `ram` whole GiB integer per ADR-0003; workload image `images.canfar.net/skaha/stress-ng:latest` from `docker/stress-ng/Dockerfile` (README: plain local `docker build` / `docker push` only); integration ADR-0004.
+- Local verification: `uv run ruff check src tests && uv run pytest` (the chart tests need `helm` on `PATH`).
+- A probe is a `@perfpulse` function; the chart runs `perfpulse <module>:<function>` once per CronJob tick. Metric names are `<function>_<key>`; every series carries `job="<installation>/perfpulse"`; built-ins are `perfpulse_probe_success` and `perfpulse_probe_duration_seconds`.
+- The OTLP resource is exactly `service.namespace`, `service.name`, `service.instance.id` (built with `Resource(...)`, not `Resource.create`), so Prometheus writes no `target_info`. `MeterProvider.force_flush` returns True on a failed push, so `_push` calls the exporter directly.
+- The OTel SDK's after-fork hook for a live `MeterProvider` deadlocks a forked child. The runner forks before OTel is loaded; tests run `gc.collect()` before each test for the same reason.
+- OTLP export goes to Prometheus's native receiver at `http://prometheus-operated.monitoring.svc:9090/api/v1/otlp` (`:4318` is closed); queries go through Mimir at `mimir-distributed-gateway.monitoring.svc/prometheus`.
+- `canfar-workloads` has node selector `skaha.opencadc.org/node-pool=cadc`; Kueue there has `manageJobsWithoutQueueName: false`, so workload probes carry the LocalQueue label (`cadc-default`, `src-default`). Sessions mount the /arc claim with `subPath: cavern`.
+- Skaha bearer tokens do not expire. Intermittent session-create HTTP 404 with a GMS `resource-caps` registry lookup failure is platform-side; the response body only exists client-side, so `spawn_session` puts it in the failure detail it logs.
+- Skaha allows each user 3 sessions, headless included; `spawn_session` sweeps its own leftover by name before creating one.

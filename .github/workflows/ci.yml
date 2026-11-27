@@ -16,98 +16,77 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@v2
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
         with:
           egress-policy: audit
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.2.12
-      - name: Setup k6
-        uses: grafana/setup-k6-action@v1
-      - name: Install dependencies
-        run: bun ci
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+      - name: Install
+        run: uv sync --frozen
       - name: Lint
-        run: bun run lint
-      - name: Typecheck
-        run: bun run typecheck
-      - name: Unit tests
-        run: bun test
-      - name: Build k6 bundle
-        run: bun run build
-      - name: k6 dry run
-        run: bun run k6:dry-run
+        run: |
+          uv run ruff check src tests
+          uv run ruff format --check src tests
+          helm lint chart --set installation=ci
+      - name: Test
+        run: uv run pytest
+
+  # A real Prometheus receives one push, proving the stored names and labels and that no
+  # target_info is written. This is the contract the CANFAR dashboards read.
+  prometheus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+      - name: Start Prometheus with the OTLP receiver
+        run: |
+          docker run -d --name prometheus -p 9090:9090 prom/prometheus:v3.16.0 \
+            --config.file=/etc/prometheus/prometheus.yml --web.enable-otlp-receiver
+          for _ in $(seq 30); do curl -sf localhost:9090/-/ready && break; sleep 1; done
+      - name: Push one run
+        env:
+          PERFPULSE_INSTALLATION: ci
+          PERFPULSE_PROBE: cpu
+          CPU_BENCHMARK_BYTES: "16777216"
+          OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:9090/api/v1/otlp
+        run: uv run --frozen perfpulse perfpulse.probes.node:cpu_benchmark
+      - name: Query what Prometheus stored
+        run: |
+          set -euo pipefail
+          count() {
+            curl -sfG localhost:9090/api/v1/query --data-urlencode "query=$1" | jq '.data.result | length'
+          }
+          test "$(count 'cpu_benchmark_sha256_bytes_per_second{job="ci/perfpulse",instance="cpu"}')" = 1
+          test "$(count 'perfpulse_probe_success{job="ci/perfpulse",instance="cpu"} == 1')" = 1
+          test "$(count 'perfpulse_probe_duration_seconds{job="ci/perfpulse"}')" = 1
+          test "$(count 'target_info{job="ci/perfpulse"}')" = 0
 
   container-build:
     runs-on: ubuntu-latest
     needs: check
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@v2
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
         with:
           egress-policy: audit
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.2.12
-      - name: Install dependencies
-        run: bun ci
-      - name: Build k6 bundle
-        run: bun run build
-      - name: Setup Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build image
-        if: github.event_name == 'pull_request'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          cache-from: type=gha,scope=perfpulse-image
-      - name: Build image with cache update
-        if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          cache-from: type=gha,scope=perfpulse-image
-          cache-to: type=gha,mode=max,scope=perfpulse-image
-
-  helm-validation:
-    runs-on: ubuntu-latest
-    needs: check
-    timeout-minutes: 10
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@v2
-        with:
-          egress-policy: audit
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Helm
-        uses: azure/setup-helm@v4
-      - name: Helm lint cron
-        run: helm lint charts/cron
-      - name: Helm lint campaign
-        run: >-
-          helm lint charts/campaign
-          --set campaign.totalJobs=12
-          --set campaign.logicalUsers=3
-          --set campaign.testid=ci-campaign-smoke
-      - name: Helm template cron
-        run: helm template perfpulse-cron charts/cron
-      - name: Helm template campaign
-        run: >-
-          helm template perfpulse-campaign charts/campaign
-          --set campaign.totalJobs=12
-          --set campaign.logicalUsers=3
-          --set campaign.testid=ci-campaign-smoke
+        run: docker build -t perfpulse:ci .
+      - name: Dry-run a probe in the image
+        run: docker run --rm -e CPU_BENCHMARK_BYTES=1048576 perfpulse:ci perfpulse.probes.node:cpu_benchmark --dry-run

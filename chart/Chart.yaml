@@ -1,0 +1,9 @@
+apiVersion: v2
+name: perfpulse
+description: Synthetic probes for the CANFAR Science Platform, one CronJob per probe, pushed to Prometheus over OTLP.
+type: application
+version: 0.1.24
+appVersion: "0.1.24"
+home: https://github.com/opencadc/perfpulse
+sources:
+  - https://github.com/opencadc/perfpulse

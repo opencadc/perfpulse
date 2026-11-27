@@ -1,0 +1,54 @@
+[project]
+name = "perfpulse"
+version = "0.1.24"
+description = "Run decorated probe functions once and push their numbers to Prometheus over OTLP"
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+authors = [{ name = "Shiny Brar", email = "shiny.brar@nrc-cnrc.gc.ca" }]
+requires-python = ">=3.13"
+dependencies = [
+    "opentelemetry-exporter-otlp-proto-http>=1.41.0",
+    "opentelemetry-sdk>=1.41.0",
+]
+
+[project.scripts]
+perfpulse = "perfpulse:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/perfpulse"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-timeout>=2.4",
+    "pyyaml>=6.0.2",
+    "ruff>=0.14.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 60
+markers = ["integration: needs a real Prometheus (PERFPULSE_IT_PROMETHEUS)"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+extend-select = [
+    "D", # pydocstyle, Google convention
+]
+ignore = [
+    "D203", # one-blank-line (conflicts with D211)
+    "D213", # multi-line second line (conflicts with D212)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "BLE001", "S110", "PIE807"]  # tests build misbehaving probes on purpose
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

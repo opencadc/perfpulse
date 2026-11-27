@@ -41,20 +41,15 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.sha || github.ref }}
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.2.12
-      - name: Install dependencies
-        run: bun ci
-      - name: Lint
-        run: bun run lint
-      - name: Typecheck
-        run: bun run typecheck
-      - name: Unit tests
-        run: bun test
-      - name: Build k6 bundle
-        run: bun run build
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+      - name: Test
+        run: |
+          uv sync --frozen
+          uv run ruff check src tests
+          uv run pytest
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4.0.0
       - name: Setup Docker Buildx
@@ -84,7 +79,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=perfpulse
             org.opencontainers.image.version=${{ env.IMAGE_TAG }}
-            org.opencontainers.image.description=PerfPulse k6 workload runner
+            org.opencontainers.image.description=perfpulse probe runner
             org.opencontainers.image.licenses=AGPL-3.0
             org.opencontainers.image.source=https://github.com/opencadc/perfpulse
             org.opencontainers.image.url=https://github.com/opencadc/perfpulse
@@ -105,3 +100,18 @@ jobs:
       - name: Cosign Container Image
         run: |
           cosign sign --yes "${{ env.REGISTRY }}/${{ env.IMAGE }}@${{ steps.build.outputs.digest }}" --upload
+      - name: Push Helm chart to Harbor chart repository (non-OCI; Helm Charts tab)
+        env:
+          HELM_REPO_BASE_URL: ${{ vars.HARBOR_HELM_BASE_URL }}
+          HELM_REPO_PROJECT: ${{ vars.HARBOR_HELM_REPO_PROJECT }}
+          HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+          HARBOR_SECRET: ${{ secrets.HARBOR_SECRET }}
+        run: |
+          set -euo pipefail
+          helm lint chart --set installation=release
+          helm package chart --destination "${RUNNER_TEMP}/chart"
+          BASE="${HELM_REPO_BASE_URL:-https://${{ env.REGISTRY }}}"
+          PROJECT="${HELM_REPO_PROJECT:-platform}"
+          curl --fail-with-body -sS -u "${HARBOR_USERNAME}:${HARBOR_SECRET}" \
+            -X POST "${BASE}/chartrepo/${PROJECT}/charts" \
+            -F "chart=@$(ls "${RUNNER_TEMP}"/chart/perfpulse-*.tgz)"

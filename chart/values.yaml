@@ -1,0 +1,78 @@
+# perfpulse: one release per CANFAR installation, installed in that installation's system
+# namespace. Each entry under `probes` becomes one CronJob that runs one probe once per tick.
+
+# -- Required. Installation id: the Skaha release name, e.g. canfar-skaha-prod. Becomes
+# service.namespace, so every series lands in job="<installation>/perfpulse".
+installation: ""
+
+image:
+  repository: images.opencadc.org/platform/perfpulse
+  tag: "0.1.24" # x-release-please-version
+  pullPolicy: IfNotPresent
+
+otlp:
+  # -- Prometheus native OTLP receiver base; the exporter appends /v1/metrics.
+  endpoint: http://prometheus-operated.monitoring.svc:9090/api/v1/otlp
+  # -- Seconds the exporter retries a push. Counted into terminationGracePeriodSeconds.
+  timeoutSeconds: 10
+
+# -- Secret in the release namespace whose keys become environment variables of every probe
+# that is not a workload probe (holds CANFAR_TOKEN). Empty: none.
+authSecret: ""
+
+# -- Environment for every probe. Environment variables are a probe's only input.
+env: {}
+
+# -- Container resources of probes that are not workload probes.
+resources:
+  requests: {cpu: 50m, memory: 128Mi}
+  limits: {memory: 512Mi}
+
+# Where `workload: true` probes run: the installation's session namespace, admitted by Kueue
+# like a user's job, on the session node pool, with /arc mounted the way sessions mount it.
+workload:
+  # -- Session namespace, e.g. canfar-workloads. Required when any probe sets workload.
+  namespace: ""
+  # -- Kueue LocalQueue, e.g. cadc-default or src-default. Required with namespace: Kueue
+  # does not manage Jobs without the label there (manageJobsWithoutQueueName is false).
+  queue: ""
+  # -- PersistentVolumeClaim of /arc in that namespace (Skaha's sessions.userStorage claim).
+  arcClaim: ""
+  # -- subPath of the claim mounted at /arc, as sessions mount it.
+  arcSubPath: cavern
+  # -- Session node pool, e.g. {skaha.opencadc.org/node-pool: cadc}.
+  nodeSelector: {}
+  # -- Non-root uid that may write the probe directory on /arc.
+  runAsUser: 65532
+  # -- Workload probe resources: real requests, so Kueue quota accounts for them.
+  resources:
+    requests: {cpu: "1", memory: 2Gi}
+    limits: {memory: 2Gi}
+
+# -- Probes, keyed by a DNS-safe name: the CronJob suffix, the session or directory name and
+# the `instance` label. Remove an inherited probe with `<key>: null`.
+#   function  (required) "<module>:<function>" of a @perfpulse function
+#   schedule  (required) cron; one run at a time (concurrencyPolicy: Forbid)
+#   timeout   seconds before the probe is stopped and reported failed (default 300)
+#   env       merged over the release-wide env
+#   workload  run in workload.namespace (Kueue, node pool, /arc, no authSecret)
+#   nodes     run this many pods at once, one per node, each labelled node=<node name>
+#   image     {repository, tag} override, for probes built FROM perfpulse elsewhere
+#   resources override
+probes: {}
+# Example:
+#   spawn-notebook:
+#     function: perfpulse.probes.skaha:spawn_session
+#     schedule: "*/10 * * * *"
+#     timeout: 900
+#     env: {SESSION_TYPE: notebook, SESSION_IMAGE: images.canfar.net/skaha/jupyter:<tag>}
+#   arc-copy:
+#     function: perfpulse.probes.storage:arc_scratch_copy
+#     schedule: "17 * * * *"
+#     workload: true
+#     env: {ARC_DIR: /arc/projects/perfpulse}
+#   disk-bench:
+#     function: perfpulse.probes.node:disk_benchmark
+#     schedule: "0 3 * * *"
+#     workload: true
+#     nodes: 12

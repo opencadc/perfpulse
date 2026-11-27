@@ -3,7 +3,7 @@
   "packages": {
     ".": {
       "package-name": "perfpulse",
-      "release-type": "node",
+      "release-type": "python",
       "changelog-path": "CHANGELOG.md",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
@@ -14,32 +14,23 @@
       "initial-version": "0.1.0",
       "extra-files": [
         {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='perfpulse')].version"
+        },
+        {
           "type": "yaml",
-          "path": "charts/cron/Chart.yaml",
+          "path": "chart/Chart.yaml",
           "jsonpath": "$.version"
         },
         {
           "type": "yaml",
-          "path": "charts/cron/Chart.yaml",
+          "path": "chart/Chart.yaml",
           "jsonpath": "$.appVersion"
         },
         {
           "type": "generic",
-          "path": "charts/cron/values.yaml"
-        },
-        {
-          "type": "yaml",
-          "path": "charts/campaign/Chart.yaml",
-          "jsonpath": "$.version"
-        },
-        {
-          "type": "yaml",
-          "path": "charts/campaign/Chart.yaml",
-          "jsonpath": "$.appVersion"
-        },
-        {
-          "type": "generic",
-          "path": "charts/campaign/values.yaml"
+          "path": "chart/values.yaml"
         }
       ]
     }
